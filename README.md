@@ -9,6 +9,7 @@
 - 選択ポジションのSL / TP一括設定・変更（Price / Points）
 - 選択ポジションのSL / TP削除
 - 取引セッション終了時刻を使ったAuto Close
+- 口座全体の含み損益に基づくEquity Guard（緊急全決済）
 - Stops Level、Freeze Level、Tick Sizeを考慮したSL / TP検証
 - Trade serverのretcode確認、部分失敗の表示、有限回リトライ
 - ページングによる全ポジションの確認
@@ -51,6 +52,12 @@ Auto CloseをONにし、Symbol、Direction、クローズ何分前かを指定�
 表示行数は1〜50、Auto CloseのMinutes Before Closeは0〜1,440へ安全側に正規化されます。
 
 起動時点ですでにAuto Close時刻を過ぎている場合の初期値は`Passed: Do Nothing`です。必要な場合だけ`Passed: Close Now`へ変更してください。実行済みの日は同一設定で再実行しません。
+
+## Equity Guard
+
+口座全体の含み損益合計を監視し、指定した閾値を超えたら口座内の全ポジションを自動決済します。Max LossとMax Profitは独立に設定でき、0または未入力の側は無効です。Amount（金額）とPercent（`ACCOUNT_BALANCE`基準の割合）を切り替えられます。
+
+一度発動すると、合計がセーフゾーン（両閾値の内側）に戻るか保有ポジションが0件になるまで再発動しません。Auto Closeと同様に確認ダイアログは表示されません。
 
 ## 安全上の注意
 
