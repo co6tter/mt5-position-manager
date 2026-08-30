@@ -54,12 +54,16 @@ public:
    PMTradeAttemptStatus CloseTicket(const ulong ticket,
                                     PMTradeFailure &failure)
      {
-      if(FindPending(PM_TRADE_OPERATION_CLOSE, ticket) >= 0)
+      CleanupClosedPending();
+      const int pending_close = FindPending(PM_TRADE_OPERATION_CLOSE, ticket);
+      if(pending_close >= 0 && !m_pending[pending_close].terminal_failure)
         {
          SetFailure(failure, ticket, 0,
                     "A close retry is already pending for this position.", 0);
          return PM_TRADE_ATTEMPT_QUEUED;
         }
+      if(pending_close >= 0)
+         ArrayRemove(m_pending, pending_close, 1);
       RemovePending(PM_TRADE_OPERATION_MODIFY, ticket);
       bool wait_only = false;
       const PMTradeAttemptStatus status = ExecuteCloseAttempt(ticket, 1,
@@ -68,10 +72,16 @@ public:
         {
          if(status == PM_TRADE_ATTEMPT_SUCCESS)
             RemovePending(PM_TRADE_OPERATION_CLOSE, ticket);
+         else
+            RememberCloseFailure(ticket, failure);
          return status;
         }
-      return QueueRetry(PM_TRADE_OPERATION_CLOSE, ticket, 0.0, 0.0,
-                        1, wait_only, failure);
+      const PMTradeAttemptStatus queued_status =
+         QueueRetry(PM_TRADE_OPERATION_CLOSE, ticket, 0.0, 0.0,
+                    1, wait_only, failure);
+      if(queued_status == PM_TRADE_ATTEMPT_FAILED)
+         RememberCloseFailure(ticket, failure);
+      return queued_status;
      }
 
    PMTradeAttemptStatus ModifyTicket(const ulong ticket,
@@ -112,6 +122,7 @@ public:
    int ProcessRetries(const datetime now, string &status_text)
      {
       status_text = "";
+      CleanupClosedPending();
       int processed = 0;
       int successful = 0;
       int failed = 0;
@@ -159,10 +170,22 @@ public:
                first_failed_ticket = pending.ticket;
                first_failure_description = failure.description;
               }
-            PrintFormat("[ERROR] Retry exhausted operation=%s ticket=%I64u retcode=%u description=%s",
-                        OperationName(pending.operation), pending.ticket,
-                        failure.retcode, failure.description);
-            ArrayRemove(m_pending, index, 1);
+            // A close failure is safety-critical: keep an unresolved close intent
+            // instead of dropping it when the bounded retry cycle is exhausted.
+            // It is retried on later timer cycles until the position disappears.
+            if(pending.operation == PM_TRADE_OPERATION_CLOSE)
+              {
+               PrintFormat("[WARN] Close retry deferred ticket=%I64u retcode=%u description=%s",
+                           pending.ticket, failure.retcode, failure.description);
+               RememberCloseFailureAt(index, failure);
+              }
+            else
+              {
+               PrintFormat("[ERROR] Retry exhausted operation=%s ticket=%I64u retcode=%u description=%s",
+                           OperationName(pending.operation), pending.ticket,
+                           failure.retcode, failure.description);
+               ArrayRemove(m_pending, index, 1);
+              }
             continue;
            }
 
@@ -187,13 +210,25 @@ public:
 
    int PendingCount()
      {
+      CleanupClosedPending();
       return ArraySize(m_pending);
      }
 
    bool HasPending(const ulong ticket)
      {
-      return FindPending(PM_TRADE_OPERATION_CLOSE, ticket) >= 0 ||
-             FindPending(PM_TRADE_OPERATION_MODIFY, ticket) >= 0;
+      for(int i = 0; i < ArraySize(m_pending); i++)
+         if(m_pending[i].ticket == ticket)
+            return true;
+      return false;
+     }
+
+   bool HasFailedClose()
+     {
+      for(int i = 0; i < ArraySize(m_pending); i++)
+         if(m_pending[i].operation == PM_TRADE_OPERATION_CLOSE &&
+            m_pending[i].terminal_failure)
+            return true;
+      return false;
      }
 
 private:
@@ -368,6 +403,7 @@ private:
       pending.attempts = attempts;
       pending.next_attempt_at = CurrentTime() + m_retry_interval_seconds;
       pending.wait_only = wait_only;
+      pending.terminal_failure = false;
       pending.last_retcode = failure.retcode;
       pending.last_description = failure.description;
 
@@ -384,6 +420,46 @@ private:
                   OperationName(operation), ticket, attempts + 1,
                   m_retry_count, failure.retcode);
       return PM_TRADE_ATTEMPT_QUEUED;
+     }
+
+   void RememberCloseFailure(const ulong ticket, PMTradeFailure &failure)
+     {
+      const int existing = FindPending(PM_TRADE_OPERATION_CLOSE, ticket);
+      if(existing >= 0)
+        {
+         RememberCloseFailureAt(existing, failure);
+         return;
+        }
+
+      PMPendingTrade blocked = {};
+      blocked.operation = PM_TRADE_OPERATION_CLOSE;
+      blocked.ticket = ticket;
+      blocked.attempts = failure.attempts;
+      blocked.next_attempt_at = CurrentTime() + m_retry_interval_seconds;
+      blocked.wait_only = false;
+      blocked.terminal_failure = true;
+      blocked.last_retcode = failure.retcode;
+      blocked.last_description = failure.description;
+      const int count = ArraySize(m_pending);
+      ArrayResize(m_pending, count + 1);
+      m_pending[count] = blocked;
+     }
+
+   void RememberCloseFailureAt(const int index, PMTradeFailure &failure)
+     {
+      m_pending[index].attempts = failure.attempts;
+      m_pending[index].next_attempt_at = CurrentTime() + m_retry_interval_seconds;
+      m_pending[index].wait_only = false;
+      m_pending[index].terminal_failure = true;
+      m_pending[index].last_retcode = failure.retcode;
+      m_pending[index].last_description = failure.description;
+     }
+
+   void CleanupClosedPending()
+     {
+      for(int i = ArraySize(m_pending) - 1; i >= 0; i--)
+         if(!PositionSelectByTicket(m_pending[i].ticket))
+            ArrayRemove(m_pending, i, 1);
      }
 
    bool StopsMatch(const ulong ticket, const double sl, const double tp)

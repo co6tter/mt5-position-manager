@@ -69,6 +69,7 @@ struct PMPendingTrade
    int attempts;
    datetime next_attempt_at;
    bool wait_only;
+   bool terminal_failure;
    uint last_retcode;
    string last_description;
   };
