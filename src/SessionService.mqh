@@ -85,8 +85,8 @@ private:
          long to_seconds = SessionSeconds(to);
          if(to_seconds == 0 && from_seconds > 0)
             to_seconds = 86400;
-         const datetime open_time = midnight + from_seconds;
-         datetime close_time = midnight + to_seconds;
+         const datetime open_time = (datetime)(midnight + from_seconds);
+         datetime close_time = (datetime)(midnight + to_seconds);
          if(to_seconds <= from_seconds)
             close_time += 86400;
          const int count = ArraySize(closes);

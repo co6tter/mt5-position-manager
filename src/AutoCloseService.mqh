@@ -105,7 +105,7 @@ public:
                      config.symbol, PMDirectionToString(config.direction));
          return true;
         }
-      PMBatchResult result = {};
+      PMBatchResult result;
       trades.CloseTickets(tickets, result);
       status = StringFormat("Auto Close: %d closed, %d queued, %d failed / %d",
                             result.successful, result.queued,

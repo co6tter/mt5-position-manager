@@ -1,7 +1,6 @@
 #ifndef __MT5_POSITION_MANAGER_UI_PANEL_MQH__
 #define __MT5_POSITION_MANAGER_UI_PANEL_MQH__
 
-#include <WinUser32.mqh>
 #include "Models.mqh"
 #include "Constants.mqh"
 #include "PositionService.mqh"
@@ -434,7 +433,7 @@ private:
          SetStatus("Close cancelled.");
          return;
         }
-      PMBatchResult result = {};
+      PMBatchResult result;
       trades.CloseTickets(tickets, result);
       SetStatus(BatchResultText("Close", result));
      }
@@ -455,7 +454,7 @@ private:
          SetStatus("Close cancelled.");
          return;
         }
-      PMBatchResult result = {};
+      PMBatchResult result;
       trades.CloseTickets(m_selected, result);
       SetStatus(BatchResultText("Close", result));
      }
@@ -514,7 +513,7 @@ private:
       const string value_text = ObjectGetString(0, Name(is_sl ? "SL_VALUE" : "TP_VALUE"), OBJPROP_TEXT);
       const double value = StringToDouble(value_text);
       const PMPriceMode mode = is_sl ? m_sl_mode : m_tp_mode;
-      PMBatchResult result = {};
+      PMBatchResult result;
       string validation_error = "";
       if(!actions.ApplyStopTarget(m_selected, is_sl, mode, value,
                                   positions, trades, validator,
@@ -536,7 +535,7 @@ private:
          SetStatus("No positions selected.");
          return;
         }
-      PMBatchResult result = {};
+      PMBatchResult result;
       actions.ClearStopTarget(m_selected, is_sl, positions, trades, result);
       SetStatus(BatchResultText(is_sl ? "SL clear" : "TP clear", result));
      }

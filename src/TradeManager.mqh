@@ -197,7 +197,7 @@ private:
                                             PMTradeFailure &failure)
      {
       wait_only = false;
-      failure = {};
+      PMResetTradeFailure(failure);
       if(!PositionSelectByTicket(ticket))
          return PM_TRADE_ATTEMPT_SUCCESS;
 
@@ -259,7 +259,7 @@ private:
                                              PMTradeFailure &failure)
      {
       wait_only = false;
-      failure = {};
+      PMResetTradeFailure(failure);
       if(!PositionSelectByTicket(ticket))
         {
          SetFailure(failure, ticket, 0, "Position no longer exists.", attempt);

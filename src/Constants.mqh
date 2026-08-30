@@ -77,6 +77,14 @@ void PMResetBatchResult(PMBatchResult &result, const int requested = 0)
    ArrayResize(result.failures, 0);
   }
 
+void PMResetTradeFailure(PMTradeFailure &failure)
+  {
+   failure.ticket = 0;
+   failure.retcode = 0;
+   failure.description = "";
+   failure.attempts = 0;
+  }
+
 void PMAddFailure(PMBatchResult &result,
                   const ulong ticket,
                   const uint retcode,

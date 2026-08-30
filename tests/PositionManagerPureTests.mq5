@@ -33,7 +33,7 @@ void TestDirectionMatching()
 
 void TestBatchResultHelpers()
   {
-   PMBatchResult result = {};
+   PMBatchResult result;
    PMResetBatchResult(result, 3);
    PMAddFailure(result, 12345, 10016, "Invalid stops", 1);
    AssertTrue(result.requested == 3 && result.successful == 0 &&
