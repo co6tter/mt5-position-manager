@@ -24,10 +24,15 @@ private:
    bool m_auto_enabled;
    bool m_equity_guard_enabled;
    PMEquityThresholdMode m_equity_guard_mode;
+   double m_equity_guard_loss_threshold;
+   double m_equity_guard_profit_threshold;
    string m_trailing_symbol;
    PMDirection m_trailing_direction;
    bool m_break_even_enabled;
    bool m_trailing_enabled;
+   int m_be_trigger_points;
+   int m_be_lock_points;
+   int m_trail_points;
    int m_max_rows;
    string m_status;
    datetime m_session_close;
@@ -51,10 +56,15 @@ public:
       m_auto_enabled = false;
       m_equity_guard_enabled = false;
       m_equity_guard_mode = PM_EQUITY_THRESHOLD_AMOUNT;
+      m_equity_guard_loss_threshold = 0.0;
+      m_equity_guard_profit_threshold = 0.0;
       m_trailing_symbol = "";
       m_trailing_direction = PM_DIRECTION_BOTH;
       m_break_even_enabled = false;
       m_trailing_enabled = false;
+      m_be_trigger_points = 0;
+      m_be_lock_points = 0;
+      m_trail_points = 0;
       m_max_rows = PM_DEFAULT_MAX_ROWS;
       m_status = "Ready";
       m_session_close = 0;
@@ -90,55 +100,55 @@ public:
       created = CreateButton("CLEAR_SELECTION", "Clear Selection", 516, 64, 125, 22) && created;
       created = CreateButton("CLOSE_SELECTED", "Close Selected", 647, 64, 120, 22, clrMaroon) && created;
 
-      created = CreateLabel("SL_LABEL", "Stop Loss", 12, section_y + 3, clrSilver, 9) && created;
-      created = CreateButton("SL_MODE", "Price", 95, section_y, 85, 22) && created;
-      created = CreateEdit("SL_VALUE", "", 185, section_y, 110, 22) && created;
-      created = CreateButton("SET_SL", "Set / Change SL", 300, section_y, 135, 22) && created;
-      created = CreateButton("CLEAR_SL", "Clear SL", 440, section_y, 90, 22) && created;
+      created = CreateLabel("SL_LABEL", "Stop Loss", 12, section_y + PM_PANEL_SL_LABEL_Y, clrSilver, 9) && created;
+      created = CreateButton("SL_MODE", "Price", 95, section_y + PM_PANEL_SL_Y, 85, 22) && created;
+      created = CreateEdit("SL_VALUE", "", 185, section_y + PM_PANEL_SL_Y, 110, 22) && created;
+      created = CreateButton("SET_SL", "Set / Change SL", 300, section_y + PM_PANEL_SL_Y, 135, 22) && created;
+      created = CreateButton("CLEAR_SL", "Clear SL", 440, section_y + PM_PANEL_SL_Y, 90, 22) && created;
 
-      created = CreateLabel("TP_LABEL", "Take Profit", 12, section_y + 36, clrSilver, 9) && created;
-      created = CreateButton("TP_MODE", "Price", 95, section_y + 33, 85, 22) && created;
-      created = CreateEdit("TP_VALUE", "", 185, section_y + 33, 110, 22) && created;
-      created = CreateButton("SET_TP", "Set / Change TP", 300, section_y + 33, 135, 22) && created;
-      created = CreateButton("CLEAR_TP", "Clear TP", 440, section_y + 33, 90, 22) && created;
+      created = CreateLabel("TP_LABEL", "Take Profit", 12, section_y + PM_PANEL_TP_LABEL_Y, clrSilver, 9) && created;
+      created = CreateButton("TP_MODE", "Price", 95, section_y + PM_PANEL_TP_Y, 85, 22) && created;
+      created = CreateEdit("TP_VALUE", "", 185, section_y + PM_PANEL_TP_Y, 110, 22) && created;
+      created = CreateButton("SET_TP", "Set / Change TP", 300, section_y + PM_PANEL_TP_Y, 135, 22) && created;
+      created = CreateButton("CLEAR_TP", "Clear TP", 440, section_y + PM_PANEL_TP_Y, 90, 22) && created;
 
-      created = CreateLabel("AUTO_LABEL", "Auto Close", 12, section_y + 70, clrSilver, 9) && created;
-      created = CreateButton("AUTO_ENABLED", "OFF", 95, section_y + 67, 65, 22) && created;
-      created = CreateLabel("AUTO_SYMBOL_LABEL", "Symbol", 170, section_y + 70, clrSilver, 9) && created;
-      created = CreateButton("AUTO_SYMBOL", "Symbol", 220, section_y + 67, 105, 22) && created;
-      created = CreateButton("AUTO_DIRECTION", "Both", 330, section_y + 67, 85, 22) && created;
-      created = CreateLabel("MINUTES_LABEL", "Minutes before", 425, section_y + 70, clrSilver, 9) && created;
-      created = CreateEdit("AUTO_MINUTES", "10", 525, section_y + 67, 55, 22) && created;
-      created = CreateButton("PASSED_BEHAVIOR", "Passed: Do Nothing", 590, section_y + 67, 155, 22) && created;
+      created = CreateLabel("AUTO_LABEL", "Auto Close", 12, section_y + PM_PANEL_AUTO_LABEL_Y, clrSilver, 9) && created;
+      created = CreateButton("AUTO_ENABLED", "OFF", 95, section_y + PM_PANEL_AUTO_Y, 65, 22) && created;
+      created = CreateLabel("AUTO_SYMBOL_LABEL", "Symbol", 170, section_y + PM_PANEL_AUTO_LABEL_Y, clrSilver, 9) && created;
+      created = CreateButton("AUTO_SYMBOL", "Symbol", 220, section_y + PM_PANEL_AUTO_Y, 105, 22) && created;
+      created = CreateButton("AUTO_DIRECTION", "Both", 330, section_y + PM_PANEL_AUTO_Y, 85, 22) && created;
+      created = CreateLabel("MINUTES_LABEL", "Mins before close", 425, section_y + PM_PANEL_AUTO_LABEL_Y, clrSilver, 9) && created;
+      created = CreateEdit("AUTO_MINUTES", "10", 525, section_y + PM_PANEL_AUTO_Y, 55, 22) && created;
+      created = CreateButton("PASSED_BEHAVIOR", "Passed: Do Nothing", 590, section_y + PM_PANEL_AUTO_Y, 155, 22) && created;
 
-      created = CreateLabel("EQ_LABEL", "Equity Guard", 12, section_y + 103, clrSilver, 9) && created;
-      created = CreateButton("EQ_ENABLED", "OFF", 95, section_y + 100, 65, 22) && created;
-      created = CreateButton("EQ_MODE", "Amount", 170, section_y + 100, 85, 22) && created;
-      created = CreateLabel("EQ_LOSS_LABEL", "Max Loss", 265, section_y + 103, clrSilver, 9) && created;
-      created = CreateEdit("EQ_LOSS_VALUE", "", 330, section_y + 100, 100, 22) && created;
-      created = CreateLabel("EQ_PROFIT_LABEL", "Max Profit", 440, section_y + 103, clrSilver, 9) && created;
-      created = CreateEdit("EQ_PROFIT_VALUE", "", 515, section_y + 100, 100, 22) && created;
-      created = CreateLabel("EQ_SCOPE_LABEL", "All symbols", 625, section_y + 103, clrOrange, 9) && created;
+      created = CreateLabel("EQ_LABEL", "Equity Guard", 12, section_y + PM_PANEL_EQUITY_LABEL_Y, clrSilver, 9) && created;
+      created = CreateButton("EQ_ENABLED", "OFF", 95, section_y + PM_PANEL_EQUITY_Y, 65, 22) && created;
+      created = CreateButton("EQ_MODE", "Amount", 170, section_y + PM_PANEL_EQUITY_Y, 85, 22) && created;
+      created = CreateLabel("EQ_LOSS_LABEL", "Loss limit", 265, section_y + PM_PANEL_EQUITY_LABEL_Y, clrSilver, 9) && created;
+      created = CreateEdit("EQ_LOSS_VALUE", "", 330, section_y + PM_PANEL_EQUITY_Y, 100, 22) && created;
+      created = CreateLabel("EQ_PROFIT_LABEL", "Profit limit", 440, section_y + PM_PANEL_EQUITY_LABEL_Y, clrSilver, 9) && created;
+      created = CreateEdit("EQ_PROFIT_VALUE", "", 515, section_y + PM_PANEL_EQUITY_Y, 100, 22) && created;
+      created = CreateLabel("EQ_SCOPE_LABEL", "All symbols", 625, section_y + PM_PANEL_EQUITY_LABEL_Y, clrOrange, 9) && created;
 
-      created = CreateLabel("TS_LABEL", "Trailing Stop", 12, section_y + 137, clrSilver, 9) && created;
-      created = CreateLabel("TS_SYMBOL_LABEL", "Symbol", 95, section_y + 137, clrSilver, 9) && created;
-      created = CreateButton("TS_SYMBOL", "Symbol", 145, section_y + 134, 105, 22) && created;
-      created = CreateButton("TS_DIRECTION", "Both", 255, section_y + 134, 85, 22) && created;
+      created = CreateLabel("TS_LABEL", "Trailing Stop", 12, section_y + PM_PANEL_TRAILING_SCOPE_LABEL_Y, clrSilver, 9) && created;
+      created = CreateLabel("TS_SYMBOL_LABEL", "Symbol", 95, section_y + PM_PANEL_TRAILING_SCOPE_LABEL_Y, clrSilver, 9) && created;
+      created = CreateButton("TS_SYMBOL", "Symbol", 145, section_y + PM_PANEL_TRAILING_SCOPE_Y, 105, 22) && created;
+      created = CreateButton("TS_DIRECTION", "Both", 255, section_y + PM_PANEL_TRAILING_SCOPE_Y, 85, 22) && created;
 
-      created = CreateLabel("BE_LABEL", "Break Even", 12, section_y + 171, clrSilver, 9) && created;
-      created = CreateButton("BE_ENABLED", "OFF", 95, section_y + 168, 65, 22) && created;
-      created = CreateLabel("BE_TRIGGER_LABEL", "Trigger(pt)", 170, section_y + 171, clrSilver, 9) && created;
-      created = CreateEdit("BE_TRIGGER_VALUE", "", 255, section_y + 168, 70, 22) && created;
-      created = CreateLabel("BE_LOCK_LABEL", "Lock(pt)", 335, section_y + 171, clrSilver, 9) && created;
-      created = CreateEdit("BE_LOCK_VALUE", "", 400, section_y + 168, 70, 22) && created;
+      created = CreateLabel("BE_LABEL", "Break Even", 12, section_y + PM_PANEL_BREAK_EVEN_LABEL_Y, clrSilver, 9) && created;
+      created = CreateButton("BE_ENABLED", "OFF", 95, section_y + PM_PANEL_BREAK_EVEN_Y, 65, 22) && created;
+      created = CreateLabel("BE_TRIGGER_LABEL", "Trigger pts", 170, section_y + PM_PANEL_BREAK_EVEN_LABEL_Y, clrSilver, 9) && created;
+      created = CreateEdit("BE_TRIGGER_VALUE", "", 255, section_y + PM_PANEL_BREAK_EVEN_Y, 70, 22) && created;
+      created = CreateLabel("BE_LOCK_LABEL", "Lock pts", 335, section_y + PM_PANEL_BREAK_EVEN_LABEL_Y, clrSilver, 9) && created;
+      created = CreateEdit("BE_LOCK_VALUE", "", 400, section_y + PM_PANEL_BREAK_EVEN_Y, 70, 22) && created;
 
-      created = CreateLabel("TRAIL_LABEL", "Trailing", 12, section_y + 205, clrSilver, 9) && created;
-      created = CreateButton("TRAIL_ENABLED", "OFF", 95, section_y + 202, 65, 22) && created;
-      created = CreateLabel("TRAIL_DIST_LABEL", "Distance(pt)", 170, section_y + 205, clrSilver, 9) && created;
-      created = CreateEdit("TRAIL_DIST_VALUE", "", 255, section_y + 202, 70, 22) && created;
+      created = CreateLabel("TRAIL_LABEL", "Trailing", 12, section_y + PM_PANEL_TRAIL_LABEL_Y, clrSilver, 9) && created;
+      created = CreateButton("TRAIL_ENABLED", "OFF", 95, section_y + PM_PANEL_TRAIL_Y, 65, 22) && created;
+      created = CreateLabel("TRAIL_DIST_LABEL", "Distance pts", 170, section_y + PM_PANEL_TRAIL_LABEL_Y, clrSilver, 9) && created;
+      created = CreateEdit("TRAIL_DIST_VALUE", "", 255, section_y + PM_PANEL_TRAIL_Y, 70, 22) && created;
 
-      created = CreateLabel("SESSION_LABEL", "Today's Close: -    Auto Close At: -", 12, section_y + 236, clrSilver, 9) && created;
-      created = CreateLabel("STATUS_LABEL", "Status: Ready", 12, section_y + 262, clrWhite, 9) && created;
+      created = CreateLabel("SESSION_LABEL", "Today's Close: -    Auto Close At: -", 12, section_y + PM_PANEL_SESSION_Y, clrSilver, 9) && created;
+      created = CreateLabel("STATUS_LABEL", "Status: Ready", 12, section_y + PM_PANEL_STATUS_Y, clrWhite, 9) && created;
       created = CreateHandle("RESIZE_HANDLE", m_panel_width - PM_RESIZE_HANDLE_SIZE,
                              PanelHeight() - PM_RESIZE_HANDLE_SIZE,
                              PM_RESIZE_HANDLE_SIZE, PM_RESIZE_HANDLE_SIZE, clrSilver) && created;
@@ -156,7 +166,10 @@ public:
    void Refresh(CPositionService &positions)
      {
       positions.Collect(m_positions);
-      positions.CollectSymbols(m_symbols);
+      ArrayResize(m_symbols, 0);
+      for(int i = 0; i < ArraySize(m_positions); i++)
+         AddUniqueSymbol(m_symbols, m_positions[i].symbol);
+      AddUniqueSymbol(m_symbols, _Symbol);
       if(m_filter_symbol == "")
          m_filter_symbol = _Symbol;
       if(m_auto_symbol == "")
@@ -263,8 +276,8 @@ public:
      {
       config.enabled = m_equity_guard_enabled;
       config.mode = m_equity_guard_mode;
-      config.loss_threshold = EquityGuardLossThreshold();
-      config.profit_threshold = EquityGuardProfitThreshold();
+      config.loss_threshold = m_equity_guard_loss_threshold;
+      config.profit_threshold = m_equity_guard_profit_threshold;
      }
 
    void GetTrailingStopConfig(TrailingStopConfig &config)
@@ -273,9 +286,9 @@ public:
       config.enabled_trailing = m_trailing_enabled;
       config.symbol = TrailingSymbol();
       config.direction = m_trailing_direction;
-      config.be_trigger_points = BreakEvenTriggerPoints();
-      config.be_lock_points = BreakEvenLockPoints();
-      config.trail_points = TrailingDistancePoints();
+      config.be_trigger_points = m_be_trigger_points;
+      config.be_lock_points = m_be_lock_points;
+      config.trail_points = m_trail_points;
      }
 
    bool HandleChartEvent(const long id,
@@ -303,13 +316,52 @@ public:
         }
       if(id != CHARTEVENT_OBJECT_CLICK && id != CHARTEVENT_OBJECT_ENDEDIT)
          return false;
-      if(id == CHARTEVENT_OBJECT_ENDEDIT && object_name == Name("AUTO_MINUTES"))
+      if(id == CHARTEVENT_OBJECT_ENDEDIT)
         {
-         const int minutes = AutoCloseMinutes();
-         ObjectSetString(0, Name("AUTO_MINUTES"), OBJPROP_TEXT,
-                         IntegerToString(minutes));
-         SetStatus(StringFormat("Auto Close minutes set to %d.", minutes));
-         return true;
+         if(object_name == Name("AUTO_MINUTES"))
+           {
+            const int minutes = AutoCloseMinutes();
+            ObjectSetString(0, Name("AUTO_MINUTES"), OBJPROP_TEXT,
+                            IntegerToString(minutes));
+            SetStatus(StringFormat("Auto Close minutes set to %d.", minutes));
+            return true;
+         }
+         if(object_name == Name("EQ_LOSS_VALUE"))
+           {
+            CommitDoubleValue("EQ_LOSS_VALUE", m_equity_guard_loss_threshold,
+                              PM_MAX_EQUITY_THRESHOLD, 2);
+            SetStatus(StringFormat("Equity Guard Max Loss set to %.2f.", m_equity_guard_loss_threshold));
+            return true;
+           }
+         if(object_name == Name("EQ_PROFIT_VALUE"))
+           {
+            CommitDoubleValue("EQ_PROFIT_VALUE", m_equity_guard_profit_threshold,
+                              PM_MAX_EQUITY_THRESHOLD, 2);
+            SetStatus(StringFormat("Equity Guard Max Profit set to %.2f.", m_equity_guard_profit_threshold));
+            return true;
+           }
+         if(object_name == Name("BE_TRIGGER_VALUE"))
+           {
+            CommitIntegerValue("BE_TRIGGER_VALUE", m_be_trigger_points,
+                               PM_MAX_TRAILING_POINTS);
+            SetStatus(StringFormat("Break Even Trigger set to %d.", m_be_trigger_points));
+            return true;
+           }
+         if(object_name == Name("BE_LOCK_VALUE"))
+           {
+            CommitIntegerValue("BE_LOCK_VALUE", m_be_lock_points,
+                               PM_MAX_TRAILING_POINTS);
+            SetStatus(StringFormat("Break Even Lock set to %d.", m_be_lock_points));
+            return true;
+           }
+         if(object_name == Name("TRAIL_DIST_VALUE"))
+           {
+            CommitIntegerValue("TRAIL_DIST_VALUE", m_trail_points,
+                               PM_MAX_TRAILING_POINTS);
+            SetStatus(StringFormat("Trailing Distance set to %d.", m_trail_points));
+            return true;
+           }
+         return false;
         }
       if(id != CHARTEVENT_OBJECT_CLICK)
          return false;
@@ -433,34 +485,33 @@ private:
       return (int)minutes;
      }
 
-   double EquityGuardLossThreshold()
+   // Values are only adopted on CHARTEVENT_OBJECT_ENDEDIT. Reading edit boxes
+   // live on every timer tick would allow transient input to drive automation.
+   void CommitDoubleValue(const string suffix,
+                          double &target,
+                          const double maximum,
+                          const int digits)
      {
-      const double value = StringToDouble(ObjectGetString(0, Name("EQ_LOSS_VALUE"), OBJPROP_TEXT));
-      return value > 0.0 ? value : 0.0;
+      double value = StringToDouble(ObjectGetString(0, Name(suffix), OBJPROP_TEXT));
+      if(!MathIsValidNumber(value) || value < 0.0)
+         value = 0.0;
+      if(value > maximum)
+         value = maximum;
+      target = value;
+      ObjectSetString(0, Name(suffix), OBJPROP_TEXT, DoubleToString(value, digits));
      }
 
-   double EquityGuardProfitThreshold()
+   void CommitIntegerValue(const string suffix,
+                           int &target,
+                           const int maximum)
      {
-      const double value = StringToDouble(ObjectGetString(0, Name("EQ_PROFIT_VALUE"), OBJPROP_TEXT));
-      return value > 0.0 ? value : 0.0;
-     }
-
-   int BreakEvenTriggerPoints()
-     {
-      const long value = StringToInteger(ObjectGetString(0, Name("BE_TRIGGER_VALUE"), OBJPROP_TEXT));
-      return value > 0 ? (int)value : 0;
-     }
-
-   int BreakEvenLockPoints()
-     {
-      const long value = StringToInteger(ObjectGetString(0, Name("BE_LOCK_VALUE"), OBJPROP_TEXT));
-      return value > 0 ? (int)value : 0;
-     }
-
-   int TrailingDistancePoints()
-     {
-      const long value = StringToInteger(ObjectGetString(0, Name("TRAIL_DIST_VALUE"), OBJPROP_TEXT));
-      return value > 0 ? (int)value : 0;
+      long value = StringToInteger(ObjectGetString(0, Name(suffix), OBJPROP_TEXT));
+      if(value < 0)
+         value = 0;
+      if(value > maximum)
+         value = maximum;
+      target = (int)value;
+      ObjectSetString(0, Name(suffix), OBJPROP_TEXT, IntegerToString(target));
      }
 
    int FindSymbol(const string symbol)
@@ -501,7 +552,7 @@ private:
 
    int PanelHeight()
      {
-      return SectionY() + 301;
+      return SectionY() + PM_PANEL_CHROME_HEIGHT;
      }
 
    int PageCount()
@@ -764,48 +815,48 @@ private:
                        m_origin_x + m_panel_width - PM_RESIZE_HANDLE_SIZE);
       ObjectSetInteger(0, Name("RESIZE_HANDLE"), OBJPROP_YDISTANCE,
                        m_origin_y + panel_height - PM_RESIZE_HANDLE_SIZE);
-      RepositionY("SL_LABEL", section_y + 3);
-      RepositionY("SL_MODE", section_y);
-      RepositionY("SL_VALUE", section_y);
-      RepositionY("SET_SL", section_y);
-      RepositionY("CLEAR_SL", section_y);
-      RepositionY("TP_LABEL", section_y + 36);
-      RepositionY("TP_MODE", section_y + 33);
-      RepositionY("TP_VALUE", section_y + 33);
-      RepositionY("SET_TP", section_y + 33);
-      RepositionY("CLEAR_TP", section_y + 33);
-      RepositionY("AUTO_LABEL", section_y + 70);
-      RepositionY("AUTO_ENABLED", section_y + 67);
-      RepositionY("AUTO_SYMBOL_LABEL", section_y + 70);
-      RepositionY("AUTO_SYMBOL", section_y + 67);
-      RepositionY("AUTO_DIRECTION", section_y + 67);
-      RepositionY("MINUTES_LABEL", section_y + 70);
-      RepositionY("AUTO_MINUTES", section_y + 67);
-      RepositionY("PASSED_BEHAVIOR", section_y + 67);
-      RepositionY("EQ_LABEL", section_y + 103);
-      RepositionY("EQ_ENABLED", section_y + 100);
-      RepositionY("EQ_MODE", section_y + 100);
-      RepositionY("EQ_LOSS_LABEL", section_y + 103);
-      RepositionY("EQ_LOSS_VALUE", section_y + 100);
-      RepositionY("EQ_PROFIT_LABEL", section_y + 103);
-      RepositionY("EQ_PROFIT_VALUE", section_y + 100);
-      RepositionY("EQ_SCOPE_LABEL", section_y + 103);
-      RepositionY("TS_LABEL", section_y + 137);
-      RepositionY("TS_SYMBOL_LABEL", section_y + 137);
-      RepositionY("TS_SYMBOL", section_y + 134);
-      RepositionY("TS_DIRECTION", section_y + 134);
-      RepositionY("BE_LABEL", section_y + 171);
-      RepositionY("BE_ENABLED", section_y + 168);
-      RepositionY("BE_TRIGGER_LABEL", section_y + 171);
-      RepositionY("BE_TRIGGER_VALUE", section_y + 168);
-      RepositionY("BE_LOCK_LABEL", section_y + 171);
-      RepositionY("BE_LOCK_VALUE", section_y + 168);
-      RepositionY("TRAIL_LABEL", section_y + 205);
-      RepositionY("TRAIL_ENABLED", section_y + 202);
-      RepositionY("TRAIL_DIST_LABEL", section_y + 205);
-      RepositionY("TRAIL_DIST_VALUE", section_y + 202);
-      RepositionY("SESSION_LABEL", section_y + 236);
-      RepositionY("STATUS_LABEL", section_y + 262);
+      RepositionY("SL_LABEL", section_y + PM_PANEL_SL_LABEL_Y);
+      RepositionY("SL_MODE", section_y + PM_PANEL_SL_Y);
+      RepositionY("SL_VALUE", section_y + PM_PANEL_SL_Y);
+      RepositionY("SET_SL", section_y + PM_PANEL_SL_Y);
+      RepositionY("CLEAR_SL", section_y + PM_PANEL_SL_Y);
+      RepositionY("TP_LABEL", section_y + PM_PANEL_TP_LABEL_Y);
+      RepositionY("TP_MODE", section_y + PM_PANEL_TP_Y);
+      RepositionY("TP_VALUE", section_y + PM_PANEL_TP_Y);
+      RepositionY("SET_TP", section_y + PM_PANEL_TP_Y);
+      RepositionY("CLEAR_TP", section_y + PM_PANEL_TP_Y);
+      RepositionY("AUTO_LABEL", section_y + PM_PANEL_AUTO_LABEL_Y);
+      RepositionY("AUTO_ENABLED", section_y + PM_PANEL_AUTO_Y);
+      RepositionY("AUTO_SYMBOL_LABEL", section_y + PM_PANEL_AUTO_LABEL_Y);
+      RepositionY("AUTO_SYMBOL", section_y + PM_PANEL_AUTO_Y);
+      RepositionY("AUTO_DIRECTION", section_y + PM_PANEL_AUTO_Y);
+      RepositionY("MINUTES_LABEL", section_y + PM_PANEL_AUTO_LABEL_Y);
+      RepositionY("AUTO_MINUTES", section_y + PM_PANEL_AUTO_Y);
+      RepositionY("PASSED_BEHAVIOR", section_y + PM_PANEL_AUTO_Y);
+      RepositionY("EQ_LABEL", section_y + PM_PANEL_EQUITY_LABEL_Y);
+      RepositionY("EQ_ENABLED", section_y + PM_PANEL_EQUITY_Y);
+      RepositionY("EQ_MODE", section_y + PM_PANEL_EQUITY_Y);
+      RepositionY("EQ_LOSS_LABEL", section_y + PM_PANEL_EQUITY_LABEL_Y);
+      RepositionY("EQ_LOSS_VALUE", section_y + PM_PANEL_EQUITY_Y);
+      RepositionY("EQ_PROFIT_LABEL", section_y + PM_PANEL_EQUITY_LABEL_Y);
+      RepositionY("EQ_PROFIT_VALUE", section_y + PM_PANEL_EQUITY_Y);
+      RepositionY("EQ_SCOPE_LABEL", section_y + PM_PANEL_EQUITY_LABEL_Y);
+      RepositionY("TS_LABEL", section_y + PM_PANEL_TRAILING_SCOPE_LABEL_Y);
+      RepositionY("TS_SYMBOL_LABEL", section_y + PM_PANEL_TRAILING_SCOPE_LABEL_Y);
+      RepositionY("TS_SYMBOL", section_y + PM_PANEL_TRAILING_SCOPE_Y);
+      RepositionY("TS_DIRECTION", section_y + PM_PANEL_TRAILING_SCOPE_Y);
+      RepositionY("BE_LABEL", section_y + PM_PANEL_BREAK_EVEN_LABEL_Y);
+      RepositionY("BE_ENABLED", section_y + PM_PANEL_BREAK_EVEN_Y);
+      RepositionY("BE_TRIGGER_LABEL", section_y + PM_PANEL_BREAK_EVEN_LABEL_Y);
+      RepositionY("BE_TRIGGER_VALUE", section_y + PM_PANEL_BREAK_EVEN_Y);
+      RepositionY("BE_LOCK_LABEL", section_y + PM_PANEL_BREAK_EVEN_LABEL_Y);
+      RepositionY("BE_LOCK_VALUE", section_y + PM_PANEL_BREAK_EVEN_Y);
+      RepositionY("TRAIL_LABEL", section_y + PM_PANEL_TRAIL_LABEL_Y);
+      RepositionY("TRAIL_ENABLED", section_y + PM_PANEL_TRAIL_Y);
+      RepositionY("TRAIL_DIST_LABEL", section_y + PM_PANEL_TRAIL_LABEL_Y);
+      RepositionY("TRAIL_DIST_VALUE", section_y + PM_PANEL_TRAIL_Y);
+      RepositionY("SESSION_LABEL", section_y + PM_PANEL_SESSION_Y);
+      RepositionY("STATUS_LABEL", section_y + PM_PANEL_STATUS_Y);
      }
 
    void RepositionY(const string suffix, const int y)
