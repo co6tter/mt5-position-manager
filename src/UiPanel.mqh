@@ -166,10 +166,7 @@ public:
    void Refresh(CPositionService &positions)
      {
       positions.Collect(m_positions);
-      ArrayResize(m_symbols, 0);
-      for(int i = 0; i < ArraySize(m_positions); i++)
-         AddUniqueSymbol(m_symbols, m_positions[i].symbol);
-      AddUniqueSymbol(m_symbols, _Symbol);
+      positions.CollectSymbols(m_symbols);
       if(m_filter_symbol == "")
          m_filter_symbol = _Symbol;
       if(m_auto_symbol == "")
