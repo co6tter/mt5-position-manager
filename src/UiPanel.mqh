@@ -110,6 +110,7 @@ public:
       created = CreateEdit("EQ_LOSS_VALUE", "", 330, section_y + 100, 100, 22) && created;
       created = CreateLabel("EQ_PROFIT_LABEL", "Max Profit", 440, section_y + 103, clrSilver, 9) && created;
       created = CreateEdit("EQ_PROFIT_VALUE", "", 515, section_y + 100, 100, 22) && created;
+      created = CreateLabel("EQ_SCOPE_LABEL", "All symbols", 625, section_y + 103, clrOrange, 9) && created;
 
       created = CreateLabel("SESSION_LABEL", "Today's Close: -    Auto Close At: -", 12, section_y + 134, clrSilver, 9) && created;
       created = CreateLabel("STATUS_LABEL", "Status: Ready", 12, section_y + 160, clrWhite, 9) && created;
@@ -670,8 +671,9 @@ private:
       const int requested_width = handle_x - m_origin_x + PM_RESIZE_HANDLE_SIZE;
       const int requested_height = handle_y - m_origin_y + PM_RESIZE_HANDLE_SIZE;
       m_panel_width = MathMax(PM_MIN_PANEL_WIDTH, MathMin(requested_width, PM_MAX_PANEL_WIDTH));
-      // Inverse of PanelHeight() = SectionY() + 165 = 95 + rows * 21 + 165.
-      const int requested_rows = (requested_height - 260) / 21;
+      // Derived from PanelHeight() so it can never drift out of sync with it.
+      const int chrome_height = PanelHeight() - m_max_rows * 21;
+      const int requested_rows = (requested_height - chrome_height) / 21;
       m_max_rows = MathMax(PM_MIN_POSITION_ROWS, MathMin(requested_rows, PM_MAX_POSITION_ROWS));
       ApplyLayout();
       ClampPage();
@@ -713,6 +715,7 @@ private:
       RepositionY("EQ_LOSS_VALUE", section_y + 100);
       RepositionY("EQ_PROFIT_LABEL", section_y + 103);
       RepositionY("EQ_PROFIT_VALUE", section_y + 100);
+      RepositionY("EQ_SCOPE_LABEL", section_y + 103);
       RepositionY("SESSION_LABEL", section_y + 134);
       RepositionY("STATUS_LABEL", section_y + 160);
      }

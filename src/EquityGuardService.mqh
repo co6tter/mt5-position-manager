@@ -120,7 +120,7 @@ public:
 private:
    string ConfigKey(const EquityGuardConfig &config)
      {
-      return StringFormat("%d|%d|%.2f|%.2f", config.enabled ? 1 : 0,
+      return StringFormat("%d|%d|%.8f|%.8f", config.enabled ? 1 : 0,
                           (int)config.mode, config.loss_threshold, config.profit_threshold);
      }
   };

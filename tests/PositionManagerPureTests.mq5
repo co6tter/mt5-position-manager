@@ -127,7 +127,26 @@ void TestEquityGuardEvaluation()
    AssertTrue(!PMEvaluateEquityGuard(-999999.0, config, 10000.0, loss_triggered, profit_triggered),
               "Zero thresholds disable both sides");
 
+   config.loss_threshold = 500.0;
+   config.profit_threshold = 0.0;
+   AssertTrue(!PMEvaluateEquityGuard(999999.0, config, 10000.0, loss_triggered, profit_triggered) &&
+              !profit_triggered,
+              "Zero profit threshold leaves the profit side disabled even on a huge gain");
+
+   config.loss_threshold = 0.0;
+   config.profit_threshold = 1000.0;
+   AssertTrue(!PMEvaluateEquityGuard(-999999.0, config, 10000.0, loss_triggered, profit_triggered) &&
+              !loss_triggered,
+              "Zero loss threshold leaves the loss side disabled even on a huge loss");
+
+   config.mode = PM_EQUITY_THRESHOLD_PERCENT;
+   config.loss_threshold = 5.0;
+   config.profit_threshold = 0.0;
+   AssertTrue(!PMEvaluateEquityGuard(-999999.0, config, 0.0, loss_triggered, profit_triggered),
+              "Percent mode with zero balance does not trigger (guards against a divide-by-zero-shaped threshold)");
+
    config.enabled = false;
+   config.mode = PM_EQUITY_THRESHOLD_AMOUNT;
    config.loss_threshold = 500.0;
    AssertTrue(!PMEvaluateEquityGuard(-999999.0, config, 10000.0, loss_triggered, profit_triggered),
               "Disabled guard never triggers");

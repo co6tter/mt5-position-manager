@@ -59,10 +59,12 @@ Auto CloseをONにし、Symbol、Direction、クローズ何分前かを指定�
 
 一度発動すると、合計がセーフゾーン（両閾値の内側）に戻るか保有ポジションが0件になるまで再発動しません。Auto Closeと同様に確認ダイアログは表示されません。
 
+監視する合計は各ポジションの含み損益（`POSITION_PROFIT`）の合計であり、swapや手数料は含みません。これらを考慮したい場合は閾値を余裕を持って設定してください。
+
 ## 安全上の注意
 
 - 実口座へ適用する前に、必ずデモ口座・ストラテジーテスターで確認してください。
-- `Close Now`と`Close Selected`には確認ダイアログがあります。
+- `Close Now`と`Close Selected`には確認ダイアログがあります。Equity Guardには確認ダイアログがなく、チャートのSymbolに関係なく口座内の全ポジションを決済します。
 - 一括処理は部分成功を許容します。失敗TicketとretcodeはExpertsログへ出力されます。
 - 再試行はEAを停止する`Sleep()`を使わず、1秒Timerから期限到来Ticketだけを処理します。
 - BrokerのStops Level、Freeze Level、取引時間、約定方式によって操作が拒否される場合があります。
@@ -78,6 +80,7 @@ Auto CloseをONにし、Symbol、Direction、クローズ何分前かを指定�
 - `src/ValidationService.mqh`: SL / TPの価格・Broker制約検証
 - `src/SessionService.mqh`: 取引セッション終了時刻の取得
 - `src/AutoCloseService.mqh`: Auto Closeの日次判定
+- `src/EquityGuardService.mqh`: 口座全体の含み損益によるEquity Guard判定
 - `src/UiPanel.mqh`: チャートオブジェクトによる操作パネル
 - `src/Models.mqh`, `src/Constants.mqh`: 共通モデルと補助関数
 - `scripts/compile.ps1`: MetaEditorコンパイル検証
