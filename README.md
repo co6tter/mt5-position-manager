@@ -12,7 +12,7 @@
 - 口座全体の含み損益に基づくEquity Guard（緊急全決済）
 - 選択したSymbol・DirectionへのBreak Even（建値保存）とTrailing Stop
 - Stops Level、Freeze Level、Tick Sizeを考慮したSL / TP検証
-- Trade serverのretcode確認、部分失敗の表示、有限回リトライ
+- Trade serverのretcode確認、部分失敗の表示、決済要求の再試行と保護
 - ページングによる全ポジションの確認
 - Timer駆動の非ブロッキングリトライ
 
@@ -62,22 +62,26 @@ Auto CloseをONにし、Symbol、Direction、クローズ何分前かを指定�
 
 監視する合計は各ポジションの含み損益（`POSITION_PROFIT`）の合計であり、swapや手数料は含みません。これらを考慮したい場合は閾値を余裕を持って設定してください。
 
+Max Loss / Max Profitへの入力は、確認ダイアログなしで口座全体を決済する機能の安全のため、Tab／Enter／欄外クリックで確定するまで反映されません（入力途中の値がタイマー処理に使われることはありません）。Percentモードで残高が0以下の場合は閾値を計算できないため、含み損があれば安全側に倒してMax Lossを発動します。
+
 ## Trailing Stop / Break Even
 
 Break EvenとTrailingは1つのSymbol・Direction選択を共有し、Filter・Auto Close・Equity Guardの選択とは独立です。
 
-Break Evenは、現在価格が建値からTrigger（points）以上有利に動いたら、建値からLock（points）分有利な位置へSLを移動します。Trailingは、現在価格が建値からDistance（points）以上有利に動いたら、現在価格からDistance分のSLで追従を開始します。どちらも毎tick再計算され、現在の実際のSLより厳密に有利な場合のみ更新するため、SLが後退することはありません（一度設定したSLより不利な方向へは動きません）。TPは変更しません。
+Break Evenは、現在価格が建値からTrigger（points）以上有利に動いたら、建値からLock（points）分有利な位置へSLを移動します。Trailingは、現在価格が建値からDistance（points）以上有利に動いたら、現在価格からDistance分のSLで追従を開始します。どちらも1秒Timer周期で再計算され、現在の実際のSLより厳密に有利な場合のみ更新するため、SLが後退することはありません（一度設定したSLより不利な方向へは動きません）。TPは変更しません。
 
-両方を同時に有効にした場合は、その時点でより有利な方を採用します。ブローカーのStops Level・Freeze Levelにより更新が拒否される場合は、もう一方の候補があればそちらを試し、両方とも拒否された場合はそのTicketをそのtickだけスキップして次のtickで再試行します。決済または変更がリトライキューに残っているTicketはこの機能の対象から除外されます（ユーザーの手動操作やAuto Close・Equity Guardの決済とは競合しません）。Auto Close・Equity Guardと同様に確認ダイアログは表示されません。
+両方を同時に有効にした場合は、その時点でより有利な方を採用します。ブローカーのStops Level・Freeze Levelにより更新が拒否される場合は、もう一方の候補があればそちらを試し、両方とも拒否された場合はそのTicketをそのtickだけスキップして次のtickで再試行します。決済または変更に未解決の要求が残っているTicketはこの機能の対象から除外されます（ユーザーの手動操作やAuto Close・Equity Guardの決済とは競合しません）。Auto Close・Equity Guardと同様に確認ダイアログは表示されません。
 
-TriggerやDistanceがブローカーのStops Levelより小さいと候補が却下され続け、SLが動かないまま`[WARN] Trailing/Break Even candidate rejected...`がExpertsログに出力され続けます。ブローカーのStops Level以上の値を設定してください。Clear SL / Clear TPでSLを削除しても、Break Even・Trailingが条件を満たしていれば次のtickで再度SLが設定されます。発動時のステータスはAuto Close・Equity Guard・Retryのメッセージより優先度が低く表示されます。
+TriggerやDistanceがブローカーのStops Levelより小さいと候補が却下され続け、SLが動かないまま`[WARN] Trailing/Break Even candidate rejected...`がExpertsログに出力され続けます。ブローカーのStops Level以上の値を設定してください。Clear SL / Clear TPでSLを削除しても、Break Even・Trailingが条件を満たしていれば次のTimer周期で再度SLが設定されます。発動時のステータスはAuto Close・Equity Guard・Retryのメッセージより優先度が低く表示されます。
+
+Trigger pts / Lock pts / Distance ptsへの入力は、Equity Guardと同様にTab／Enter／欄外クリックで確定するまで反映されません。
 
 ## 安全上の注意
 
 - 実口座へ適用する前に、必ずデモ口座・ストラテジーテスターで確認してください。
 - `Close Now`と`Close Selected`には確認ダイアログがあります。Equity Guardには確認ダイアログがなく、チャートのSymbolに関係なく口座内の全ポジションを決済します。
 - 一括処理は部分成功を許容します。失敗TicketとretcodeはExpertsログへ出力されます。
-- 再試行はEAを停止する`Sleep()`を使わず、1秒Timerから期限到来Ticketだけを処理します。
+- 再試行はEAを停止する`Sleep()`を使わず、1秒Timerから期限到来Ticketだけを処理します。決済未完了Ticketは成功するまで決済意図を保持し、Trailing / Break Evenの変更対象から除外されます。
 - BrokerのStops Level、Freeze Level、取引時間、約定方式によって操作が拒否される場合があります。
 - Auto CloseはEA、端末、取引サーバー、通信状態に依存します。決済完了を必ず確認してください。
 - EAの停止・再起動後も実行済み状態を永続化する仕様ではありません。再起動時に`Passed`設定が適用されます。
