@@ -20,6 +20,12 @@ enum PMPassedCloseBehavior
    PM_PASSED_CLOSE_IMMEDIATELY = 1
   };
 
+enum PMEquityThresholdMode
+  {
+   PM_EQUITY_THRESHOLD_AMOUNT = 0,
+   PM_EQUITY_THRESHOLD_PERCENT = 1
+  };
+
 enum PMTradeOperationType
   {
    PM_TRADE_OPERATION_CLOSE = 0,
@@ -82,6 +88,14 @@ struct AutoCloseConfig
    PMDirection direction;
    int minutes_before_close;
    PMPassedCloseBehavior passed_behavior;
+  };
+
+struct EquityGuardConfig
+  {
+   bool enabled;
+   PMEquityThresholdMode mode;
+   double loss_threshold;
+   double profit_threshold;
   };
 
 #endif

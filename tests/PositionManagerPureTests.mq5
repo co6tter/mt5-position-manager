@@ -4,6 +4,7 @@
 #include "..\src\Models.mqh"
 #include "..\src\Constants.mqh"
 #include "..\src\SessionService.mqh"
+#include "..\src\EquityGuardService.mqh"
 
 int g_failures = 0;
 
@@ -88,12 +89,57 @@ void TestSessionCloseResolution()
               "Ended overnight session does not mask today's close");
   }
 
+void TestEquityGuardEvaluation()
+  {
+   EquityGuardConfig config;
+   config.enabled = true;
+   config.mode = PM_EQUITY_THRESHOLD_AMOUNT;
+   config.loss_threshold = 500.0;
+   config.profit_threshold = 1000.0;
+   bool loss_triggered = false;
+   bool profit_triggered = false;
+
+   AssertTrue(PMEvaluateEquityGuard(-500.0, config, 10000.0, loss_triggered, profit_triggered) &&
+              loss_triggered && !profit_triggered,
+              "Amount mode triggers on loss threshold");
+
+   AssertTrue(PMEvaluateEquityGuard(1000.0, config, 10000.0, loss_triggered, profit_triggered) &&
+              !loss_triggered && profit_triggered,
+              "Amount mode triggers on profit threshold");
+
+   AssertTrue(!PMEvaluateEquityGuard(-100.0, config, 10000.0, loss_triggered, profit_triggered) &&
+              !loss_triggered && !profit_triggered,
+              "Amount mode does not trigger inside the safe zone");
+
+   config.mode = PM_EQUITY_THRESHOLD_PERCENT;
+   config.loss_threshold = 5.0;
+   config.profit_threshold = 10.0;
+   AssertTrue(PMEvaluateEquityGuard(-500.0, config, 10000.0, loss_triggered, profit_triggered) &&
+              loss_triggered && !profit_triggered,
+              "Percent mode converts the loss threshold against balance");
+   AssertTrue(PMEvaluateEquityGuard(1000.0, config, 10000.0, loss_triggered, profit_triggered) &&
+              !loss_triggered && profit_triggered,
+              "Percent mode converts the profit threshold against balance");
+
+   config.mode = PM_EQUITY_THRESHOLD_AMOUNT;
+   config.loss_threshold = 0.0;
+   config.profit_threshold = 0.0;
+   AssertTrue(!PMEvaluateEquityGuard(-999999.0, config, 10000.0, loss_triggered, profit_triggered),
+              "Zero thresholds disable both sides");
+
+   config.enabled = false;
+   config.loss_threshold = 500.0;
+   AssertTrue(!PMEvaluateEquityGuard(-999999.0, config, 10000.0, loss_triggered, profit_triggered),
+              "Disabled guard never triggers");
+  }
+
 void OnStart()
   {
    TestDirectionMatching();
    TestBatchResultHelpers();
    TestTransientRetcodes();
    TestSessionCloseResolution();
+   TestEquityGuardEvaluation();
    if(g_failures == 0)
       Print("[PASS] All Position Manager pure tests passed.");
    else
