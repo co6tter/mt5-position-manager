@@ -184,6 +184,10 @@ void TestBreakEvenCandidate()
 
    AssertTrue(!PMBreakEvenCandidate(1.1000, POSITION_TYPE_BUY, 1.1050, 0.0001, 0, 2, candidate),
               "Break even is disabled when trigger_points is zero");
+
+   AssertTrue(PMBreakEvenCandidate(1.1000, POSITION_TYPE_BUY, 1.1020, 0.0001, 20, 0, candidate) &&
+              MathAbs(candidate - 1.1000) < 0.00001,
+              "Buy break even with zero lock points locks in exactly the entry price");
   }
 
 void TestTrailingCandidate()
@@ -219,6 +223,10 @@ void TestIsMoreFavorableStop()
               "A lower candidate is more favorable for a Sell");
    AssertTrue(!PMIsMoreFavorableStop(POSITION_TYPE_SELL, 1.1000, 1.0995),
               "A higher candidate is not more favorable for a Sell");
+   AssertTrue(!PMIsMoreFavorableStop(POSITION_TYPE_BUY, 1.1005, 1.1005),
+              "An equal candidate is not more favorable for a Buy (prevents resubmitting every tick)");
+   AssertTrue(!PMIsMoreFavorableStop(POSITION_TYPE_SELL, 1.0995, 1.0995),
+              "An equal candidate is not more favorable for a Sell (prevents resubmitting every tick)");
   }
 
 void TestBestStopCandidate()
@@ -243,6 +251,10 @@ void TestBestStopCandidate()
    AssertTrue(PMBestStopCandidate(POSITION_TYPE_SELL, true, 1.0998, true, 1.0990, best) &&
               MathAbs(best - 1.0990) < 0.00001,
               "Sell: the more favorable (lower) of the two candidates wins");
+
+   AssertTrue(PMBestStopCandidate(POSITION_TYPE_SELL, true, 1.0998, true, 1.1005, best) &&
+              MathAbs(best - 1.0998) < 0.00001,
+              "Sell: break even wins when it is more favorable (lower) than trailing");
   }
 
 void OnStart()

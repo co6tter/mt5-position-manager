@@ -112,6 +112,9 @@ public:
 
       for(int i = 0; i < ArraySize(tickets); i++)
         {
+         if(trades.HasPending(tickets[i]))
+            continue;
+
          PMPosition position = {};
          if(!positions.Get(tickets[i], position))
             continue;
@@ -138,8 +141,18 @@ public:
 
          double target = 0.0;
          string reason = "";
-         if(!validator.CalculateTarget(position, true, PM_PRICE_ABSOLUTE, best, target, reason))
+         bool accepted = validator.CalculateTarget(position, true, PM_PRICE_ABSOLUTE, best, target, reason);
+         if(!accepted && has_break_even && has_trailing)
+           {
+            const double fallback = best == trailing_candidate ? break_even_candidate : trailing_candidate;
+            accepted = validator.CalculateTarget(position, true, PM_PRICE_ABSOLUTE, fallback, target, reason);
+           }
+         if(!accepted)
+           {
+            PrintFormat("[WARN] Trailing/Break Even candidate rejected ticket=%I64u reason=%s",
+                        tickets[i], reason);
             continue;
+           }
          if(!PMIsMoreFavorableStop(position.type, target, position.sl))
             continue;
 

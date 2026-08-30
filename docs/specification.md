@@ -50,9 +50,9 @@ Break Evenは、現在価格と建値の差（points）がTriggerに達したら
 
 毎tick、対象Ticketごとに両候補のうち有利な方を採用し、現在の実際のSLより厳密に有利な場合のみSLを更新する（TPは変更しない）。SLを後退させることはない。状態は保持せず、既存のSL・建値・現在価格から都度再計算する。
 
-候補価格（Break Evenの建値ベース、Trailingの現在価格ベース）はどちらも自前で絶対値として計算し、Tick Sizeへの正規化・Stops Level・Freeze Levelチェックには既存の`CValidationService.CalculateTarget()`をAbsoluteモードで再利用する。
+候補価格（Break Evenの建値ベース、Trailingの現在価格ベース）はどちらも自前で絶対値として計算し、Tick Sizeへの正規化・Stops Level・Freeze Levelチェックには既存の`CValidationService.CalculateTarget()`をAbsoluteモードで再利用する。両候補が有効な場合はより有利な方を先に検証し、Stops Level・Freeze Levelで却下されたらもう一方を検証する。両方とも却下された場合、およびそのTicketに決済・変更のリトライが残っている場合は、そのtickでは何もしない。
 
-Auto Close・Equity Guardと同様にOnTimer駆動の自動処理とし、確認ダイアログは表示しない。
+Auto Close・Equity Guardと同様にOnTimer駆動の自動処理とし、確認ダイアログは表示しない。発動時のステータスはAuto Close・Equity Guard・Retryのメッセージより優先度が低い。
 
 ## 非対象
 

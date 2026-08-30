@@ -63,4 +63,4 @@
 3. TrailingをONにしDistanceを設定し、含み益がDistance未満の間はSLが動かず、Distance以上になってから現在価格からDistance分の位置で追従を始めることを確認する。価格が反落してもSLが後退しないことを確認する。
 4. Break Even・Trailing両方ONの状態で、含み益が小さい間はBreak Evenのロック位置、含み益が大きくなるとTrailingの位置に自然に切り替わることを確認する。
 5. Trigger/Lock/Distance欄に非数値・負数・空欄を入力し、その機能が実質的に無効になる（SLを一切動かさない）ことを確認する。
-6. 対象外のSymbol・Directionのポジションが影響を受けないことを確認する.
+6. 対象外のSymbol・Directionのポジションが影響を受けないことを確認する。

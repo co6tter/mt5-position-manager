@@ -68,7 +68,9 @@ Break EvenとTrailingは1つのSymbol・Direction選択を共有し、Filter・A
 
 Break Evenは、現在価格が建値からTrigger（points）以上有利に動いたら、建値からLock（points）分有利な位置へSLを移動します。Trailingは、現在価格が建値からDistance（points）以上有利に動いたら、現在価格からDistance分のSLで追従を開始します。どちらも毎tick再計算され、現在の実際のSLより厳密に有利な場合のみ更新するため、SLが後退することはありません（一度設定したSLより不利な方向へは動きません）。TPは変更しません。
 
-両方を同時に有効にした場合は、その時点でより有利な方を採用します。ブローカーのStops Level・Freeze Levelにより更新が拒否される場合は、そのTicketをそのtickだけスキップし、次のtickで再試行します。Auto Close・Equity Guardと同様に確認ダイアログは表示されません。
+両方を同時に有効にした場合は、その時点でより有利な方を採用します。ブローカーのStops Level・Freeze Levelにより更新が拒否される場合は、もう一方の候補があればそちらを試し、両方とも拒否された場合はそのTicketをそのtickだけスキップして次のtickで再試行します。決済または変更がリトライキューに残っているTicketはこの機能の対象から除外されます（ユーザーの手動操作やAuto Close・Equity Guardの決済とは競合しません）。Auto Close・Equity Guardと同様に確認ダイアログは表示されません。
+
+TriggerやDistanceがブローカーのStops Levelより小さいと候補が却下され続け、SLが動かないまま`[WARN] Trailing/Break Even candidate rejected...`がExpertsログに出力され続けます。ブローカーのStops Level以上の値を設定してください。Clear SL / Clear TPでSLを削除しても、Break Even・Trailingが条件を満たしていれば次のtickで再度SLが設定されます。発動時のステータスはAuto Close・Equity Guard・Retryのメッセージより優先度が低く表示されます。
 
 ## 安全上の注意
 

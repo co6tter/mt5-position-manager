@@ -190,6 +190,12 @@ public:
       return ArraySize(m_pending);
      }
 
+   bool HasPending(const ulong ticket)
+     {
+      return FindPending(PM_TRADE_OPERATION_CLOSE, ticket) >= 0 ||
+             FindPending(PM_TRADE_OPERATION_MODIFY, ticket) >= 0;
+     }
+
 private:
    PMTradeAttemptStatus ExecuteCloseAttempt(const ulong ticket,
                                             const int attempt,
