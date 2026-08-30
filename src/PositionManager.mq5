@@ -94,6 +94,6 @@ void OnChartEvent(const int id,
                   const double &dparam,
                   const string &sparam)
   {
-   g_ui.HandleChartEvent(id, sparam, g_positions, g_trades,
+   g_ui.HandleChartEvent(id, lparam, dparam, sparam, g_positions, g_trades,
                          g_validation, g_actions);
   }

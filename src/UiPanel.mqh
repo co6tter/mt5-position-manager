@@ -42,6 +42,17 @@ private:
    int m_origin_x;
    int m_origin_y;
    int m_panel_width;
+   int m_panel_height;
+   bool m_dragging;
+   bool m_resizing;
+   int m_interaction_start_x;
+   int m_interaction_start_y;
+   int m_interaction_origin_x;
+   int m_interaction_origin_y;
+   int m_interaction_width;
+   int m_interaction_height;
+   bool m_chart_mouse_scroll_before_interaction;
+   bool m_chart_mouse_move_before_create;
 
 public:
    CUiPanel()
@@ -74,6 +85,17 @@ public:
       m_origin_x = 0;
       m_origin_y = 0;
       m_panel_width = PM_DEFAULT_PANEL_WIDTH;
+      m_panel_height = 0;
+      m_dragging = false;
+      m_resizing = false;
+      m_interaction_start_x = 0;
+      m_interaction_start_y = 0;
+      m_interaction_origin_x = 0;
+      m_interaction_origin_y = 0;
+      m_interaction_width = 0;
+      m_interaction_height = 0;
+      m_chart_mouse_scroll_before_interaction = true;
+      m_chart_mouse_move_before_create = true;
      }
 
    bool Create(const int max_rows)
@@ -82,11 +104,21 @@ public:
       m_panel_width = PM_DEFAULT_PANEL_WIDTH;
       m_origin_x = 0;
       m_origin_y = 0;
+      m_panel_height = MinimumPanelHeightForRows(m_max_rows);
+      long mouse_move_enabled = 0;
+      if(ChartGetInteger(0, CHART_EVENT_MOUSE_MOVE, 0, mouse_move_enabled))
+         m_chart_mouse_move_before_create = mouse_move_enabled != 0;
+      ResetLastError();
+      if(!ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, 0, true))
+        {
+         PrintFormat("[ERROR] Unable to enable chart mouse move events. error=%d",
+                     GetLastError());
+         return false;
+        }
       ObjectsDeleteAll(0, PM_OBJECT_PREFIX);
       const int section_y = SectionY();
       bool created = true;
       created = CreateBackground(PanelHeight()) && created;
-      created = CreateHandle("DRAG_HANDLE", 0, 0, m_panel_width, PM_TITLEBAR_HEIGHT, C'25,25,30', 0) && created;
       created = CreateLabel("TITLE", "MT5 Position Manager", 12, 8, clrWhite, 12) && created;
       created = CreateLabel("FILTER_LABEL", "Filter", 12, 38, clrSilver, 9) && created;
       created = CreateButton("FILTER_SYMBOL", "Symbol", 62, 34, 120, 22) && created;
@@ -149,17 +181,21 @@ public:
 
       created = CreateLabel("SESSION_LABEL", "Today's Close: -    Auto Close At: -", 12, section_y + PM_PANEL_SESSION_Y, clrSilver, 9) && created;
       created = CreateLabel("STATUS_LABEL", "Status: Ready", 12, section_y + PM_PANEL_STATUS_Y, clrWhite, 9) && created;
-      created = CreateHandle("RESIZE_HANDLE", m_panel_width - PM_RESIZE_HANDLE_SIZE,
-                             PanelHeight() - PM_RESIZE_HANDLE_SIZE,
-                             PM_RESIZE_HANDLE_SIZE, PM_RESIZE_HANDLE_SIZE, clrSilver) && created;
+      created = CreateLabel("RESIZE_GRIP", "///", m_panel_width - 24,
+                            PanelHeight() - 18, clrSilver, 8) && created;
       ChartRedraw();
       if(!created)
+        {
          PrintFormat("[ERROR] UI panel creation failed. last_error=%d", GetLastError());
+         Destroy();
+        }
       return created;
      }
 
    void Destroy()
      {
+      EndInteraction();
+      ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, 0, m_chart_mouse_move_before_create);
       ObjectsDeleteAll(0, PM_OBJECT_PREFIX);
      }
 
@@ -186,10 +222,6 @@ public:
 
    void Render()
      {
-      // Clicking elsewhere on the chart deselects other selectable objects;
-      // keep the drag/resize handles perpetually selected so they stay grabbable.
-      ObjectSetInteger(0, Name("DRAG_HANDLE"), OBJPROP_SELECTED, true);
-      ObjectSetInteger(0, Name("RESIZE_HANDLE"), OBJPROP_SELECTED, true);
       ObjectSetString(0, Name("FILTER_SYMBOL"), OBJPROP_TEXT, FilterSymbol());
       ObjectSetString(0, Name("FILTER_DIRECTION"), OBJPROP_TEXT, PMDirectionToString(m_filter_direction));
       ObjectSetString(0, Name("SL_MODE"), OBJPROP_TEXT, PriceModeToString(m_sl_mode));
@@ -289,30 +321,28 @@ public:
      }
 
    bool HandleChartEvent(const long id,
+                         const long lparam,
+                         const double dparam,
                          const string object_name,
                          CPositionService &positions,
                          CTradeManager &trades,
                          CValidationService &validator,
                          CPositionActionService &actions)
      {
-      if(id == CHARTEVENT_OBJECT_DRAG)
+      if(id == CHARTEVENT_MOUSE_MOVE)
         {
-         if(object_name == Name("DRAG_HANDLE"))
-           {
-            HandleDrag();
-            Render();
-            return true;
-           }
-         if(object_name == Name("RESIZE_HANDLE"))
-           {
-            HandleResize();
-            Render();
-            return true;
-           }
-         return false;
+         HandleMouseMove((int)lparam, (int)dparam, object_name);
+         return true;
+        }
+      if(id == CHARTEVENT_CLICK)
+        {
+         EndInteraction();
+         return true;
         }
       if(id != CHARTEVENT_OBJECT_CLICK && id != CHARTEVENT_OBJECT_ENDEDIT)
          return false;
+      if(id == CHARTEVENT_OBJECT_CLICK)
+         EndInteraction();
       if(id == CHARTEVENT_OBJECT_ENDEDIT)
         {
          if(object_name == Name("AUTO_MINUTES"))
@@ -547,9 +577,24 @@ private:
       return 95 + m_max_rows * 21;
      }
 
+   int MinimumPanelHeightForRows(const int rows)
+     {
+      return 95 + rows * 21 + PM_PANEL_CHROME_HEIGHT;
+     }
+
+   int MinimumPanelHeight()
+     {
+      return MinimumPanelHeightForRows(PM_MIN_POSITION_ROWS);
+     }
+
+   int MaximumPanelHeight()
+     {
+      return MinimumPanelHeightForRows(PM_MAX_POSITION_ROWS);
+     }
+
    int PanelHeight()
      {
-      return SectionY() + PM_PANEL_CHROME_HEIGHT;
+      return m_panel_height > 0 ? m_panel_height : MinimumPanelHeightForRows(m_max_rows);
      }
 
    int PageCount()
@@ -756,18 +801,6 @@ private:
       SetStatus(BatchResultText(is_sl ? "SL clear" : "TP clear", result));
      }
 
-   void HandleDrag()
-     {
-      const string handle = Name("DRAG_HANDLE");
-      const int new_x = (int)ObjectGetInteger(0, handle, OBJPROP_XDISTANCE);
-      const int new_y = (int)ObjectGetInteger(0, handle, OBJPROP_YDISTANCE);
-      const int delta_x = new_x - m_origin_x;
-      const int delta_y = new_y - m_origin_y;
-      m_origin_x = new_x;
-      m_origin_y = new_y;
-      ShiftPanelObjects(delta_x, delta_y, handle);
-     }
-
    void ShiftPanelObjects(const int delta_x, const int delta_y, const string exclude_name)
      {
       if(delta_x == 0 && delta_y == 0)
@@ -785,33 +818,162 @@ private:
         }
      }
 
-   void HandleResize()
+   bool IsInsideTitleBar(const int x, const int y)
      {
-      const string handle = Name("RESIZE_HANDLE");
-      const int handle_x = (int)ObjectGetInteger(0, handle, OBJPROP_XDISTANCE);
-      const int handle_y = (int)ObjectGetInteger(0, handle, OBJPROP_YDISTANCE);
-      const int requested_width = handle_x - m_origin_x + PM_RESIZE_HANDLE_SIZE;
-      const int requested_height = handle_y - m_origin_y + PM_RESIZE_HANDLE_SIZE;
-      m_panel_width = MathMax(PM_MIN_PANEL_WIDTH, MathMin(requested_width, PM_MAX_PANEL_WIDTH));
-      // Derived from PanelHeight() so it can never drift out of sync with it.
-      const int chrome_height = PanelHeight() - m_max_rows * 21;
-      const int requested_rows = (requested_height - chrome_height) / 21;
-      m_max_rows = MathMax(PM_MIN_POSITION_ROWS, MathMin(requested_rows, PM_MAX_POSITION_ROWS));
-      ApplyLayout();
-      ClampPage();
+      return x >= m_origin_x && x < m_origin_x + m_panel_width &&
+             y >= m_origin_y && y < m_origin_y + PM_TITLEBAR_HEIGHT;
+     }
+
+   bool IsInsideResizeCorner(const int x, const int y)
+     {
+      return x >= m_origin_x + m_panel_width - PM_RESIZE_HANDLE_HIT_SIZE &&
+             x <= m_origin_x + m_panel_width &&
+             y >= m_origin_y + PanelHeight() - PM_RESIZE_HANDLE_HIT_SIZE &&
+             y <= m_origin_y + PanelHeight();
+     }
+
+   void BeginInteraction(const bool resize,
+                         const int x,
+                         const int y)
+     {
+      m_dragging = !resize;
+      m_resizing = resize;
+      m_interaction_start_x = x;
+      m_interaction_start_y = y;
+      m_interaction_origin_x = m_origin_x;
+      m_interaction_origin_y = m_origin_y;
+      m_interaction_width = m_panel_width;
+      m_interaction_height = PanelHeight();
+      long mouse_scroll_enabled = 1;
+      if(ChartGetInteger(0, CHART_MOUSE_SCROLL, 0, mouse_scroll_enabled))
+         m_chart_mouse_scroll_before_interaction = mouse_scroll_enabled != 0;
+      ChartSetInteger(0, CHART_MOUSE_SCROLL, 0, false);
+     }
+
+   void EndInteraction()
+     {
+      if(!m_dragging && !m_resizing)
+         return;
+      m_dragging = false;
+      m_resizing = false;
+      ChartSetInteger(0, CHART_MOUSE_SCROLL, 0,
+                     m_chart_mouse_scroll_before_interaction);
+      ChartRedraw();
+     }
+
+   void HandleMouseMove(const int x,
+                        const int y,
+                        const string state_text)
+     {
+      const uint state = (uint)StringToInteger(state_text);
+      const bool left_pressed = (state & 1) != 0;
+      if(!left_pressed)
+        {
+         EndInteraction();
+         return;
+        }
+      if(!m_dragging && !m_resizing)
+        {
+         if(IsInsideResizeCorner(x, y))
+            BeginInteraction(true, x, y);
+         else if(IsInsideTitleBar(x, y))
+            BeginInteraction(false, x, y);
+        }
+      if(m_dragging)
+        {
+         MovePanelTo(m_interaction_origin_x + x - m_interaction_start_x,
+                     m_interaction_origin_y + y - m_interaction_start_y);
+         ChartRedraw();
+        }
+      else if(m_resizing)
+         ResizePanelTo(m_interaction_width + x - m_interaction_start_x,
+                       m_interaction_height + y - m_interaction_start_y);
+     }
+
+   void MovePanelTo(const int requested_x, const int requested_y)
+     {
+      long chart_width = 0;
+      long chart_height = 0;
+      ChartGetInteger(0, CHART_WIDTH_IN_PIXELS, 0, chart_width);
+      ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0, chart_height);
+      int max_x = (int)chart_width - m_panel_width;
+      int max_y = (int)chart_height - PanelHeight();
+      if(max_x < 0)
+         max_x = 0;
+      if(max_y < 0)
+         max_y = 0;
+      int new_x = requested_x;
+      int new_y = requested_y;
+      if(new_x < 0)
+         new_x = 0;
+      if(new_x > max_x)
+         new_x = max_x;
+      if(new_y < 0)
+         new_y = 0;
+      if(new_y > max_y)
+         new_y = max_y;
+      const int delta_x = new_x - m_origin_x;
+      const int delta_y = new_y - m_origin_y;
+      if(delta_x == 0 && delta_y == 0)
+         return;
+      m_origin_x = new_x;
+      m_origin_y = new_y;
+      ShiftPanelObjects(delta_x, delta_y, "");
+     }
+
+   void ResizePanelTo(const int requested_width,
+                      const int requested_height)
+     {
+      const int previous_rows = m_max_rows;
+      long chart_width = 0;
+      long chart_height = 0;
+      ChartGetInteger(0, CHART_WIDTH_IN_PIXELS, 0, chart_width);
+      ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0, chart_height);
+      int maximum_width = PM_MAX_PANEL_WIDTH;
+      int maximum_height = MaximumPanelHeight();
+      if((int)chart_width - m_origin_x > PM_MIN_PANEL_WIDTH)
+         maximum_width = MathMin(maximum_width, (int)chart_width - m_origin_x);
+      if((int)chart_height - m_origin_y > MinimumPanelHeight())
+         maximum_height = MathMin(maximum_height, (int)chart_height - m_origin_y);
+      m_panel_width = MathMax(PM_MIN_PANEL_WIDTH,
+                              MathMin(requested_width, maximum_width));
+      m_panel_height = MathMax(MinimumPanelHeight(),
+                               MathMin(requested_height, maximum_height));
+      const int content_height = m_panel_height - (95 + PM_PANEL_CHROME_HEIGHT);
+      const int requested_rows = content_height / 21;
+      m_max_rows = MathMax(PM_MIN_POSITION_ROWS,
+                           MathMin(requested_rows, PM_MAX_POSITION_ROWS));
+      if(m_max_rows != previous_rows)
+        {
+         ApplyLayout();
+         ClampPage();
+         Render();
+         return;
+        }
+      ApplyPanelFrameLayout();
+      ResizeVisibleRows();
+      ChartRedraw();
+     }
+
+   void ApplyPanelFrameLayout()
+     {
+      ObjectSetInteger(0, Name("BACKGROUND"), OBJPROP_XSIZE, m_panel_width);
+      ObjectSetInteger(0, Name("BACKGROUND"), OBJPROP_YSIZE, PanelHeight());
+      Reposition("RESIZE_GRIP", m_panel_width - 24, PanelHeight() - 18);
+     }
+
+   void ResizeVisibleRows()
+     {
+      const int page_start = m_page * m_max_rows;
+      const int visible = MathMin(m_max_rows, ArraySize(m_positions) - page_start);
+      for(int row = 0; row < visible; row++)
+         ObjectSetInteger(0, RowName(row), OBJPROP_XSIZE, m_panel_width - 25);
      }
 
    void ApplyLayout()
      {
       const int section_y = SectionY();
-      const int panel_height = PanelHeight();
-      ObjectSetInteger(0, Name("BACKGROUND"), OBJPROP_XSIZE, m_panel_width);
-      ObjectSetInteger(0, Name("BACKGROUND"), OBJPROP_YSIZE, panel_height);
-      ObjectSetInteger(0, Name("DRAG_HANDLE"), OBJPROP_XSIZE, m_panel_width);
-      ObjectSetInteger(0, Name("RESIZE_HANDLE"), OBJPROP_XDISTANCE,
-                       m_origin_x + m_panel_width - PM_RESIZE_HANDLE_SIZE);
-      ObjectSetInteger(0, Name("RESIZE_HANDLE"), OBJPROP_YDISTANCE,
-                       m_origin_y + panel_height - PM_RESIZE_HANDLE_SIZE);
+      ApplyPanelFrameLayout();
       RepositionY("SL_LABEL", section_y + PM_PANEL_SL_LABEL_Y);
       RepositionY("SL_MODE", section_y + PM_PANEL_SL_Y);
       RepositionY("SL_VALUE", section_y + PM_PANEL_SL_Y);
@@ -861,6 +1023,12 @@ private:
       ObjectSetInteger(0, Name(suffix), OBJPROP_YDISTANCE, m_origin_y + y);
      }
 
+   void Reposition(const string suffix, const int x, const int y)
+     {
+      ObjectSetInteger(0, Name(suffix), OBJPROP_XDISTANCE, m_origin_x + x);
+      ObjectSetInteger(0, Name(suffix), OBJPROP_YDISTANCE, m_origin_y + y);
+     }
+
    bool CreateBackground(const int height)
      {
       const string object_name = Name("BACKGROUND");
@@ -890,29 +1058,6 @@ private:
       ObjectSetInteger(0, object_name, OBJPROP_SELECTABLE, false);
       ObjectSetInteger(0, object_name, OBJPROP_HIDDEN, true);
       ObjectSetInteger(0, object_name, OBJPROP_ZORDER, 1);
-     }
-
-   bool CreateHandle(const string suffix,
-                     const int x,
-                     const int y,
-                     const int width,
-                     const int height,
-                     const color bg,
-                     const int zorder = 1)
-     {
-      const string object_name = Name(suffix);
-      if(!ObjectCreate(0, object_name, OBJ_RECTANGLE_LABEL, 0, 0, 0))
-         return false;
-      PrepareObject(object_name, x, y);
-      ObjectSetInteger(0, object_name, OBJPROP_SELECTABLE, true);
-      ObjectSetInteger(0, object_name, OBJPROP_SELECTED, true);
-      ObjectSetInteger(0, object_name, OBJPROP_XSIZE, width);
-      ObjectSetInteger(0, object_name, OBJPROP_YSIZE, height);
-      ObjectSetInteger(0, object_name, OBJPROP_BGCOLOR, bg);
-      ObjectSetInteger(0, object_name, OBJPROP_BORDER_COLOR, bg);
-      ObjectSetInteger(0, object_name, OBJPROP_BACK, false);
-      ObjectSetInteger(0, object_name, OBJPROP_ZORDER, zorder);
-      return true;
      }
 
    bool CreateLabel(const string suffix,

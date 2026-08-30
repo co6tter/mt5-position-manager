@@ -43,6 +43,7 @@ EAをチャートへ適用し、AutoTradingを有効にします。SymbolやDire
 - `Close Selected`: 選択行だけを確認後に決済します。
 - `Set / Change SL` / `Set / Change TP`: 選択行を先に選び、ModeとValueを指定します。
 - `Clear SL` / `Clear TP`: 選択ポジションの該当保護注文を削除します。
+- タイトルバー部分を左ドラッグするとパネルを移動できます。右下の`///`付近を左ドラッグすると、幅と高さをピクセル単位で変更できます。
 
 Points指定では、LongはBidを基準にSLを下側、TPを上側へ、ShortはAskを基準にSLを上側、TPを下側へ計算します。
 

@@ -35,7 +35,7 @@
 #define PM_PANEL_SESSION_Y 236
 #define PM_PANEL_STATUS_Y 262
 #define PM_TITLEBAR_HEIGHT 28
-#define PM_RESIZE_HANDLE_SIZE 14
+#define PM_RESIZE_HANDLE_HIT_SIZE 28
 
 string PMDirectionToString(const PMDirection direction)
   {
