@@ -42,6 +42,32 @@ bool PMDirectionMatches(const PMDirection direction,
    return type == POSITION_TYPE_SELL;
   }
 
+double PMProfitPoints(const double open_price,
+                      const ENUM_POSITION_TYPE type,
+                      const double current_price,
+                      const double point)
+  {
+   if(point <= 0.0)
+      return 0.0;
+   return type == POSITION_TYPE_BUY ?
+          (current_price - open_price) / point :
+          (open_price - current_price) / point;
+  }
+
+string PMAutoCloseConfigKey(const AutoCloseConfig &config)
+  {
+   return StringFormat("%s|%d|%d|%d|%d", config.symbol,
+                       (int)config.direction, config.minutes_before_close,
+                       (int)config.passed_behavior, config.enabled ? 1 : 0);
+  }
+
+string PMEquityGuardConfigKey(const EquityGuardConfig &config)
+  {
+   return StringFormat("%d|%d|%.8f|%.8f", config.enabled ? 1 : 0,
+                       (int)config.mode, config.loss_threshold,
+                       config.profit_threshold);
+  }
+
 bool PMIsTransientTradeRetcode(const uint retcode)
   {
    return retcode == TRADE_RETCODE_REQUOTE ||

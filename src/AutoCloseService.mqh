@@ -40,7 +40,7 @@ public:
                  string &status)
      {
       status = "";
-      const string key = ConfigKey(config);
+      const string key = PMAutoCloseConfigKey(config);
       if(key != m_config_key)
         {
          m_config_key = key;
@@ -123,13 +123,6 @@ public:
       return m_auto_close_at;
      }
 
-private:
-   string ConfigKey(const AutoCloseConfig &config)
-     {
-      return StringFormat("%s|%d|%d|%d|%d", config.symbol,
-                          (int)config.direction, config.minutes_before_close,
-                          (int)config.passed_behavior, config.enabled ? 1 : 0);
-     }
   };
 
 #endif

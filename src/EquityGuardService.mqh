@@ -19,11 +19,22 @@ bool PMEvaluateEquityGuard(const double total_profit,
 
    if(config.loss_threshold > 0.0)
      {
-      const double loss_amount = config.mode == PM_EQUITY_THRESHOLD_PERCENT ?
-                                 balance * config.loss_threshold / 100.0 :
-                                 config.loss_threshold;
-      if(loss_amount > 0.0 && total_profit <= -loss_amount)
-         loss_triggered = true;
+      if(config.mode == PM_EQUITY_THRESHOLD_PERCENT && balance <= 0.0)
+        {
+         // A percentage of a zero/negative balance can't express a meaningful loss
+         // limit. Fail safe rather than silently disabling the guard exactly when
+         // the account is in its worst state: any floating loss triggers.
+         if(total_profit < 0.0)
+            loss_triggered = true;
+        }
+      else
+        {
+         const double loss_amount = config.mode == PM_EQUITY_THRESHOLD_PERCENT ?
+                                    balance * config.loss_threshold / 100.0 :
+                                    config.loss_threshold;
+         if(loss_amount > 0.0 && total_profit <= -loss_amount)
+            loss_triggered = true;
+        }
      }
 
    if(config.profit_threshold > 0.0)
@@ -70,7 +81,7 @@ public:
                  string &status)
      {
       status = "";
-      const string key = ConfigKey(config);
+      const string key = PMEquityGuardConfigKey(config);
       if(key != m_config_key)
         {
          m_config_key = key;
@@ -91,20 +102,34 @@ public:
       const bool should_trigger = PMEvaluateEquityGuard(total_profit, config, balance,
                                                         loss_triggered, profit_triggered);
 
+      // Keep the latch clear while there are no positions so a later crossing
+      // can trigger a fresh close request.
+      if(ArraySize(all_positions) == 0)
+        {
+         m_triggered = false;
+         if(!should_trigger)
+            return false;
+         const string empty_side = loss_triggered ? "loss" : "profit";
+         status = StringFormat("Equity Guard: %s threshold reached (%.2f) but no positions to close.",
+                               empty_side, total_profit);
+         PrintFormat("[WARN] Equity Guard %s threshold reached (%.2f) with no open positions.",
+                     empty_side, total_profit);
+         return true;
+        }
+
+      // A previous close attempt may have failed permanently and left a
+      // terminal close marker. Re-arm the edge trigger so the guard can retry
+      // while the threshold remains breached.
+      if(should_trigger && m_triggered && trades.HasFailedClose())
+         m_triggered = false;
       if(!PMShouldFireEquityGuard(should_trigger, m_triggered))
          return false;
 
       const string side = loss_triggered ? "loss" : "profit";
       ulong tickets[];
-      positions.CollectTickets("", PM_DIRECTION_BOTH, tickets);
-      if(ArraySize(tickets) == 0)
-        {
-         status = StringFormat("Equity Guard: %s threshold reached (%.2f) but no positions to close.",
-                               side, total_profit);
-         PrintFormat("[WARN] Equity Guard %s threshold reached (%.2f) with no open positions.",
-                     side, total_profit);
-         return true;
-        }
+      ArrayResize(tickets, ArraySize(all_positions));
+      for(int i = 0; i < ArraySize(all_positions); i++)
+         tickets[i] = all_positions[i].ticket;
 
       PMBatchResult result;
       trades.CloseTickets(tickets, result);
@@ -114,15 +139,11 @@ public:
       PrintFormat("[WARN] Equity Guard triggered by %s threshold. total_profit=%.2f closed=%d queued=%d failed=%d requested=%d",
                   side, total_profit, result.successful, result.queued,
                   ArraySize(result.failures), result.requested);
+      if(ArraySize(result.failures) > 0)
+         m_triggered = false;
       return true;
      }
 
-private:
-   string ConfigKey(const EquityGuardConfig &config)
-     {
-      return StringFormat("%d|%d|%.8f|%.8f", config.enabled ? 1 : 0,
-                          (int)config.mode, config.loss_threshold, config.profit_threshold);
-     }
   };
 
 #endif

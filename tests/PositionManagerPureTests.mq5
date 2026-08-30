@@ -143,8 +143,14 @@ void TestEquityGuardEvaluation()
    config.mode = PM_EQUITY_THRESHOLD_PERCENT;
    config.loss_threshold = 5.0;
    config.profit_threshold = 0.0;
-   AssertTrue(!PMEvaluateEquityGuard(-999999.0, config, 0.0, loss_triggered, profit_triggered),
-              "Percent mode with zero balance does not trigger (guards against a divide-by-zero-shaped threshold)");
+   AssertTrue(PMEvaluateEquityGuard(-999999.0, config, 0.0, loss_triggered, profit_triggered) &&
+              loss_triggered,
+              "Percent mode with non-positive balance fails safe: any floating loss triggers");
+   AssertTrue(!PMEvaluateEquityGuard(0.0, config, 0.0, loss_triggered, profit_triggered),
+              "Percent mode with non-positive balance and zero profit does not trigger");
+   AssertTrue(PMEvaluateEquityGuard(-999999.0, config, -5000.0, loss_triggered, profit_triggered) &&
+              loss_triggered,
+              "Percent mode with a negative balance also fails safe on any floating loss");
 
    config.enabled = false;
    config.mode = PM_EQUITY_THRESHOLD_AMOUNT;
@@ -209,6 +215,16 @@ void TestTrailingCandidate()
               "Trailing is disabled when trail_points is zero");
   }
 
+void TestProfitPoints()
+  {
+   AssertTrue(MathAbs(PMProfitPoints(1.1000, POSITION_TYPE_BUY, 1.1020, 0.0001) - 20.0) < 0.00001,
+              "Buy profit points are calculated consistently");
+   AssertTrue(MathAbs(PMProfitPoints(1.1000, POSITION_TYPE_SELL, 1.0980, 0.0001) - 20.0) < 0.00001,
+              "Sell profit points are calculated consistently");
+   AssertTrue(PMProfitPoints(1.1000, POSITION_TYPE_BUY, 1.1020, 0.0) == 0.0,
+              "Profit points are zero when point size is unavailable");
+  }
+
 void TestIsMoreFavorableStop()
   {
    AssertTrue(PMIsMoreFavorableStop(POSITION_TYPE_BUY, 1.1005, 0.0),
@@ -267,6 +283,7 @@ void OnStart()
    TestEquityGuardLatch();
    TestBreakEvenCandidate();
    TestTrailingCandidate();
+   TestProfitPoints();
    TestIsMoreFavorableStop();
    TestBestStopCandidate();
    if(g_failures == 0)

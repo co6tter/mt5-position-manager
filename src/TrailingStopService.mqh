@@ -18,10 +18,11 @@ bool PMBreakEvenCandidate(const double open_price,
    candidate = 0.0;
    if(trigger_points <= 0 || point <= 0.0)
       return false;
-   const double profit_points = type == POSITION_TYPE_BUY ?
-                                (current_price - open_price) / point :
-                                (open_price - current_price) / point;
-   if(profit_points < trigger_points)
+   const double profit_points = PMProfitPoints(open_price, type, current_price, point);
+   // Tolerate floating-point noise (e.g. 19.999999999999996 for an exact 20-point
+   // move) so a price that has genuinely reached the trigger isn't spuriously
+   // rejected for one tick.
+   if(profit_points < trigger_points - 0.0000001)
       return false;
    candidate = type == POSITION_TYPE_BUY ?
               open_price + lock_points * point :
@@ -39,10 +40,8 @@ bool PMTrailingCandidate(const double open_price,
    candidate = 0.0;
    if(trail_points <= 0 || point <= 0.0)
       return false;
-   const double profit_points = type == POSITION_TYPE_BUY ?
-                                (current_price - open_price) / point :
-                                (open_price - current_price) / point;
-   if(profit_points < trail_points)
+   const double profit_points = PMProfitPoints(open_price, type, current_price, point);
+   if(profit_points < trail_points - 0.0000001)
       return false;
    candidate = type == POSITION_TYPE_BUY ?
               current_price - trail_points * point :
@@ -99,10 +98,19 @@ public:
       if(!config.enabled_break_even && !config.enabled_trailing)
          return false;
 
-      ulong tickets[];
-      positions.CollectTickets(config.symbol, config.direction, tickets);
-      if(ArraySize(tickets) == 0)
+      PMPosition all_positions[];
+      positions.Collect(all_positions);
+      if(ArraySize(all_positions) == 0)
          return false;
+
+      const bool has_symbol_scope = config.symbol != "";
+      const double scoped_point = has_symbol_scope ?
+                                  SymbolInfoDouble(config.symbol, SYMBOL_POINT) : 0.0;
+      if(has_symbol_scope && scoped_point <= 0.0)
+        {
+         PrintFormat("[WARN] Trailing/Break Even: point size unavailable for %s.", config.symbol);
+         return false;
+        }
 
       int modified = 0;
       int queued = 0;
@@ -110,16 +118,18 @@ public:
       ulong first_failed_ticket = 0;
       string first_failure_description = "";
 
-      for(int i = 0; i < ArraySize(tickets); i++)
+      for(int i = 0; i < ArraySize(all_positions); i++)
         {
-         if(trades.HasPending(tickets[i]))
+         if(has_symbol_scope && all_positions[i].symbol != config.symbol)
+            continue;
+         if(!PMDirectionMatches(config.direction, all_positions[i].type))
+            continue;
+         if(trades.HasPending(all_positions[i].ticket))
             continue;
 
-         PMPosition position = {};
-         if(!positions.Get(tickets[i], position))
-            continue;
-
-         const double point = SymbolInfoDouble(position.symbol, SYMBOL_POINT);
+         PMPosition position = all_positions[i];
+         const double point = has_symbol_scope ? scoped_point :
+                              SymbolInfoDouble(position.symbol, SYMBOL_POINT);
          if(point <= 0.0)
             continue;
 
@@ -150,7 +160,7 @@ public:
          if(!accepted)
            {
             PrintFormat("[WARN] Trailing/Break Even candidate rejected ticket=%I64u reason=%s",
-                        tickets[i], reason);
+                        position.ticket, reason);
             continue;
            }
          if(!PMIsMoreFavorableStop(position.type, target, position.sl))
@@ -158,7 +168,7 @@ public:
 
          PMTradeFailure failure = {};
          const PMTradeAttemptStatus attempt_status =
-            trades.ModifyTicket(tickets[i], target, position.tp, failure);
+            trades.ModifyTicket(position.ticket, target, position.tp, failure);
          if(attempt_status == PM_TRADE_ATTEMPT_SUCCESS)
             modified++;
          else if(attempt_status == PM_TRADE_ATTEMPT_QUEUED)
@@ -167,12 +177,12 @@ public:
            {
             failed++;
             if(first_failed_ticket == 0)
-              {
-               first_failed_ticket = tickets[i];
+             {
+               first_failed_ticket = position.ticket;
                first_failure_description = failure.description;
-              }
+            }
             PrintFormat("[ERROR] Trailing/Break Even modify failed ticket=%I64u description=%s",
-                        tickets[i], failure.description);
+                        position.ticket, failure.description);
            }
         }
 
