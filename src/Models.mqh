@@ -98,4 +98,15 @@ struct EquityGuardConfig
    double profit_threshold;
   };
 
+struct TrailingStopConfig
+  {
+   bool enabled_break_even;
+   bool enabled_trailing;
+   string symbol;
+   PMDirection direction;
+   int be_trigger_points;
+   int be_lock_points;
+   int trail_points;
+  };
+
 #endif

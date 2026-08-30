@@ -5,6 +5,7 @@
 #include "..\src\Constants.mqh"
 #include "..\src\SessionService.mqh"
 #include "..\src\EquityGuardService.mqh"
+#include "..\src\TrailingStopService.mqh"
 
 int g_failures = 0;
 
@@ -166,6 +167,84 @@ void TestEquityGuardLatch()
               "Latch fires again after resetting");
   }
 
+void TestBreakEvenCandidate()
+  {
+   double candidate = 0.0;
+
+   AssertTrue(!PMBreakEvenCandidate(1.1000, POSITION_TYPE_BUY, 1.1010, 0.0001, 20, 2, candidate),
+              "Break even does not trigger before reaching the trigger distance");
+
+   AssertTrue(PMBreakEvenCandidate(1.1000, POSITION_TYPE_BUY, 1.1020, 0.0001, 20, 2, candidate) &&
+              MathAbs(candidate - 1.1002) < 0.00001,
+              "Buy break even locks in entry plus the lock distance once triggered");
+
+   AssertTrue(PMBreakEvenCandidate(1.1000, POSITION_TYPE_SELL, 1.0980, 0.0001, 20, 2, candidate) &&
+              MathAbs(candidate - 1.0998) < 0.00001,
+              "Sell break even locks in entry minus the lock distance once triggered");
+
+   AssertTrue(!PMBreakEvenCandidate(1.1000, POSITION_TYPE_BUY, 1.1050, 0.0001, 0, 2, candidate),
+              "Break even is disabled when trigger_points is zero");
+  }
+
+void TestTrailingCandidate()
+  {
+   double candidate = 0.0;
+
+   AssertTrue(!PMTrailingCandidate(1.1000, POSITION_TYPE_BUY, 1.1015, 0.0001, 20, candidate),
+              "Trailing does not start before price has moved the full trail distance");
+
+   AssertTrue(PMTrailingCandidate(1.1000, POSITION_TYPE_BUY, 1.1030, 0.0001, 20, candidate) &&
+              MathAbs(candidate - 1.1010) < 0.00001,
+              "Buy trailing candidate sits trail distance behind current price, already above entry");
+
+   AssertTrue(PMTrailingCandidate(1.1000, POSITION_TYPE_SELL, 1.0970, 0.0001, 20, candidate) &&
+              MathAbs(candidate - 1.0990) < 0.00001,
+              "Sell trailing candidate sits trail distance above current price, already below entry");
+
+   AssertTrue(!PMTrailingCandidate(1.1000, POSITION_TYPE_BUY, 1.1050, 0.0001, 0, candidate),
+              "Trailing is disabled when trail_points is zero");
+  }
+
+void TestIsMoreFavorableStop()
+  {
+   AssertTrue(PMIsMoreFavorableStop(POSITION_TYPE_BUY, 1.1005, 0.0),
+              "Any real candidate improves on a Buy position with no SL");
+   AssertTrue(PMIsMoreFavorableStop(POSITION_TYPE_SELL, 1.0995, 0.0),
+              "Any real candidate improves on a Sell position with no SL");
+   AssertTrue(PMIsMoreFavorableStop(POSITION_TYPE_BUY, 1.1010, 1.1005),
+              "A higher candidate is more favorable for a Buy");
+   AssertTrue(!PMIsMoreFavorableStop(POSITION_TYPE_BUY, 1.1000, 1.1005),
+              "A lower candidate is not more favorable for a Buy");
+   AssertTrue(PMIsMoreFavorableStop(POSITION_TYPE_SELL, 1.0990, 1.0995),
+              "A lower candidate is more favorable for a Sell");
+   AssertTrue(!PMIsMoreFavorableStop(POSITION_TYPE_SELL, 1.1000, 1.0995),
+              "A higher candidate is not more favorable for a Sell");
+  }
+
+void TestBestStopCandidate()
+  {
+   double best = 0.0;
+
+   AssertTrue(!PMBestStopCandidate(POSITION_TYPE_BUY, false, 0.0, false, 0.0, best),
+              "No candidate when neither break even nor trailing is active");
+
+   AssertTrue(PMBestStopCandidate(POSITION_TYPE_BUY, true, 1.1002, false, 0.0, best) &&
+              MathAbs(best - 1.1002) < 0.00001,
+              "Only the break even candidate is used when trailing is inactive");
+
+   AssertTrue(PMBestStopCandidate(POSITION_TYPE_BUY, false, 0.0, true, 1.1010, best) &&
+              MathAbs(best - 1.1010) < 0.00001,
+              "Only the trailing candidate is used when break even is inactive");
+
+   AssertTrue(PMBestStopCandidate(POSITION_TYPE_BUY, true, 1.1002, true, 1.1010, best) &&
+              MathAbs(best - 1.1010) < 0.00001,
+              "Buy: the more favorable (higher) of the two candidates wins");
+
+   AssertTrue(PMBestStopCandidate(POSITION_TYPE_SELL, true, 1.0998, true, 1.0990, best) &&
+              MathAbs(best - 1.0990) < 0.00001,
+              "Sell: the more favorable (lower) of the two candidates wins");
+  }
+
 void OnStart()
   {
    TestDirectionMatching();
@@ -174,6 +253,10 @@ void OnStart()
    TestSessionCloseResolution();
    TestEquityGuardEvaluation();
    TestEquityGuardLatch();
+   TestBreakEvenCandidate();
+   TestTrailingCandidate();
+   TestIsMoreFavorableStop();
+   TestBestStopCandidate();
    if(g_failures == 0)
       Print("[PASS] All Position Manager pure tests passed.");
    else
