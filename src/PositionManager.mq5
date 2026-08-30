@@ -10,6 +10,7 @@
 #include "PositionActionService.mqh"
 #include "SessionService.mqh"
 #include "AutoCloseService.mqh"
+#include "EquityGuardService.mqh"
 #include "UiPanel.mqh"
 
 input int InpMaxPositionRows = PM_DEFAULT_MAX_ROWS;
@@ -23,6 +24,7 @@ CValidationService g_validation;
 CPositionActionService g_actions;
 CSessionService g_sessions;
 CAutoCloseService g_auto_close;
+CEquityGuardService g_equity_guard;
 CUiPanel g_ui;
 
 int OnInit()
@@ -66,7 +68,13 @@ void OnTimer()
    string auto_status = "";
    g_auto_close.Evaluate(config, now, g_sessions, g_positions, g_trades, auto_status);
    g_ui.SetAutoSchedule(g_auto_close.SessionClose(), g_auto_close.AutoCloseAt());
-   if(auto_status != "")
+   EquityGuardConfig equity_guard_config = {};
+   g_ui.GetEquityGuardConfig(equity_guard_config);
+   string equity_guard_status = "";
+   g_equity_guard.Evaluate(equity_guard_config, g_positions, g_trades, equity_guard_status);
+   if(equity_guard_status != "")
+      g_ui.SetStatus(equity_guard_status);
+   else if(auto_status != "")
       g_ui.SetStatus(auto_status);
    else if(retry_status != "")
       g_ui.SetStatus(retry_status);
