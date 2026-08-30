@@ -22,6 +22,8 @@ private:
    PMPriceMode m_tp_mode;
    PMPassedCloseBehavior m_passed_behavior;
    bool m_auto_enabled;
+   bool m_equity_guard_enabled;
+   PMEquityThresholdMode m_equity_guard_mode;
    int m_max_rows;
    string m_status;
    datetime m_session_close;
@@ -43,6 +45,8 @@ public:
       m_tp_mode = PM_PRICE_ABSOLUTE;
       m_passed_behavior = PM_PASSED_CLOSE_DO_NOTHING;
       m_auto_enabled = false;
+      m_equity_guard_enabled = false;
+      m_equity_guard_mode = PM_EQUITY_THRESHOLD_AMOUNT;
       m_max_rows = PM_DEFAULT_MAX_ROWS;
       m_status = "Ready";
       m_session_close = 0;
@@ -98,8 +102,17 @@ public:
       created = CreateLabel("MINUTES_LABEL", "Minutes before", 425, section_y + 70, clrSilver, 9) && created;
       created = CreateEdit("AUTO_MINUTES", "10", 525, section_y + 67, 55, 22) && created;
       created = CreateButton("PASSED_BEHAVIOR", "Passed: Do Nothing", 590, section_y + 67, 155, 22) && created;
-      created = CreateLabel("SESSION_LABEL", "Today's Close: -    Auto Close At: -", 12, section_y + 100, clrSilver, 9) && created;
-      created = CreateLabel("STATUS_LABEL", "Status: Ready", 12, section_y + 126, clrWhite, 9) && created;
+
+      created = CreateLabel("EQ_LABEL", "Equity Guard", 12, section_y + 103, clrSilver, 9) && created;
+      created = CreateButton("EQ_ENABLED", "OFF", 95, section_y + 100, 65, 22) && created;
+      created = CreateButton("EQ_MODE", "Amount", 170, section_y + 100, 85, 22) && created;
+      created = CreateLabel("EQ_LOSS_LABEL", "Max Loss", 265, section_y + 103, clrSilver, 9) && created;
+      created = CreateEdit("EQ_LOSS_VALUE", "", 330, section_y + 100, 100, 22) && created;
+      created = CreateLabel("EQ_PROFIT_LABEL", "Max Profit", 440, section_y + 103, clrSilver, 9) && created;
+      created = CreateEdit("EQ_PROFIT_VALUE", "", 515, section_y + 100, 100, 22) && created;
+
+      created = CreateLabel("SESSION_LABEL", "Today's Close: -    Auto Close At: -", 12, section_y + 134, clrSilver, 9) && created;
+      created = CreateLabel("STATUS_LABEL", "Status: Ready", 12, section_y + 160, clrWhite, 9) && created;
       created = CreateHandle("RESIZE_HANDLE", m_panel_width - PM_RESIZE_HANDLE_SIZE,
                              PanelHeight() - PM_RESIZE_HANDLE_SIZE,
                              PM_RESIZE_HANDLE_SIZE, PM_RESIZE_HANDLE_SIZE, clrSilver) && created;
@@ -147,6 +160,8 @@ public:
       ObjectSetString(0, Name("AUTO_DIRECTION"), OBJPROP_TEXT, PMDirectionToString(m_auto_direction));
       ObjectSetString(0, Name("PASSED_BEHAVIOR"), OBJPROP_TEXT,
                       m_passed_behavior == PM_PASSED_CLOSE_IMMEDIATELY ? "Passed: Close Now" : "Passed: Do Nothing");
+      ObjectSetString(0, Name("EQ_ENABLED"), OBJPROP_TEXT, m_equity_guard_enabled ? "ON" : "OFF");
+      ObjectSetString(0, Name("EQ_MODE"), OBJPROP_TEXT, EquityThresholdModeToString(m_equity_guard_mode));
       ObjectSetString(0, Name("SESSION_LABEL"), OBJPROP_TEXT,
                       "Today's Close: " + PMFormatDateTime(m_session_close) +
                       "    Auto Close At: " + PMFormatDateTime(m_auto_close_at));
@@ -209,6 +224,14 @@ public:
       config.direction = m_auto_direction;
       config.minutes_before_close = AutoCloseMinutes();
       config.passed_behavior = m_passed_behavior;
+     }
+
+   void GetEquityGuardConfig(EquityGuardConfig &config)
+     {
+      config.enabled = m_equity_guard_enabled;
+      config.mode = m_equity_guard_mode;
+      config.loss_threshold = EquityGuardLossThreshold();
+      config.profit_threshold = EquityGuardProfitThreshold();
      }
 
    bool HandleChartEvent(const long id,
@@ -296,6 +319,11 @@ public:
       else if(object_name == Name("PASSED_BEHAVIOR"))
          m_passed_behavior = m_passed_behavior == PM_PASSED_CLOSE_DO_NOTHING ?
                              PM_PASSED_CLOSE_IMMEDIATELY : PM_PASSED_CLOSE_DO_NOTHING;
+      else if(object_name == Name("EQ_ENABLED"))
+         m_equity_guard_enabled = !m_equity_guard_enabled;
+      else if(object_name == Name("EQ_MODE"))
+         m_equity_guard_mode = m_equity_guard_mode == PM_EQUITY_THRESHOLD_AMOUNT ?
+                               PM_EQUITY_THRESHOLD_PERCENT : PM_EQUITY_THRESHOLD_AMOUNT;
       else
         {
          const int page_start = m_page * m_max_rows;
@@ -348,6 +376,18 @@ private:
       return (int)minutes;
      }
 
+   double EquityGuardLossThreshold()
+     {
+      const double value = StringToDouble(ObjectGetString(0, Name("EQ_LOSS_VALUE"), OBJPROP_TEXT));
+      return value > 0.0 ? value : 0.0;
+     }
+
+   double EquityGuardProfitThreshold()
+     {
+      const double value = StringToDouble(ObjectGetString(0, Name("EQ_PROFIT_VALUE"), OBJPROP_TEXT));
+      return value > 0.0 ? value : 0.0;
+     }
+
    int FindSymbol(const string symbol)
      {
       for(int i = 0; i < ArraySize(m_symbols); i++)
@@ -386,7 +426,7 @@ private:
 
    int PanelHeight()
      {
-      return SectionY() + 165;
+      return SectionY() + 199;
      }
 
    int PageCount()
@@ -414,6 +454,11 @@ private:
    string PriceModeToString(const PMPriceMode mode)
      {
       return mode == PM_PRICE_ABSOLUTE ? "Price" : "Points";
+     }
+
+   string EquityThresholdModeToString(const PMEquityThresholdMode mode)
+     {
+      return mode == PM_EQUITY_THRESHOLD_AMOUNT ? "Amount" : "Percent";
      }
 
    bool IsSelected(const ulong ticket)
@@ -661,8 +706,15 @@ private:
       RepositionY("MINUTES_LABEL", section_y + 70);
       RepositionY("AUTO_MINUTES", section_y + 67);
       RepositionY("PASSED_BEHAVIOR", section_y + 67);
-      RepositionY("SESSION_LABEL", section_y + 100);
-      RepositionY("STATUS_LABEL", section_y + 126);
+      RepositionY("EQ_LABEL", section_y + 103);
+      RepositionY("EQ_ENABLED", section_y + 100);
+      RepositionY("EQ_MODE", section_y + 100);
+      RepositionY("EQ_LOSS_LABEL", section_y + 103);
+      RepositionY("EQ_LOSS_VALUE", section_y + 100);
+      RepositionY("EQ_PROFIT_LABEL", section_y + 103);
+      RepositionY("EQ_PROFIT_VALUE", section_y + 100);
+      RepositionY("SESSION_LABEL", section_y + 134);
+      RepositionY("STATUS_LABEL", section_y + 160);
      }
 
    void RepositionY(const string suffix, const int y)
