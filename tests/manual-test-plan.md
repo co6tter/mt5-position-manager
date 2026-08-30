@@ -55,3 +55,12 @@
 4. 発動中（決済がリトライ待ちの状態）に閾値やモードを変更し、ラッチがリセットされて次のクロッシングで再発動できることを確認する。
 5. Percentモードで、`ACCOUNT_BALANCE`基準で閾値金額に正しく換算されることを確認する（残高の変化ではなくBalanceを基準にしていること）。
 6. Max Loss / Max Profit欄に非数値・負数・空欄を入力し、その側が無効（0扱い）になることを確認する。
+
+## Trailing Stop / Break Even
+
+1. Break Even・Trailingを両方OFFのまま複数ポジションを保有し、SLが一切変化しないことを確認する。
+2. Break EvenをONにしTrigger/Lockを設定し、対象Symbol・Directionのポジションが含み益Trigger以上になった瞬間にSLが建値+Lock（Buy）または建値-Lock（Sell）へ1回だけ更新されることを確認する（Expertsログの`[INFO] Position modified...`が連続して出力されないこと）。
+3. TrailingをONにしDistanceを設定し、含み益がDistance未満の間はSLが動かず、Distance以上になってから現在価格からDistance分の位置で追従を始めることを確認する。価格が反落してもSLが後退しないことを確認する。
+4. Break Even・Trailing両方ONの状態で、含み益が小さい間はBreak Evenのロック位置、含み益が大きくなるとTrailingの位置に自然に切り替わることを確認する。
+5. Trigger/Lock/Distance欄に非数値・負数・空欄を入力し、その機能が実質的に無効になる（SLを一切動かさない）ことを確認する。
+6. 対象外のSymbol・Directionのポジションが影響を受けないことを確認する.

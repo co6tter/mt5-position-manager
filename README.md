@@ -10,6 +10,7 @@
 - 選択ポジションのSL / TP削除
 - 取引セッション終了時刻を使ったAuto Close
 - 口座全体の含み損益に基づくEquity Guard（緊急全決済）
+- 選択したSymbol・DirectionへのBreak Even（建値保存）とTrailing Stop
 - Stops Level、Freeze Level、Tick Sizeを考慮したSL / TP検証
 - Trade serverのretcode確認、部分失敗の表示、有限回リトライ
 - ページングによる全ポジションの確認
@@ -61,6 +62,14 @@ Auto CloseをONにし、Symbol、Direction、クローズ何分前かを指定�
 
 監視する合計は各ポジションの含み損益（`POSITION_PROFIT`）の合計であり、swapや手数料は含みません。これらを考慮したい場合は閾値を余裕を持って設定してください。
 
+## Trailing Stop / Break Even
+
+Break EvenとTrailingは1つのSymbol・Direction選択を共有し、Filter・Auto Close・Equity Guardの選択とは独立です。
+
+Break Evenは、現在価格が建値からTrigger（points）以上有利に動いたら、建値からLock（points）分有利な位置へSLを移動します。Trailingは、現在価格が建値からDistance（points）以上有利に動いたら、現在価格からDistance分のSLで追従を開始します。どちらも毎tick再計算され、現在の実際のSLより厳密に有利な場合のみ更新するため、SLが後退することはありません（一度設定したSLより不利な方向へは動きません）。TPは変更しません。
+
+両方を同時に有効にした場合は、その時点でより有利な方を採用します。ブローカーのStops Level・Freeze Levelにより更新が拒否される場合は、そのTicketをそのtickだけスキップし、次のtickで再試行します。Auto Close・Equity Guardと同様に確認ダイアログは表示されません。
+
 ## 安全上の注意
 
 - 実口座へ適用する前に、必ずデモ口座・ストラテジーテスターで確認してください。
@@ -81,6 +90,7 @@ Auto CloseをONにし、Symbol、Direction、クローズ何分前かを指定�
 - `src/SessionService.mqh`: 取引セッション終了時刻の取得
 - `src/AutoCloseService.mqh`: Auto Closeの日次判定
 - `src/EquityGuardService.mqh`: 口座全体の含み損益によるEquity Guard判定
+- `src/TrailingStopService.mqh`: Break Even・Trailing StopのSL候補計算とラチェット更新
 - `src/UiPanel.mqh`: チャートオブジェクトによる操作パネル
 - `src/Models.mqh`, `src/Constants.mqh`: 共通モデルと補助関数
 - `scripts/compile.ps1`: MetaEditorコンパイル検証
