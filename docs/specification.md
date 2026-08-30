@@ -42,6 +42,18 @@ Price入力またはPoints入力を受け付ける。Pointsの基準価格はLon
 
 Auto Closeと同様にOnTimer駆動の自動処理とし、確認ダイアログは表示しない。発動時のステータスはAuto Close/Retryのメッセージより優先して表示する。
 
+## Trailing Stop / Break Even
+
+対象は1つのSymbol・Directionを選択し、Auto Closeと同様に他の選択（Filter等）とは独立に保持する。
+
+Break Evenは、現在価格と建値の差（points）がTriggerに達したら、建値からLock（points）分有利な位置をSL候補とする。Trailingは、現在価格と建値の差（points）がTrail距離に達したら、現在価格からTrail距離分のSLを候補とする。
+
+毎tick、対象Ticketごとに両候補のうち有利な方を採用し、現在の実際のSLより厳密に有利な場合のみSLを更新する（TPは変更しない）。SLを後退させることはない。状態は保持せず、既存のSL・建値・現在価格から都度再計算する。
+
+候補価格（Break Evenの建値ベース、Trailingの現在価格ベース）はどちらも自前で絶対値として計算し、Tick Sizeへの正規化・Stops Level・Freeze Levelチェックには既存の`CValidationService.CalculateTarget()`をAbsoluteモードで再利用する。
+
+Auto Close・Equity Guardと同様にOnTimer駆動の自動処理とし、確認ダイアログは表示しない。
+
 ## 非対象
 
-新規エントリー、自動売買戦略、インジケーター、Risk %、Trailing Stop、Break Even、Partial Close、Pending Order、Magic Numberフィルタ。
+新規エントリー、自動売買戦略、インジケーター、Risk %、Partial Close、Pending Order、Magic Numberフィルタ。

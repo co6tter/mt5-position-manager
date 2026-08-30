@@ -88,4 +88,4 @@ Auto CloseをONにし、Symbol、Direction、クローズ何分前かを指定�
 
 ## 非対象
 
-新規Buy / Sell、自動エントリー、戦略、インジケーター、ロット計算、Trailing Stop、Break Even、Partial Close、Pending Order管理、Magic Numberフィルタは対象外です。
+新規Buy / Sell、自動エントリー、戦略、インジケーター、ロット計算、Partial Close、Pending Order管理、Magic Numberフィルタは対象外です。
