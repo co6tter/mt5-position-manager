@@ -28,6 +28,9 @@ private:
    datetime m_auto_close_at;
    int m_page;
    bool m_row_render_error_reported;
+   int m_origin_x;
+   int m_origin_y;
+   int m_panel_width;
 
 public:
    CUiPanel()
@@ -46,15 +49,22 @@ public:
       m_auto_close_at = 0;
       m_page = 0;
       m_row_render_error_reported = false;
+      m_origin_x = 0;
+      m_origin_y = 0;
+      m_panel_width = PM_DEFAULT_PANEL_WIDTH;
      }
 
    bool Create(const int max_rows)
      {
-      m_max_rows = MathMax(1, MathMin(max_rows, PM_MAX_POSITION_ROWS));
+      m_max_rows = MathMax(PM_MIN_POSITION_ROWS, MathMin(max_rows, PM_MAX_POSITION_ROWS));
+      m_panel_width = PM_DEFAULT_PANEL_WIDTH;
+      m_origin_x = 0;
+      m_origin_y = 0;
       ObjectsDeleteAll(0, PM_OBJECT_PREFIX);
-      const int section_y = 95 + m_max_rows * 21;
+      const int section_y = SectionY();
       bool created = true;
-      created = CreateBackground(section_y + 165) && created;
+      created = CreateBackground(PanelHeight()) && created;
+      created = CreateHandle("DRAG_HANDLE", 0, 0, m_panel_width, PM_TITLEBAR_HEIGHT, C'25,25,30', 0) && created;
       created = CreateLabel("TITLE", "MT5 Position Manager", 12, 8, clrWhite, 12) && created;
       created = CreateLabel("FILTER_LABEL", "Filter", 12, 38, clrSilver, 9) && created;
       created = CreateButton("FILTER_SYMBOL", "Symbol", 62, 34, 120, 22) && created;
@@ -90,6 +100,9 @@ public:
       created = CreateButton("PASSED_BEHAVIOR", "Passed: Do Nothing", 590, section_y + 67, 155, 22) && created;
       created = CreateLabel("SESSION_LABEL", "Today's Close: -    Auto Close At: -", 12, section_y + 100, clrSilver, 9) && created;
       created = CreateLabel("STATUS_LABEL", "Status: Ready", 12, section_y + 126, clrWhite, 9) && created;
+      created = CreateHandle("RESIZE_HANDLE", m_panel_width - PM_RESIZE_HANDLE_SIZE,
+                             PanelHeight() - PM_RESIZE_HANDLE_SIZE,
+                             PM_RESIZE_HANDLE_SIZE, PM_RESIZE_HANDLE_SIZE, clrSilver) && created;
       ChartRedraw();
       if(!created)
          PrintFormat("[ERROR] UI panel creation failed. last_error=%d", GetLastError());
@@ -139,7 +152,7 @@ public:
                                    m_page + 1, PageCount(),
                                    ArraySize(m_selected), ArraySize(m_positions)));
 
-      for(int row = 0; row < m_max_rows; row++)
+      for(int row = 0; row < PM_MAX_POSITION_ROWS; row++)
          ObjectDelete(0, RowName(row));
       const int page_start = m_page * m_max_rows;
       const int visible = MathMin(m_max_rows, ArraySize(m_positions) - page_start);
@@ -156,7 +169,7 @@ public:
                              "  P=" + DoubleToString(position.profit, 2) +
                              "  #" + StringFormat("%I64u", position.ticket);
          rows_created = CreateButton(
-            RowSuffix(row), text, 12, 90 + row * 21, 755, 19,
+            RowSuffix(row), text, 12, 90 + row * 21, m_panel_width - 25, 19,
             IsSelected(position.ticket) ? clrDarkGreen : clrDarkSlateGray) &&
             rows_created;
         }
@@ -201,6 +214,22 @@ public:
                          CValidationService &validator,
                          CPositionActionService &actions)
      {
+      if(id == CHARTEVENT_OBJECT_DRAG)
+        {
+         if(object_name == Name("DRAG_HANDLE"))
+           {
+            HandleDrag();
+            Render();
+            return true;
+           }
+         if(object_name == Name("RESIZE_HANDLE"))
+           {
+            HandleResize();
+            Render();
+            return true;
+           }
+         return false;
+        }
       if(id != CHARTEVENT_OBJECT_CLICK && id != CHARTEVENT_OBJECT_ENDEDIT)
          return false;
       if(id == CHARTEVENT_OBJECT_ENDEDIT && object_name == Name("AUTO_MINUTES"))
@@ -344,6 +373,16 @@ private:
       if(index < 0)
          index = 0;
       selected = m_symbols[(index + 1) % ArraySize(m_symbols)];
+     }
+
+   int SectionY()
+     {
+      return 95 + m_max_rows * 21;
+     }
+
+   int PanelHeight()
+     {
+      return SectionY() + 165;
      }
 
    int PageCount()
@@ -540,15 +579,97 @@ private:
       SetStatus(BatchResultText(is_sl ? "SL clear" : "TP clear", result));
      }
 
+   void HandleDrag()
+     {
+      const string handle = Name("DRAG_HANDLE");
+      const int new_x = (int)ObjectGetInteger(0, handle, OBJPROP_XDISTANCE);
+      const int new_y = (int)ObjectGetInteger(0, handle, OBJPROP_YDISTANCE);
+      const int delta_x = new_x - m_origin_x;
+      const int delta_y = new_y - m_origin_y;
+      m_origin_x = new_x;
+      m_origin_y = new_y;
+      ShiftPanelObjects(delta_x, delta_y, handle);
+     }
+
+   void ShiftPanelObjects(const int delta_x, const int delta_y, const string exclude_name)
+     {
+      if(delta_x == 0 && delta_y == 0)
+         return;
+      const int total = ObjectsTotal(0, -1, -1);
+      for(int i = total - 1; i >= 0; i--)
+        {
+         const string name = ObjectName(0, i, -1, -1);
+         if(StringFind(name, PM_OBJECT_PREFIX) != 0 || name == exclude_name)
+            continue;
+         const int x = (int)ObjectGetInteger(0, name, OBJPROP_XDISTANCE);
+         const int y = (int)ObjectGetInteger(0, name, OBJPROP_YDISTANCE);
+         ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x + delta_x);
+         ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y + delta_y);
+        }
+     }
+
+   void HandleResize()
+     {
+      const string handle = Name("RESIZE_HANDLE");
+      const int handle_x = (int)ObjectGetInteger(0, handle, OBJPROP_XDISTANCE);
+      const int handle_y = (int)ObjectGetInteger(0, handle, OBJPROP_YDISTANCE);
+      const int requested_width = handle_x - m_origin_x + PM_RESIZE_HANDLE_SIZE;
+      const int requested_height = handle_y - m_origin_y + PM_RESIZE_HANDLE_SIZE;
+      m_panel_width = MathMax(PM_MIN_PANEL_WIDTH, MathMin(requested_width, PM_MAX_PANEL_WIDTH));
+      // Inverse of PanelHeight() = SectionY() + 165 = 95 + rows * 21 + 165.
+      const int requested_rows = (requested_height - 260) / 21;
+      m_max_rows = MathMax(PM_MIN_POSITION_ROWS, MathMin(requested_rows, PM_MAX_POSITION_ROWS));
+      ApplyLayout();
+      ClampPage();
+     }
+
+   void ApplyLayout()
+     {
+      const int section_y = SectionY();
+      const int panel_height = PanelHeight();
+      ObjectSetInteger(0, Name("BACKGROUND"), OBJPROP_XSIZE, m_panel_width);
+      ObjectSetInteger(0, Name("BACKGROUND"), OBJPROP_YSIZE, panel_height);
+      ObjectSetInteger(0, Name("DRAG_HANDLE"), OBJPROP_XSIZE, m_panel_width);
+      ObjectSetInteger(0, Name("RESIZE_HANDLE"), OBJPROP_XDISTANCE,
+                       m_origin_x + m_panel_width - PM_RESIZE_HANDLE_SIZE);
+      ObjectSetInteger(0, Name("RESIZE_HANDLE"), OBJPROP_YDISTANCE,
+                       m_origin_y + panel_height - PM_RESIZE_HANDLE_SIZE);
+      RepositionY("SL_LABEL", section_y + 3);
+      RepositionY("SL_MODE", section_y);
+      RepositionY("SL_VALUE", section_y);
+      RepositionY("SET_SL", section_y);
+      RepositionY("CLEAR_SL", section_y);
+      RepositionY("TP_LABEL", section_y + 36);
+      RepositionY("TP_MODE", section_y + 33);
+      RepositionY("TP_VALUE", section_y + 33);
+      RepositionY("SET_TP", section_y + 33);
+      RepositionY("CLEAR_TP", section_y + 33);
+      RepositionY("AUTO_LABEL", section_y + 70);
+      RepositionY("AUTO_ENABLED", section_y + 67);
+      RepositionY("AUTO_SYMBOL_LABEL", section_y + 70);
+      RepositionY("AUTO_SYMBOL", section_y + 67);
+      RepositionY("AUTO_DIRECTION", section_y + 67);
+      RepositionY("MINUTES_LABEL", section_y + 70);
+      RepositionY("AUTO_MINUTES", section_y + 67);
+      RepositionY("PASSED_BEHAVIOR", section_y + 67);
+      RepositionY("SESSION_LABEL", section_y + 100);
+      RepositionY("STATUS_LABEL", section_y + 126);
+     }
+
+   void RepositionY(const string suffix, const int y)
+     {
+      ObjectSetInteger(0, Name(suffix), OBJPROP_YDISTANCE, m_origin_y + y);
+     }
+
    bool CreateBackground(const int height)
      {
       const string object_name = Name("BACKGROUND");
       if(!ObjectCreate(0, object_name, OBJ_RECTANGLE_LABEL, 0, 0, 0))
          return false;
       ObjectSetInteger(0, object_name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
-      ObjectSetInteger(0, object_name, OBJPROP_XDISTANCE, 0);
-      ObjectSetInteger(0, object_name, OBJPROP_YDISTANCE, 0);
-      ObjectSetInteger(0, object_name, OBJPROP_XSIZE, 780);
+      ObjectSetInteger(0, object_name, OBJPROP_XDISTANCE, m_origin_x);
+      ObjectSetInteger(0, object_name, OBJPROP_YDISTANCE, m_origin_y);
+      ObjectSetInteger(0, object_name, OBJPROP_XSIZE, m_panel_width);
       ObjectSetInteger(0, object_name, OBJPROP_YSIZE, height);
       ObjectSetInteger(0, object_name, OBJPROP_BGCOLOR, C'25,25,30');
       ObjectSetInteger(0, object_name, OBJPROP_BORDER_COLOR, clrDimGray);
@@ -564,11 +685,33 @@ private:
                       const int y)
      {
       ObjectSetInteger(0, object_name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
-      ObjectSetInteger(0, object_name, OBJPROP_XDISTANCE, x);
-      ObjectSetInteger(0, object_name, OBJPROP_YDISTANCE, y);
+      ObjectSetInteger(0, object_name, OBJPROP_XDISTANCE, m_origin_x + x);
+      ObjectSetInteger(0, object_name, OBJPROP_YDISTANCE, m_origin_y + y);
       ObjectSetInteger(0, object_name, OBJPROP_SELECTABLE, false);
       ObjectSetInteger(0, object_name, OBJPROP_HIDDEN, true);
       ObjectSetInteger(0, object_name, OBJPROP_ZORDER, 1);
+     }
+
+   bool CreateHandle(const string suffix,
+                     const int x,
+                     const int y,
+                     const int width,
+                     const int height,
+                     const color bg,
+                     const int zorder = 1)
+     {
+      const string object_name = Name(suffix);
+      if(!ObjectCreate(0, object_name, OBJ_RECTANGLE_LABEL, 0, 0, 0))
+         return false;
+      PrepareObject(object_name, x, y);
+      ObjectSetInteger(0, object_name, OBJPROP_SELECTABLE, true);
+      ObjectSetInteger(0, object_name, OBJPROP_XSIZE, width);
+      ObjectSetInteger(0, object_name, OBJPROP_YSIZE, height);
+      ObjectSetInteger(0, object_name, OBJPROP_BGCOLOR, bg);
+      ObjectSetInteger(0, object_name, OBJPROP_BORDER_COLOR, bg);
+      ObjectSetInteger(0, object_name, OBJPROP_BACK, false);
+      ObjectSetInteger(0, object_name, OBJPROP_ZORDER, zorder);
+      return true;
      }
 
    bool CreateLabel(const string suffix,
