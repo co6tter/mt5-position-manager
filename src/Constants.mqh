@@ -53,6 +53,14 @@ bool PMIsTransientTradeRetcode(const uint retcode)
           retcode == TRADE_RETCODE_TOO_MANY_REQUESTS;
   }
 
+bool PMIsTradingUnavailableRetcode(const uint retcode)
+  {
+   return retcode == TRADE_RETCODE_TRADE_DISABLED ||
+          retcode == TRADE_RETCODE_MARKET_CLOSED ||
+          retcode == TRADE_RETCODE_SERVER_DISABLES_AT ||
+          retcode == TRADE_RETCODE_CLIENT_DISABLES_AT;
+  }
+
 string PMFormatPrice(const string symbol, const double price)
   {
    const int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);

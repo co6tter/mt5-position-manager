@@ -134,6 +134,10 @@ public:
 
    void Render()
      {
+      // Clicking elsewhere on the chart deselects other selectable objects;
+      // keep the drag/resize handles perpetually selected so they stay grabbable.
+      ObjectSetInteger(0, Name("DRAG_HANDLE"), OBJPROP_SELECTED, true);
+      ObjectSetInteger(0, Name("RESIZE_HANDLE"), OBJPROP_SELECTED, true);
       ObjectSetString(0, Name("FILTER_SYMBOL"), OBJPROP_TEXT, FilterSymbol());
       ObjectSetString(0, Name("FILTER_DIRECTION"), OBJPROP_TEXT, PMDirectionToString(m_filter_direction));
       ObjectSetString(0, Name("SL_MODE"), OBJPROP_TEXT, PriceModeToString(m_sl_mode));
@@ -500,13 +504,18 @@ private:
 
    string BatchResultText(const string operation, PMBatchResult &result)
      {
+      if(ArraySize(result.failures) > 0 &&
+         PMIsTradingUnavailableRetcode(result.failures[0].retcode))
+         return StringFormat("%s stopped: trading unavailable (%s)",
+                             operation, result.failures[0].description);
       string text = StringFormat("%s: %d succeeded, %d queued, %d failed / %d",
                                  operation, result.successful, result.queued,
                                  ArraySize(result.failures), result.requested);
       if(ArraySize(result.failures) > 0)
-         text += StringFormat("; ticket=%I64u (%s)",
+         text += StringFormat("; ticket=%I64u (%s, retcode=%u)",
                               result.failures[0].ticket,
-                              result.failures[0].description);
+                              result.failures[0].description,
+                              result.failures[0].retcode);
       return text;
      }
 
@@ -705,6 +714,7 @@ private:
          return false;
       PrepareObject(object_name, x, y);
       ObjectSetInteger(0, object_name, OBJPROP_SELECTABLE, true);
+      ObjectSetInteger(0, object_name, OBJPROP_SELECTED, true);
       ObjectSetInteger(0, object_name, OBJPROP_XSIZE, width);
       ObjectSetInteger(0, object_name, OBJPROP_YSIZE, height);
       ObjectSetInteger(0, object_name, OBJPROP_BGCOLOR, bg);
