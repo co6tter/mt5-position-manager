@@ -24,6 +24,10 @@ private:
    bool m_auto_enabled;
    bool m_equity_guard_enabled;
    PMEquityThresholdMode m_equity_guard_mode;
+   string m_trailing_symbol;
+   PMDirection m_trailing_direction;
+   bool m_break_even_enabled;
+   bool m_trailing_enabled;
    int m_max_rows;
    string m_status;
    datetime m_session_close;
@@ -47,6 +51,10 @@ public:
       m_auto_enabled = false;
       m_equity_guard_enabled = false;
       m_equity_guard_mode = PM_EQUITY_THRESHOLD_AMOUNT;
+      m_trailing_symbol = "";
+      m_trailing_direction = PM_DIRECTION_BOTH;
+      m_break_even_enabled = false;
+      m_trailing_enabled = false;
       m_max_rows = PM_DEFAULT_MAX_ROWS;
       m_status = "Ready";
       m_session_close = 0;
@@ -112,8 +120,25 @@ public:
       created = CreateEdit("EQ_PROFIT_VALUE", "", 515, section_y + 100, 100, 22) && created;
       created = CreateLabel("EQ_SCOPE_LABEL", "All symbols", 625, section_y + 103, clrOrange, 9) && created;
 
-      created = CreateLabel("SESSION_LABEL", "Today's Close: -    Auto Close At: -", 12, section_y + 134, clrSilver, 9) && created;
-      created = CreateLabel("STATUS_LABEL", "Status: Ready", 12, section_y + 160, clrWhite, 9) && created;
+      created = CreateLabel("TS_LABEL", "Trailing Stop", 12, section_y + 137, clrSilver, 9) && created;
+      created = CreateLabel("TS_SYMBOL_LABEL", "Symbol", 95, section_y + 137, clrSilver, 9) && created;
+      created = CreateButton("TS_SYMBOL", "Symbol", 145, section_y + 134, 105, 22) && created;
+      created = CreateButton("TS_DIRECTION", "Both", 255, section_y + 134, 85, 22) && created;
+
+      created = CreateLabel("BE_LABEL", "Break Even", 12, section_y + 171, clrSilver, 9) && created;
+      created = CreateButton("BE_ENABLED", "OFF", 95, section_y + 168, 65, 22) && created;
+      created = CreateLabel("BE_TRIGGER_LABEL", "Trigger(pt)", 170, section_y + 171, clrSilver, 9) && created;
+      created = CreateEdit("BE_TRIGGER_VALUE", "", 255, section_y + 168, 70, 22) && created;
+      created = CreateLabel("BE_LOCK_LABEL", "Lock(pt)", 335, section_y + 171, clrSilver, 9) && created;
+      created = CreateEdit("BE_LOCK_VALUE", "", 400, section_y + 168, 70, 22) && created;
+
+      created = CreateLabel("TRAIL_LABEL", "Trailing", 12, section_y + 205, clrSilver, 9) && created;
+      created = CreateButton("TRAIL_ENABLED", "OFF", 95, section_y + 202, 65, 22) && created;
+      created = CreateLabel("TRAIL_DIST_LABEL", "Distance(pt)", 170, section_y + 205, clrSilver, 9) && created;
+      created = CreateEdit("TRAIL_DIST_VALUE", "", 255, section_y + 202, 70, 22) && created;
+
+      created = CreateLabel("SESSION_LABEL", "Today's Close: -    Auto Close At: -", 12, section_y + 236, clrSilver, 9) && created;
+      created = CreateLabel("STATUS_LABEL", "Status: Ready", 12, section_y + 262, clrWhite, 9) && created;
       created = CreateHandle("RESIZE_HANDLE", m_panel_width - PM_RESIZE_HANDLE_SIZE,
                              PanelHeight() - PM_RESIZE_HANDLE_SIZE,
                              PM_RESIZE_HANDLE_SIZE, PM_RESIZE_HANDLE_SIZE, clrSilver) && created;
@@ -136,8 +161,11 @@ public:
          m_filter_symbol = _Symbol;
       if(m_auto_symbol == "")
          m_auto_symbol = _Symbol;
+      if(m_trailing_symbol == "")
+         m_trailing_symbol = _Symbol;
       EnsureSymbolCandidate(m_filter_symbol);
       EnsureSymbolCandidate(m_auto_symbol);
+      EnsureSymbolCandidate(m_trailing_symbol);
       ClampPage();
       for(int i = ArraySize(m_selected) - 1; i >= 0; i--)
         {
@@ -163,6 +191,10 @@ public:
                       m_passed_behavior == PM_PASSED_CLOSE_IMMEDIATELY ? "Passed: Close Now" : "Passed: Do Nothing");
       ObjectSetString(0, Name("EQ_ENABLED"), OBJPROP_TEXT, m_equity_guard_enabled ? "ON" : "OFF");
       ObjectSetString(0, Name("EQ_MODE"), OBJPROP_TEXT, EquityThresholdModeToString(m_equity_guard_mode));
+      ObjectSetString(0, Name("TS_SYMBOL"), OBJPROP_TEXT, TrailingSymbol());
+      ObjectSetString(0, Name("TS_DIRECTION"), OBJPROP_TEXT, PMDirectionToString(m_trailing_direction));
+      ObjectSetString(0, Name("BE_ENABLED"), OBJPROP_TEXT, m_break_even_enabled ? "ON" : "OFF");
+      ObjectSetString(0, Name("TRAIL_ENABLED"), OBJPROP_TEXT, m_trailing_enabled ? "ON" : "OFF");
       ObjectSetString(0, Name("SESSION_LABEL"), OBJPROP_TEXT,
                       "Today's Close: " + PMFormatDateTime(m_session_close) +
                       "    Auto Close At: " + PMFormatDateTime(m_auto_close_at));
@@ -233,6 +265,17 @@ public:
       config.mode = m_equity_guard_mode;
       config.loss_threshold = EquityGuardLossThreshold();
       config.profit_threshold = EquityGuardProfitThreshold();
+     }
+
+   void GetTrailingStopConfig(TrailingStopConfig &config)
+     {
+      config.enabled_break_even = m_break_even_enabled;
+      config.enabled_trailing = m_trailing_enabled;
+      config.symbol = TrailingSymbol();
+      config.direction = m_trailing_direction;
+      config.be_trigger_points = BreakEvenTriggerPoints();
+      config.be_lock_points = BreakEvenLockPoints();
+      config.trail_points = TrailingDistancePoints();
      }
 
    bool HandleChartEvent(const long id,
@@ -325,6 +368,14 @@ public:
       else if(object_name == Name("EQ_MODE"))
          m_equity_guard_mode = m_equity_guard_mode == PM_EQUITY_THRESHOLD_AMOUNT ?
                                PM_EQUITY_THRESHOLD_PERCENT : PM_EQUITY_THRESHOLD_AMOUNT;
+      else if(object_name == Name("TS_SYMBOL"))
+         CycleSymbol(m_trailing_symbol);
+      else if(object_name == Name("TS_DIRECTION"))
+         m_trailing_direction = NextDirection(m_trailing_direction);
+      else if(object_name == Name("BE_ENABLED"))
+         m_break_even_enabled = !m_break_even_enabled;
+      else if(object_name == Name("TRAIL_ENABLED"))
+         m_trailing_enabled = !m_trailing_enabled;
       else
         {
          const int page_start = m_page * m_max_rows;
@@ -366,6 +417,11 @@ private:
       return m_auto_symbol == "" ? _Symbol : m_auto_symbol;
      }
 
+   string TrailingSymbol()
+     {
+      return m_trailing_symbol == "" ? _Symbol : m_trailing_symbol;
+     }
+
    int AutoCloseMinutes()
      {
       long minutes = StringToInteger(
@@ -387,6 +443,24 @@ private:
      {
       const double value = StringToDouble(ObjectGetString(0, Name("EQ_PROFIT_VALUE"), OBJPROP_TEXT));
       return value > 0.0 ? value : 0.0;
+     }
+
+   int BreakEvenTriggerPoints()
+     {
+      const long value = StringToInteger(ObjectGetString(0, Name("BE_TRIGGER_VALUE"), OBJPROP_TEXT));
+      return value > 0 ? (int)value : 0;
+     }
+
+   int BreakEvenLockPoints()
+     {
+      const long value = StringToInteger(ObjectGetString(0, Name("BE_LOCK_VALUE"), OBJPROP_TEXT));
+      return value > 0 ? (int)value : 0;
+     }
+
+   int TrailingDistancePoints()
+     {
+      const long value = StringToInteger(ObjectGetString(0, Name("TRAIL_DIST_VALUE"), OBJPROP_TEXT));
+      return value > 0 ? (int)value : 0;
      }
 
    int FindSymbol(const string symbol)
@@ -427,7 +501,7 @@ private:
 
    int PanelHeight()
      {
-      return SectionY() + 199;
+      return SectionY() + 301;
      }
 
    int PageCount()
@@ -716,8 +790,22 @@ private:
       RepositionY("EQ_PROFIT_LABEL", section_y + 103);
       RepositionY("EQ_PROFIT_VALUE", section_y + 100);
       RepositionY("EQ_SCOPE_LABEL", section_y + 103);
-      RepositionY("SESSION_LABEL", section_y + 134);
-      RepositionY("STATUS_LABEL", section_y + 160);
+      RepositionY("TS_LABEL", section_y + 137);
+      RepositionY("TS_SYMBOL_LABEL", section_y + 137);
+      RepositionY("TS_SYMBOL", section_y + 134);
+      RepositionY("TS_DIRECTION", section_y + 134);
+      RepositionY("BE_LABEL", section_y + 171);
+      RepositionY("BE_ENABLED", section_y + 168);
+      RepositionY("BE_TRIGGER_LABEL", section_y + 171);
+      RepositionY("BE_TRIGGER_VALUE", section_y + 168);
+      RepositionY("BE_LOCK_LABEL", section_y + 171);
+      RepositionY("BE_LOCK_VALUE", section_y + 168);
+      RepositionY("TRAIL_LABEL", section_y + 205);
+      RepositionY("TRAIL_ENABLED", section_y + 202);
+      RepositionY("TRAIL_DIST_LABEL", section_y + 205);
+      RepositionY("TRAIL_DIST_VALUE", section_y + 202);
+      RepositionY("SESSION_LABEL", section_y + 236);
+      RepositionY("STATUS_LABEL", section_y + 262);
      }
 
    void RepositionY(const string suffix, const int y)
