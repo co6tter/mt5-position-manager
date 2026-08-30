@@ -133,6 +133,20 @@ void TestEquityGuardEvaluation()
               "Disabled guard never triggers");
   }
 
+void TestEquityGuardLatch()
+  {
+   bool triggered = false;
+
+   AssertTrue(PMShouldFireEquityGuard(true, triggered) && triggered,
+              "Latch fires on first crossing");
+   AssertTrue(!PMShouldFireEquityGuard(true, triggered) && triggered,
+              "Latch stays quiet while still triggered");
+   AssertTrue(!PMShouldFireEquityGuard(false, triggered) && !triggered,
+              "Latch resets once the crossing clears");
+   AssertTrue(PMShouldFireEquityGuard(true, triggered) && triggered,
+              "Latch fires again after resetting");
+  }
+
 void OnStart()
   {
    TestDirectionMatching();
@@ -140,6 +154,7 @@ void OnStart()
    TestTransientRetcodes();
    TestSessionCloseResolution();
    TestEquityGuardEvaluation();
+   TestEquityGuardLatch();
    if(g_failures == 0)
       Print("[PASS] All Position Manager pure tests passed.");
    else

@@ -38,6 +38,19 @@ bool PMEvaluateEquityGuard(const double total_profit,
    return loss_triggered || profit_triggered;
   }
 
+bool PMShouldFireEquityGuard(const bool should_trigger, bool &triggered)
+  {
+   if(!should_trigger)
+     {
+      triggered = false;
+      return false;
+     }
+   if(triggered)
+      return false;
+   triggered = true;
+   return true;
+  }
+
 class CEquityGuardService
   {
 private:
@@ -78,14 +91,8 @@ public:
       const bool should_trigger = PMEvaluateEquityGuard(total_profit, config, balance,
                                                         loss_triggered, profit_triggered);
 
-      if(!should_trigger)
-        {
-         m_triggered = false;
+      if(!PMShouldFireEquityGuard(should_trigger, m_triggered))
          return false;
-        }
-      if(m_triggered)
-         return false;
-      m_triggered = true;
 
       const string side = loss_triggered ? "loss" : "profit";
       ulong tickets[];
