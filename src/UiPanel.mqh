@@ -153,8 +153,8 @@ public:
       created = CreateButton("ENTRY_TP_INC", "+", 182, ContentTop() + 94, 26, 22) && created;
       created = CreateLabel("ENTRY_BUY_PREVIEW", "Buy SL/TP: - / -", 230, ContentTop() + 34, clrSilver, 9) && created;
       created = CreateLabel("ENTRY_SELL_PREVIEW", "Sell SL/TP: - / -", 230, ContentTop() + 51, clrSilver, 9) && created;
-      created = CreateButton("ENTRY_SELL", "SELL MARKET", 230, ContentTop() + 72, 105, 28, clrMaroon) && created;
-      created = CreateButton("ENTRY_BUY", "BUY MARKET", 343, ContentTop() + 72, 105, 28, clrDarkGreen) && created;
+      created = CreateButton("ENTRY_SELL", "SELL", 230, ContentTop() + 72, 105, 28, clrMaroon) && created;
+      created = CreateButton("ENTRY_BUY", "BUY", 343, ContentTop() + 72, 105, 28, clrDarkGreen) && created;
       created = CreateLabel("ENTRY_HINT", "Prices follow current Bid/Ask; 0 pts disables SL/TP.", 12, ContentTop() + 130, clrSilver, 8) && created;
 
       created = CreateLabel("FILTER_LABEL", "Filter", 12, ContentTop() + 4, clrSilver, 9) && created;

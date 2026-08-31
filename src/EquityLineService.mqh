@@ -86,7 +86,7 @@ public:
       ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_COLOR,
                        PM_EQUITY_LINE_COLOR);
       ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_STYLE,
-                       STYLE_DASH);
+                       STYLE_DOT);
       ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_WIDTH, 1);
       ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_BACK, true);
       ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_ZORDER, 0);
