@@ -34,15 +34,19 @@ private:
    int m_be_lock_points;
    int m_trail_points;
    int m_max_rows;
+   PMPanelTab m_active_tab;
+   bool m_collapsed;
    string m_status;
    datetime m_session_close;
    datetime m_auto_close_at;
    int m_page;
+   int m_rendered_rows;
    bool m_row_render_error_reported;
    int m_origin_x;
    int m_origin_y;
    int m_panel_width;
    int m_panel_height;
+   int m_expanded_height;
    bool m_dragging;
    bool m_resizing;
    int m_interaction_start_x;
@@ -50,7 +54,6 @@ private:
    int m_interaction_origin_x;
    int m_interaction_origin_y;
    int m_interaction_width;
-   int m_interaction_height;
    bool m_chart_mouse_scroll_before_interaction;
    bool m_chart_mouse_move_before_create;
 
@@ -77,15 +80,19 @@ public:
       m_be_lock_points = 0;
       m_trail_points = 0;
       m_max_rows = PM_DEFAULT_MAX_ROWS;
+      m_active_tab = PM_PANEL_TAB_ENTRY;
+      m_collapsed = false;
       m_status = "Ready";
       m_session_close = 0;
       m_auto_close_at = 0;
       m_page = 0;
+      m_rendered_rows = 0;
       m_row_render_error_reported = false;
       m_origin_x = 0;
       m_origin_y = 0;
       m_panel_width = PM_DEFAULT_PANEL_WIDTH;
       m_panel_height = 0;
+      m_expanded_height = 0;
       m_dragging = false;
       m_resizing = false;
       m_interaction_start_x = 0;
@@ -93,7 +100,6 @@ public:
       m_interaction_origin_x = 0;
       m_interaction_origin_y = 0;
       m_interaction_width = 0;
-      m_interaction_height = 0;
       m_chart_mouse_scroll_before_interaction = true;
       m_chart_mouse_move_before_create = true;
      }
@@ -104,85 +110,114 @@ public:
       m_panel_width = PM_DEFAULT_PANEL_WIDTH;
       m_origin_x = 0;
       m_origin_y = 0;
-      m_panel_height = MinimumPanelHeightForRows(m_max_rows);
+      m_panel_height = ExpandedPanelHeight();
+      m_expanded_height = m_panel_height;
       long mouse_move_enabled = 0;
       if(ChartGetInteger(0, CHART_EVENT_MOUSE_MOVE, 0, mouse_move_enabled))
          m_chart_mouse_move_before_create = mouse_move_enabled != 0;
       ResetLastError();
       if(!ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, 0, true))
         {
-         PrintFormat("[ERROR] Unable to enable chart mouse move events. error=%d",
-                     GetLastError());
+         PrintFormat("[ERROR] Unable to enable chart mouse move events. error=%d", GetLastError());
          return false;
         }
       ObjectsDeleteAll(0, PM_OBJECT_PREFIX);
-      const int section_y = SectionY();
       bool created = true;
       created = CreateBackground(PanelHeight()) && created;
-      created = CreateLabel("TITLE", "MT5 Position Manager", 12, 8, clrWhite, 12) && created;
-      created = CreateLabel("FILTER_LABEL", "Filter", 12, 38, clrSilver, 9) && created;
-      created = CreateButton("FILTER_SYMBOL", "Symbol", 62, 34, 120, 22) && created;
-      created = CreateButton("FILTER_DIRECTION", "Both", 188, 34, 95, 22) && created;
-      created = CreateButton("CLOSE_NOW", "Close Now", 292, 34, 110, 22, clrMaroon) && created;
-      created = CreateLabel("POSITIONS_LABEL", "Positions", 12, 67, clrSilver, 9) && created;
-      created = CreateButton("PAGE_PREV", "<", 85, 64, 35, 22) && created;
-      created = CreateButton("PAGE_NEXT", ">", 125, 64, 35, 22) && created;
-      created = CreateLabel("PAGE_LABEL", "Page 1/1", 170, 67, clrSilver, 9) && created;
-      created = CreateButton("SELECT_ALL", "Select All", 410, 64, 100, 22) && created;
-      created = CreateButton("CLEAR_SELECTION", "Clear Selection", 516, 64, 125, 22) && created;
-      created = CreateButton("CLOSE_SELECTED", "Close Selected", 647, 64, 120, 22, clrMaroon) && created;
+      created = CreateLabel("TITLE", "MT5 Position Manager", 12, 7, clrWhite, 12) && created;
+      created = CreateButton("COLLAPSE", "-", m_panel_width - 30, 4, 24, 20) && created;
+      created = CreateButton("TAB_ENTRY", "Entry", 8, PM_TITLEBAR_HEIGHT + 3, 72, PM_TAB_BAR_HEIGHT - 4) && created;
+      created = CreateButton("TAB_POSITIONS", "Positions", 84, PM_TITLEBAR_HEIGHT + 3, 72, PM_TAB_BAR_HEIGHT - 4) && created;
+      created = CreateButton("TAB_STOPS", "SL/TP", 160, PM_TITLEBAR_HEIGHT + 3, 72, PM_TAB_BAR_HEIGHT - 4) && created;
+      created = CreateButton("TAB_AUTO", "Auto", 236, PM_TITLEBAR_HEIGHT + 3, 72, PM_TAB_BAR_HEIGHT - 4) && created;
+      created = CreateButton("TAB_GUARD", "Guard", 312, PM_TITLEBAR_HEIGHT + 3, 72, PM_TAB_BAR_HEIGHT - 4) && created;
+      created = CreateButton("TAB_TRAIL", "Trail", 388, PM_TITLEBAR_HEIGHT + 3, 72, PM_TAB_BAR_HEIGHT - 4) && created;
 
-      created = CreateLabel("SL_LABEL", "Stop Loss", 12, section_y + PM_PANEL_SL_LABEL_Y, clrSilver, 9) && created;
-      created = CreateButton("SL_MODE", "Price", 95, section_y + PM_PANEL_SL_Y, 85, 22) && created;
-      created = CreateEdit("SL_VALUE", "", 185, section_y + PM_PANEL_SL_Y, 110, 22) && created;
-      created = CreateButton("SET_SL", "Set / Change SL", 300, section_y + PM_PANEL_SL_Y, 135, 22) && created;
-      created = CreateButton("CLEAR_SL", "Clear SL", 440, section_y + PM_PANEL_SL_Y, 90, 22) && created;
+      created = CreateLabel("ENTRY_PRICE", "Bid - / Ask -", 12, ContentTop() + 5, clrSilver, 9) && created;
+      created = CreateLabel("ENTRY_LOT_LABEL", "Lot", 12, ContentTop() + 35, clrSilver, 9) && created;
+      created = CreateButton("ENTRY_LOT_DEC", "-", 58, ContentTop() + 30, 26, 22) && created;
+      created = CreateEdit("ENTRY_LOT", "0.01", 88, ContentTop() + 30, 90, 22) && created;
+      created = CreateButton("ENTRY_LOT_INC", "+", 182, ContentTop() + 30, 26, 22) && created;
+      created = CreateLabel("ENTRY_SL_LABEL", "SL pts", 12, ContentTop() + 67, clrSilver, 9) && created;
+      created = CreateButton("ENTRY_SL_DEC", "-", 58, ContentTop() + 62, 26, 22) && created;
+      created = CreateEdit("ENTRY_SL_POINTS", "0", 88, ContentTop() + 62, 90, 22) && created;
+      created = CreateButton("ENTRY_SL_INC", "+", 182, ContentTop() + 62, 26, 22) && created;
+      created = CreateLabel("ENTRY_TP_LABEL", "TP pts", 12, ContentTop() + 99, clrSilver, 9) && created;
+      created = CreateButton("ENTRY_TP_DEC", "-", 58, ContentTop() + 94, 26, 22) && created;
+      created = CreateEdit("ENTRY_TP_POINTS", "0", 88, ContentTop() + 94, 90, 22) && created;
+      created = CreateButton("ENTRY_TP_INC", "+", 182, ContentTop() + 94, 26, 22) && created;
+      created = CreateLabel("ENTRY_BUY_PREVIEW", "Buy SL/TP: - / -", 230, ContentTop() + 34, clrSilver, 9) && created;
+      created = CreateLabel("ENTRY_SELL_PREVIEW", "Sell SL/TP: - / -", 230, ContentTop() + 51, clrSilver, 9) && created;
+      created = CreateButton("ENTRY_BUY", "BUY MARKET", 230, ContentTop() + 72, 105, 28, clrDarkGreen) && created;
+      created = CreateButton("ENTRY_SELL", "SELL MARKET", 343, ContentTop() + 72, 105, 28, clrMaroon) && created;
+      created = CreateLabel("ENTRY_HINT", "Prices follow current Bid/Ask; 0 pts disables SL/TP.", 12, ContentTop() + 130, clrSilver, 8) && created;
 
-      created = CreateLabel("TP_LABEL", "Take Profit", 12, section_y + PM_PANEL_TP_LABEL_Y, clrSilver, 9) && created;
-      created = CreateButton("TP_MODE", "Price", 95, section_y + PM_PANEL_TP_Y, 85, 22) && created;
-      created = CreateEdit("TP_VALUE", "", 185, section_y + PM_PANEL_TP_Y, 110, 22) && created;
-      created = CreateButton("SET_TP", "Set / Change TP", 300, section_y + PM_PANEL_TP_Y, 135, 22) && created;
-      created = CreateButton("CLEAR_TP", "Clear TP", 440, section_y + PM_PANEL_TP_Y, 90, 22) && created;
+      created = CreateLabel("FILTER_LABEL", "Filter", 12, ContentTop() + 4, clrSilver, 9) && created;
+      created = CreateButton("FILTER_SYMBOL", "Symbol", 62, ContentTop(), 120, 22) && created;
+      created = CreateButton("FILTER_DIRECTION", "Both", 188, ContentTop(), 90, 22) && created;
+      created = CreateButton("CLOSE_NOW", "Close Now", 284, ContentTop(), 100, 22, clrMaroon) && created;
+      created = CreateButton("PAGE_PREV", "<", 390, ContentTop(), 28, 22) && created;
+      created = CreateButton("PAGE_NEXT", ">", 422, ContentTop(), 28, 22) && created;
+      created = CreateLabel("PAGE_LABEL", "Page 1/1", 12, ContentTop() + 31, clrSilver, 9) && created;
+      created = CreateButton("SELECT_ALL", "Select All", 150, ContentTop() + 26, 100, 22) && created;
+      created = CreateButton("CLEAR_SELECTION", "Clear", 256, ContentTop() + 26, 75, 22) && created;
+      created = CreateButton("CLOSE_SELECTED", "Close Selected", 327, ContentTop() + 26, 125, 22, clrMaroon) && created;
 
-      created = CreateLabel("AUTO_LABEL", "Auto Close", 12, section_y + PM_PANEL_AUTO_LABEL_Y, clrSilver, 9) && created;
-      created = CreateButton("AUTO_ENABLED", "OFF", 95, section_y + PM_PANEL_AUTO_Y, 65, 22) && created;
-      created = CreateLabel("AUTO_SYMBOL_LABEL", "Symbol", 170, section_y + PM_PANEL_AUTO_LABEL_Y, clrSilver, 9) && created;
-      created = CreateButton("AUTO_SYMBOL", "Symbol", 220, section_y + PM_PANEL_AUTO_Y, 105, 22) && created;
-      created = CreateButton("AUTO_DIRECTION", "Both", 330, section_y + PM_PANEL_AUTO_Y, 85, 22) && created;
-      created = CreateLabel("MINUTES_LABEL", "Mins before close", 425, section_y + PM_PANEL_AUTO_LABEL_Y, clrSilver, 9) && created;
-      created = CreateEdit("AUTO_MINUTES", "10", 525, section_y + PM_PANEL_AUTO_Y, 55, 22) && created;
-      created = CreateButton("PASSED_BEHAVIOR", "Passed: Do Nothing", 590, section_y + PM_PANEL_AUTO_Y, 155, 22) && created;
+      created = CreateLabel("SL_LABEL", "Stop Loss", 12, ContentTop() + 5, clrSilver, 9) && created;
+      created = CreateButton("SL_MODE", "Price", 95, ContentTop(), 75, 22) && created;
+      created = CreateButton("SL_DEC", "-", 176, ContentTop(), 26, 22) && created;
+      created = CreateEdit("SL_VALUE", "", 206, ContentTop(), 110, 22) && created;
+      created = CreateButton("SL_INC", "+", 322, ContentTop(), 26, 22) && created;
+      created = CreateButton("SET_SL", "Set / Change", 354, ContentTop(), 105, 22) && created;
+      created = CreateButton("CLEAR_SL", "Clear SL", 12, ContentTop() + 32, 90, 22) && created;
+      created = CreateLabel("TP_LABEL", "Take Profit", 112, ContentTop() + 37, clrSilver, 9) && created;
+      created = CreateButton("TP_MODE", "Price", 195, ContentTop() + 32, 75, 22) && created;
+      created = CreateButton("TP_DEC", "-", 276, ContentTop() + 32, 26, 22) && created;
+      created = CreateEdit("TP_VALUE", "", 306, ContentTop() + 32, 110, 22) && created;
+      created = CreateButton("TP_INC", "+", 422, ContentTop() + 32, 26, 22) && created;
+      created = CreateButton("SET_TP", "Set / Change", 12, ContentTop() + 62, 105, 22) && created;
+      created = CreateButton("CLEAR_TP", "Clear TP", 123, ContentTop() + 62, 90, 22) && created;
+      created = CreateLabel("STOPS_HINT", "Selection; +/- tick/point.", 220, ContentTop() + 66, clrSilver, 8) && created;
 
-      created = CreateLabel("EQ_LABEL", "Equity Guard", 12, section_y + PM_PANEL_EQUITY_LABEL_Y, clrSilver, 9) && created;
-      created = CreateButton("EQ_ENABLED", "OFF", 95, section_y + PM_PANEL_EQUITY_Y, 65, 22) && created;
-      created = CreateButton("EQ_MODE", "Amount", 170, section_y + PM_PANEL_EQUITY_Y, 85, 22) && created;
-      created = CreateLabel("EQ_LOSS_LABEL", "Loss limit", 265, section_y + PM_PANEL_EQUITY_LABEL_Y, clrSilver, 9) && created;
-      created = CreateEdit("EQ_LOSS_VALUE", "", 330, section_y + PM_PANEL_EQUITY_Y, 100, 22) && created;
-      created = CreateLabel("EQ_PROFIT_LABEL", "Profit limit", 440, section_y + PM_PANEL_EQUITY_LABEL_Y, clrSilver, 9) && created;
-      created = CreateEdit("EQ_PROFIT_VALUE", "", 515, section_y + PM_PANEL_EQUITY_Y, 100, 22) && created;
-      created = CreateLabel("EQ_SCOPE_LABEL", "All symbols", 625, section_y + PM_PANEL_EQUITY_LABEL_Y, clrOrange, 9) && created;
+      created = CreateLabel("AUTO_LABEL", "Auto Close", 12, ContentTop() + 4, clrSilver, 9) && created;
+      created = CreateButton("AUTO_ENABLED", "OFF", 95, ContentTop(), 60, 22) && created;
+      created = CreateButton("AUTO_SYMBOL", "Symbol", 165, ContentTop(), 105, 22) && created;
+      created = CreateButton("AUTO_DIRECTION", "Both", 280, ContentTop(), 85, 22) && created;
+      created = CreateLabel("MINUTES_LABEL", "Mins", 370, ContentTop() + 5, clrSilver, 9) && created;
+      created = CreateEdit("AUTO_MINUTES", "10", 405, ContentTop(), 50, 22) && created;
+      created = CreateButton("PASSED_BEHAVIOR", "Passed: Do Nothing", 12, ContentTop() + 32, 170, 22) && created;
+      created = CreateLabel("AUTO_HINT", "Timer-driven schedule.", 195, ContentTop() + 37, clrSilver, 8) && created;
 
-      created = CreateLabel("TS_LABEL", "Trailing Stop", 12, section_y + PM_PANEL_TRAILING_SCOPE_LABEL_Y, clrSilver, 9) && created;
-      created = CreateLabel("TS_SYMBOL_LABEL", "Symbol", 95, section_y + PM_PANEL_TRAILING_SCOPE_LABEL_Y, clrSilver, 9) && created;
-      created = CreateButton("TS_SYMBOL", "Symbol", 145, section_y + PM_PANEL_TRAILING_SCOPE_Y, 105, 22) && created;
-      created = CreateButton("TS_DIRECTION", "Both", 255, section_y + PM_PANEL_TRAILING_SCOPE_Y, 85, 22) && created;
+      created = CreateLabel("EQ_LABEL", "Equity Guard", 12, ContentTop() + 4, clrSilver, 9) && created;
+      created = CreateButton("EQ_ENABLED", "OFF", 95, ContentTop(), 60, 22) && created;
+      created = CreateButton("EQ_MODE", "Amount", 165, ContentTop(), 85, 22) && created;
+      created = CreateLabel("EQ_LOSS_LABEL", "Loss", 12, ContentTop() + 37, clrSilver, 9) && created;
+      created = CreateEdit("EQ_LOSS_VALUE", "", 52, ContentTop() + 32, 120, 22) && created;
+      created = CreateLabel("EQ_PROFIT_LABEL", "Profit", 184, ContentTop() + 37, clrSilver, 9) && created;
+      created = CreateEdit("EQ_PROFIT_VALUE", "", 229, ContentTop() + 32, 120, 22) && created;
+      created = CreateLabel("EQ_HINT", "All symbols", 365, ContentTop() + 37, clrOrange, 8) && created;
 
-      created = CreateLabel("BE_LABEL", "Break Even", 12, section_y + PM_PANEL_BREAK_EVEN_LABEL_Y, clrSilver, 9) && created;
-      created = CreateButton("BE_ENABLED", "OFF", 95, section_y + PM_PANEL_BREAK_EVEN_Y, 65, 22) && created;
-      created = CreateLabel("BE_TRIGGER_LABEL", "Trigger pts", 170, section_y + PM_PANEL_BREAK_EVEN_LABEL_Y, clrSilver, 9) && created;
-      created = CreateEdit("BE_TRIGGER_VALUE", "", 255, section_y + PM_PANEL_BREAK_EVEN_Y, 70, 22) && created;
-      created = CreateLabel("BE_LOCK_LABEL", "Lock pts", 335, section_y + PM_PANEL_BREAK_EVEN_LABEL_Y, clrSilver, 9) && created;
-      created = CreateEdit("BE_LOCK_VALUE", "", 400, section_y + PM_PANEL_BREAK_EVEN_Y, 70, 22) && created;
+      created = CreateLabel("TS_LABEL", "Trailing Scope", 12, ContentTop() + 4, clrSilver, 9) && created;
+      created = CreateButton("TS_SYMBOL", "Symbol", 105, ContentTop(), 105, 22) && created;
+      created = CreateButton("TS_DIRECTION", "Both", 220, ContentTop(), 85, 22) && created;
+      created = CreateLabel("BE_LABEL", "Break Even", 12, ContentTop() + 37, clrSilver, 9) && created;
+      created = CreateButton("BE_ENABLED", "OFF", 95, ContentTop() + 32, 60, 22) && created;
+      created = CreateLabel("BE_TRIGGER_LABEL", "Trigger", 165, ContentTop() + 37, clrSilver, 9) && created;
+      created = CreateEdit("BE_TRIGGER_VALUE", "", 215, ContentTop() + 32, 70, 22) && created;
+      created = CreateLabel("BE_LOCK_LABEL", "Lock", 295, ContentTop() + 37, clrSilver, 9) && created;
+      created = CreateEdit("BE_LOCK_VALUE", "", 330, ContentTop() + 32, 70, 22) && created;
+      created = CreateLabel("TRAIL_LABEL", "Trailing", 12, ContentTop() + 70, clrSilver, 9) && created;
+      created = CreateButton("TRAIL_ENABLED", "OFF", 95, ContentTop() + 65, 60, 22) && created;
+      created = CreateLabel("TRAIL_DIST_LABEL", "Distance", 165, ContentTop() + 70, clrSilver, 9) && created;
+      created = CreateEdit("TRAIL_DIST_VALUE", "", 220, ContentTop() + 65, 70, 22) && created;
+      created = CreateLabel("TRAIL_HINT", "Break-even and trailing rules use points.", 12, ContentTop() + 103, clrSilver, 8) && created;
 
-      created = CreateLabel("TRAIL_LABEL", "Trailing", 12, section_y + PM_PANEL_TRAIL_LABEL_Y, clrSilver, 9) && created;
-      created = CreateButton("TRAIL_ENABLED", "OFF", 95, section_y + PM_PANEL_TRAIL_Y, 65, 22) && created;
-      created = CreateLabel("TRAIL_DIST_LABEL", "Distance pts", 170, section_y + PM_PANEL_TRAIL_LABEL_Y, clrSilver, 9) && created;
-      created = CreateEdit("TRAIL_DIST_VALUE", "", 255, section_y + PM_PANEL_TRAIL_Y, 70, 22) && created;
-
-      created = CreateLabel("SESSION_LABEL", "Today's Close: -    Auto Close At: -", 12, section_y + PM_PANEL_SESSION_Y, clrSilver, 9) && created;
-      created = CreateLabel("STATUS_LABEL", "Status: Ready", 12, section_y + PM_PANEL_STATUS_Y, clrWhite, 9) && created;
-      created = CreateLabel("RESIZE_GRIP", "///", m_panel_width - 24,
-                            PanelHeight() - 18, clrSilver, 8) && created;
+      created = CreateLabel("SESSION_LABEL", "Today's Close: -    Auto Close At: -", 12, 0, clrSilver, 9) && created;
+      for(int line = 0; line < PM_MAX_STATUS_LINES; line++)
+         created = CreateLabel("STATUS_LINE_" + IntegerToString(line), "", 12, 0, clrWhite, 9) && created;
+      created = CreateLabel("RESIZE_GRIP", "///", m_panel_width - 24, PanelHeight() - 18, clrSilver, 8) && created;
+      ApplyTabVisibility();
+      UpdateStatusLayout();
       ChartRedraw();
       if(!created)
         {
@@ -214,10 +249,8 @@ public:
       EnsureSymbolCandidate(m_trailing_symbol);
       ClampPage();
       for(int i = ArraySize(m_selected) - 1; i >= 0; i--)
-        {
          if(!ContainsPosition(m_selected[i]))
             ArrayRemove(m_selected, i, 1);
-        }
      }
 
    void Render()
@@ -240,43 +273,21 @@ public:
       ObjectSetString(0, Name("SESSION_LABEL"), OBJPROP_TEXT,
                       "Today's Close: " + PMFormatDateTime(m_session_close) +
                       "    Auto Close At: " + PMFormatDateTime(m_auto_close_at));
-      ObjectSetString(0, Name("STATUS_LABEL"), OBJPROP_TEXT, "Status: " + m_status);
+      MqlTick tick = {};
+      SymbolInfoTick(_Symbol, tick);
+      ObjectSetString(0, Name("ENTRY_PRICE"), OBJPROP_TEXT,
+                      _Symbol + "  Bid " + PMFormatPrice(_Symbol, tick.bid) +
+                      " / Ask " + PMFormatPrice(_Symbol, tick.ask));
+      UpdateEntryPreview(tick);
       ObjectSetString(0, Name("PAGE_LABEL"), OBJPROP_TEXT,
-                      StringFormat("Page %d/%d  Selected %d  Total %d",
-                                   m_page + 1, PageCount(),
-                                   ArraySize(m_selected), ArraySize(m_positions)));
-
-      for(int row = 0; row < PM_MAX_POSITION_ROWS; row++)
-         ObjectDelete(0, RowName(row));
-      const int page_start = m_page * m_max_rows;
-      const int visible = MathMin(m_max_rows, ArraySize(m_positions) - page_start);
-      bool rows_created = true;
-      for(int row = 0; row < visible; row++)
-        {
-         PMPosition position = m_positions[page_start + row];
-         const string selected = IsSelected(position.ticket) ? "[x] " : "[ ] ";
-         const string text = selected + position.symbol + " " + PMPositionTypeToString(position.type) +
-                             "  Lot=" + DoubleToString(position.volume, 2) +
-                             "  Entry=" + PMFormatPrice(position.symbol, position.open_price) +
-                             "  SL=" + PMFormatPrice(position.symbol, position.sl) +
-                             "  TP=" + PMFormatPrice(position.symbol, position.tp) +
-                             "  P=" + DoubleToString(position.profit, 2) +
-                             "  #" + StringFormat("%I64u", position.ticket);
-         rows_created = CreateButton(
-            RowSuffix(row), text, 12, 90 + row * 21, m_panel_width - 25, 19,
-            IsSelected(position.ticket) ? clrDarkGreen : clrDarkSlateGray) &&
-            rows_created;
-        }
-      if(!rows_created)
-        {
-         m_status = "UI row rendering failed; check Experts log.";
-         ObjectSetString(0, Name("STATUS_LABEL"), OBJPROP_TEXT,
-                         "Status: " + m_status);
-         if(!m_row_render_error_reported)
-            PrintFormat("[ERROR] UI position row creation failed. last_error=%d",
-                        GetLastError());
-        }
-      m_row_render_error_reported = !rows_created;
+                      StringFormat("Page %d/%d  Selected %d  Total %d", m_page + 1, PageCount(), ArraySize(m_selected), ArraySize(m_positions)));
+      if(!m_collapsed && m_active_tab == PM_PANEL_TAB_POSITIONS)
+         RenderPositionRows();
+      else
+         ClearPositionRows();
+      ApplyTabVisibility();
+      UpdateStatusLayout();
+      MovePanelTo(m_origin_x, m_origin_y);
       ChartRedraw();
      }
 
@@ -341,62 +352,39 @@ public:
         }
       if(id != CHARTEVENT_OBJECT_CLICK && id != CHARTEVENT_OBJECT_ENDEDIT)
          return false;
-      if(id == CHARTEVENT_OBJECT_CLICK)
-         EndInteraction();
       if(id == CHARTEVENT_OBJECT_ENDEDIT)
-        {
-         if(object_name == Name("AUTO_MINUTES"))
-           {
-            const int minutes = AutoCloseMinutes();
-            ObjectSetString(0, Name("AUTO_MINUTES"), OBJPROP_TEXT,
-                            IntegerToString(minutes));
-            SetStatus(StringFormat("Auto Close minutes set to %d.", minutes));
-            return true;
-         }
-         if(object_name == Name("EQ_LOSS_VALUE"))
-           {
-            CommitDoubleValue("EQ_LOSS_VALUE", m_equity_guard_loss_threshold,
-                              PM_MAX_EQUITY_THRESHOLD, 2);
-            SetStatus(StringFormat("Equity Guard Max Loss set to %.2f.", m_equity_guard_loss_threshold));
-            return true;
-           }
-         if(object_name == Name("EQ_PROFIT_VALUE"))
-           {
-            CommitDoubleValue("EQ_PROFIT_VALUE", m_equity_guard_profit_threshold,
-                              PM_MAX_EQUITY_THRESHOLD, 2);
-            SetStatus(StringFormat("Equity Guard Max Profit set to %.2f.", m_equity_guard_profit_threshold));
-            return true;
-           }
-         if(object_name == Name("BE_TRIGGER_VALUE"))
-           {
-            CommitIntegerValue("BE_TRIGGER_VALUE", m_be_trigger_points,
-                               PM_MAX_TRAILING_POINTS);
-            SetStatus(StringFormat("Break Even Trigger set to %d.", m_be_trigger_points));
-            return true;
-           }
-         if(object_name == Name("BE_LOCK_VALUE"))
-           {
-            CommitIntegerValue("BE_LOCK_VALUE", m_be_lock_points,
-                               PM_MAX_TRAILING_POINTS);
-            SetStatus(StringFormat("Break Even Lock set to %d.", m_be_lock_points));
-            return true;
-           }
-         if(object_name == Name("TRAIL_DIST_VALUE"))
-           {
-            CommitIntegerValue("TRAIL_DIST_VALUE", m_trail_points,
-                               PM_MAX_TRAILING_POINTS);
-            SetStatus(StringFormat("Trailing Distance set to %d.", m_trail_points));
-            return true;
-           }
-         return false;
-        }
-      if(id != CHARTEVENT_OBJECT_CLICK)
-         return false;
+         return HandleEditEnd(object_name);
+      EndInteraction();
       if(StringFind(object_name, PM_OBJECT_PREFIX) != 0)
          return false;
       ObjectSetInteger(0, object_name, OBJPROP_STATE, false);
-
-      if(object_name == Name("FILTER_SYMBOL"))
+      if(object_name == Name("COLLAPSE"))
+        {
+         m_collapsed = !m_collapsed;
+         if(m_collapsed)
+            m_panel_height = PM_TITLEBAR_HEIGHT;
+         else
+            m_panel_height = m_expanded_height;
+        }
+      else if(HandleTabClick(object_name))
+         m_collapsed = false;
+      else if(object_name == Name("ENTRY_LOT_DEC"))
+         ShiftEntryVolume(-1.0);
+      else if(object_name == Name("ENTRY_LOT_INC"))
+         ShiftEntryVolume(1.0);
+      else if(object_name == Name("ENTRY_SL_DEC"))
+         ShiftEntryPoints("ENTRY_SL_POINTS", -1);
+      else if(object_name == Name("ENTRY_SL_INC"))
+         ShiftEntryPoints("ENTRY_SL_POINTS", 1);
+      else if(object_name == Name("ENTRY_TP_DEC"))
+         ShiftEntryPoints("ENTRY_TP_POINTS", -1);
+      else if(object_name == Name("ENTRY_TP_INC"))
+         ShiftEntryPoints("ENTRY_TP_POINTS", 1);
+      else if(object_name == Name("ENTRY_BUY"))
+         OpenMarket(PM_ENTRY_BUY, trades, validator);
+      else if(object_name == Name("ENTRY_SELL"))
+         OpenMarket(PM_ENTRY_SELL, trades, validator);
+      else if(object_name == Name("FILTER_SYMBOL"))
          CycleSymbol(m_filter_symbol);
       else if(object_name == Name("FILTER_DIRECTION"))
          m_filter_direction = NextDirection(m_filter_direction);
@@ -423,12 +411,20 @@ public:
          CloseSelected(trades);
       else if(object_name == Name("SL_MODE"))
          m_sl_mode = m_sl_mode == PM_PRICE_ABSOLUTE ? PM_PRICE_POINTS : PM_PRICE_ABSOLUTE;
+      else if(object_name == Name("SL_DEC"))
+         ShiftStopEditor(true, -1);
+      else if(object_name == Name("SL_INC"))
+         ShiftStopEditor(true, 1);
       else if(object_name == Name("SET_SL"))
          ApplyStopTarget(true, positions, trades, validator, actions);
       else if(object_name == Name("CLEAR_SL"))
          ClearStopTarget(true, positions, trades, actions);
       else if(object_name == Name("TP_MODE"))
          m_tp_mode = m_tp_mode == PM_PRICE_ABSOLUTE ? PM_PRICE_POINTS : PM_PRICE_ABSOLUTE;
+      else if(object_name == Name("TP_DEC"))
+         ShiftStopEditor(false, -1);
+      else if(object_name == Name("TP_INC"))
+         ShiftStopEditor(false, 1);
       else if(object_name == Name("SET_TP"))
          ApplyStopTarget(false, positions, trades, validator, actions);
       else if(object_name == Name("CLEAR_TP"))
@@ -440,13 +436,11 @@ public:
       else if(object_name == Name("AUTO_DIRECTION"))
          m_auto_direction = NextDirection(m_auto_direction);
       else if(object_name == Name("PASSED_BEHAVIOR"))
-         m_passed_behavior = m_passed_behavior == PM_PASSED_CLOSE_DO_NOTHING ?
-                             PM_PASSED_CLOSE_IMMEDIATELY : PM_PASSED_CLOSE_DO_NOTHING;
+         m_passed_behavior = m_passed_behavior == PM_PASSED_CLOSE_DO_NOTHING ? PM_PASSED_CLOSE_IMMEDIATELY : PM_PASSED_CLOSE_DO_NOTHING;
       else if(object_name == Name("EQ_ENABLED"))
          m_equity_guard_enabled = !m_equity_guard_enabled;
       else if(object_name == Name("EQ_MODE"))
-         m_equity_guard_mode = m_equity_guard_mode == PM_EQUITY_THRESHOLD_AMOUNT ?
-                               PM_EQUITY_THRESHOLD_PERCENT : PM_EQUITY_THRESHOLD_AMOUNT;
+         m_equity_guard_mode = m_equity_guard_mode == PM_EQUITY_THRESHOLD_AMOUNT ? PM_EQUITY_THRESHOLD_PERCENT : PM_EQUITY_THRESHOLD_AMOUNT;
       else if(object_name == Name("TS_SYMBOL"))
          CycleSymbol(m_trailing_symbol);
       else if(object_name == Name("TS_DIRECTION"))
@@ -456,208 +450,80 @@ public:
       else if(object_name == Name("TRAIL_ENABLED"))
          m_trailing_enabled = !m_trailing_enabled;
       else
-        {
-         const int page_start = m_page * m_max_rows;
-         const int visible = MathMin(m_max_rows, ArraySize(m_positions) - page_start);
-         for(int row = 0; row < visible; row++)
-            if(object_name == RowName(row))
-              {
-               ToggleSelection(m_positions[page_start + row].ticket);
-               break;
-              }
-        }
+         ToggleRowSelection(object_name);
       Render();
       return true;
      }
 
 private:
-   string Name(const string suffix)
-     {
-      return PM_OBJECT_PREFIX + suffix;
-     }
-
-   string RowName(const int row)
-     {
-      return Name(RowSuffix(row));
-     }
-
-   string RowSuffix(const int row)
-     {
-      return "ROW_" + IntegerToString(row);
-     }
-
-   string FilterSymbol()
-     {
-      return m_filter_symbol == "" ? _Symbol : m_filter_symbol;
-     }
-
-   string AutoSymbol()
-     {
-      return m_auto_symbol == "" ? _Symbol : m_auto_symbol;
-     }
-
-   string TrailingSymbol()
-     {
-      return m_trailing_symbol == "" ? _Symbol : m_trailing_symbol;
-     }
-
+   string Name(const string suffix) { return PM_OBJECT_PREFIX + suffix; }
+   string RowName(const int row) { return Name("ROW_" + IntegerToString(row)); }
+   string RowDetailName(const int row) { return Name("ROW_DETAIL_" + IntegerToString(row)); }
+   string FilterSymbol() { return m_filter_symbol == "" ? _Symbol : m_filter_symbol; }
+   string AutoSymbol() { return m_auto_symbol == "" ? _Symbol : m_auto_symbol; }
+   string TrailingSymbol() { return m_trailing_symbol == "" ? _Symbol : m_trailing_symbol; }
+   int ContentTop() { return PM_TITLEBAR_HEIGHT + PM_TAB_BAR_HEIGHT + PM_PANEL_CONTENT_GAP; }
    int AutoCloseMinutes()
      {
-      long minutes = StringToInteger(
-         ObjectGetString(0, Name("AUTO_MINUTES"), OBJPROP_TEXT));
-      if(minutes < 0)
-         minutes = 0;
-      if(minutes > PM_MAX_AUTO_CLOSE_MINUTES)
-         minutes = PM_MAX_AUTO_CLOSE_MINUTES;
+      long minutes = StringToInteger(ObjectGetString(0, Name("AUTO_MINUTES"), OBJPROP_TEXT));
+      if(minutes < 0) minutes = 0;
+      if(minutes > PM_MAX_AUTO_CLOSE_MINUTES) minutes = PM_MAX_AUTO_CLOSE_MINUTES;
       return (int)minutes;
      }
-
-   // Values are only adopted on CHARTEVENT_OBJECT_ENDEDIT. Reading edit boxes
-   // live on every timer tick would allow transient input to drive automation.
-   void CommitDoubleValue(const string suffix,
-                          double &target,
-                          const double maximum,
-                          const int digits)
-     {
-      double value = StringToDouble(ObjectGetString(0, Name(suffix), OBJPROP_TEXT));
-      if(!MathIsValidNumber(value) || value < 0.0)
-         value = 0.0;
-      if(value > maximum)
-         value = maximum;
-      target = value;
-      ObjectSetString(0, Name(suffix), OBJPROP_TEXT, DoubleToString(value, digits));
-     }
-
-   void CommitIntegerValue(const string suffix,
-                           int &target,
-                           const int maximum)
-     {
-      long value = StringToInteger(ObjectGetString(0, Name(suffix), OBJPROP_TEXT));
-      if(value < 0)
-         value = 0;
-      if(value > maximum)
-         value = maximum;
-      target = (int)value;
-      ObjectSetString(0, Name(suffix), OBJPROP_TEXT, IntegerToString(target));
-     }
-
-   int FindSymbol(const string symbol)
-     {
-      for(int i = 0; i < ArraySize(m_symbols); i++)
-         if(m_symbols[i] == symbol)
-            return i;
-      return -1;
-     }
-
-   void EnsureSymbolCandidate(const string symbol)
-     {
-      if(symbol == "" || FindSymbol(symbol) >= 0)
-         return;
-      const int count = ArraySize(m_symbols);
-      ArrayResize(m_symbols, count + 1);
-      m_symbols[count] = symbol;
-     }
-
-   void CycleSymbol(string &selected)
-     {
-      EnsureSymbolCandidate(selected);
-      if(ArraySize(m_symbols) == 0)
-        {
-         selected = _Symbol;
-         return;
-        }
-      int index = FindSymbol(selected);
-      if(index < 0)
-         index = 0;
-      selected = m_symbols[(index + 1) % ArraySize(m_symbols)];
-     }
-
-   int SectionY()
-     {
-      return 95 + m_max_rows * 21;
-     }
-
-   int MinimumPanelHeightForRows(const int rows)
-     {
-      return 95 + rows * 21 + PM_PANEL_CHROME_HEIGHT;
-     }
-
-   int MinimumPanelHeight()
-     {
-      return MinimumPanelHeightForRows(PM_MIN_POSITION_ROWS);
-     }
-
-   int MaximumPanelHeight()
-     {
-      return MinimumPanelHeightForRows(PM_MAX_POSITION_ROWS);
-     }
-
-   int PanelHeight()
-     {
-      return m_panel_height > 0 ? m_panel_height : MinimumPanelHeightForRows(m_max_rows);
-     }
-
    int PageCount()
      {
-      if(ArraySize(m_positions) == 0)
-         return 1;
+      if(ArraySize(m_positions) == 0) return 1;
       return (ArraySize(m_positions) + m_max_rows - 1) / m_max_rows;
      }
-
    void ClampPage()
      {
       const int pages = PageCount();
-      if(m_page < 0)
-         m_page = 0;
-      if(m_page >= pages)
-         m_page = pages - 1;
+      if(m_page < 0) m_page = 0;
+      if(m_page >= pages) m_page = pages - 1;
      }
-
+   int VisiblePositionRows()
+     {
+      const int start = m_page * m_max_rows;
+      return MathMax(0, MathMin(m_max_rows, ArraySize(m_positions) - start));
+     }
+   int ContentHeight()
+     {
+      if(m_active_tab == PM_PANEL_TAB_ENTRY) return PM_PANEL_ENTRY_HEIGHT;
+      if(m_active_tab == PM_PANEL_TAB_POSITIONS) return PM_PANEL_POSITIONS_HEADER_HEIGHT + MathMax(1, VisiblePositionRows()) * PM_PANEL_POSITION_ROW_HEIGHT;
+      if(m_active_tab == PM_PANEL_TAB_STOPS) return PM_PANEL_STOPS_HEIGHT;
+      if(m_active_tab == PM_PANEL_TAB_AUTO) return PM_PANEL_AUTO_HEIGHT;
+      if(m_active_tab == PM_PANEL_TAB_GUARD) return PM_PANEL_GUARD_HEIGHT;
+      return PM_PANEL_TRAIL_HEIGHT;
+     }
+   int ExpandedPanelHeight()
+     {
+      return ContentTop() + ContentHeight() + PM_PANEL_CONTENT_GAP + PM_PANEL_STATUS_LINE_HEIGHT * 3 + 32;
+     }
+   int PanelHeight() { return m_panel_height > 0 ? m_panel_height : ExpandedPanelHeight(); }
    PMDirection NextDirection(const PMDirection direction)
      {
-      return direction == PM_DIRECTION_LONG ? PM_DIRECTION_SHORT :
-             direction == PM_DIRECTION_SHORT ? PM_DIRECTION_BOTH : PM_DIRECTION_LONG;
+      return direction == PM_DIRECTION_LONG ? PM_DIRECTION_SHORT : direction == PM_DIRECTION_SHORT ? PM_DIRECTION_BOTH : PM_DIRECTION_LONG;
      }
-
-   string PriceModeToString(const PMPriceMode mode)
-     {
-      return mode == PM_PRICE_ABSOLUTE ? "Price" : "Points";
-     }
-
-   string EquityThresholdModeToString(const PMEquityThresholdMode mode)
-     {
-      return mode == PM_EQUITY_THRESHOLD_AMOUNT ? "Amount" : "Percent";
-     }
-
+   string PriceModeToString(const PMPriceMode mode) { return mode == PM_PRICE_ABSOLUTE ? "Price" : "Points"; }
+   string EquityThresholdModeToString(const PMEquityThresholdMode mode) { return mode == PM_EQUITY_THRESHOLD_AMOUNT ? "Amount" : "Percent"; }
    bool IsSelected(const ulong ticket)
      {
-      for(int i = 0; i < ArraySize(m_selected); i++)
-         if(m_selected[i] == ticket)
-            return true;
+      for(int i = 0; i < ArraySize(m_selected); i++) if(m_selected[i] == ticket) return true;
       return false;
      }
-
    bool ContainsPosition(const ulong ticket)
      {
-      for(int i = 0; i < ArraySize(m_positions); i++)
-         if(m_positions[i].ticket == ticket)
-            return true;
+      for(int i = 0; i < ArraySize(m_positions); i++) if(m_positions[i].ticket == ticket) return true;
       return false;
      }
-
    void ToggleSelection(const ulong ticket)
      {
       for(int i = 0; i < ArraySize(m_selected); i++)
-         if(m_selected[i] == ticket)
-           {
-            ArrayRemove(m_selected, i, 1);
-            return;
-           }
+         if(m_selected[i] == ticket) { ArrayRemove(m_selected, i, 1); return; }
       const int count = ArraySize(m_selected);
       ArrayResize(m_selected, count + 1);
       m_selected[count] = ticket;
      }
-
    void SelectAll()
      {
       ArrayResize(m_selected, 0);
@@ -669,69 +535,16 @@ private:
         }
       SetStatus(StringFormat("%d positions selected.", ArraySize(m_selected)));
      }
-
-   void CloseNow(CPositionService &positions, CTradeManager &trades)
+   void ToggleRowSelection(const string object_name)
      {
-      const string symbol = FilterSymbol();
-      ulong tickets[];
-      positions.CollectTickets(symbol, m_filter_direction, tickets);
-      if(ArraySize(tickets) == 0)
-        {
-         SetStatus("No matching positions.");
-         return;
-        }
-      const string question = BuildTicketSummary(
-         StringFormat("Close %d %s %s positions?", ArraySize(tickets), symbol,
-                      PMDirectionToString(m_filter_direction)), tickets);
-      if(MessageBox(question, "MT5 Position Manager",
-                    MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) != IDYES)
-        {
-         SetStatus("Close cancelled.");
-         return;
-        }
-      PMBatchResult result;
-      trades.CloseTickets(tickets, result);
-      SetStatus(BatchResultText("Close", result));
+      const int start = m_page * m_max_rows;
+      for(int row = 0; row < VisiblePositionRows(); row++)
+         if(object_name == RowName(row) || object_name == RowDetailName(row))
+           {
+            ToggleSelection(m_positions[start + row].ticket);
+            return;
+           }
      }
-
-   void CloseSelected(CTradeManager &trades)
-     {
-      if(ArraySize(m_selected) == 0)
-        {
-         SetStatus("No positions selected.");
-         return;
-        }
-      const string question = BuildTicketSummary(
-         StringFormat("Close %d selected positions?", ArraySize(m_selected)),
-         m_selected);
-      if(MessageBox(question, "MT5 Position Manager",
-                    MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) != IDYES)
-        {
-         SetStatus("Close cancelled.");
-         return;
-        }
-      PMBatchResult result;
-      trades.CloseTickets(m_selected, result);
-      SetStatus(BatchResultText("Close", result));
-     }
-
-   string BatchResultText(const string operation, PMBatchResult &result)
-     {
-      if(ArraySize(result.failures) > 0 &&
-         PMIsTradingUnavailableRetcode(result.failures[0].retcode))
-         return StringFormat("%s stopped: trading unavailable (%s)",
-                             operation, result.failures[0].description);
-      string text = StringFormat("%s: %d succeeded, %d queued, %d failed / %d",
-                                 operation, result.successful, result.queued,
-                                 ArraySize(result.failures), result.requested);
-      if(ArraySize(result.failures) > 0)
-         text += StringFormat("; ticket=%I64u (%s, retcode=%u)",
-                              result.failures[0].ticket,
-                              result.failures[0].description,
-                              result.failures[0].retcode);
-      return text;
-     }
-
    string BuildTicketSummary(const string heading, const ulong &tickets[])
      {
       string text = heading + "\n\n";
@@ -739,296 +552,537 @@ private:
         {
          PMPosition position = {};
          if(FindCachedPosition(tickets[i], position))
-            text += StringFormat("%s %s %.2f  #%I64u\n", position.symbol,
-                                 PMPositionTypeToString(position.type),
-                                 position.volume, position.ticket);
+            text += StringFormat("%s %s %.2f  #%I64u\n", position.symbol, PMPositionTypeToString(position.type), position.volume, position.ticket);
          else
             text += StringFormat("Unavailable  #%I64u\n", tickets[i]);
         }
-      text += "\nContinue?";
-      return text;
+      return text + "\nContinue?";
      }
-
    bool FindCachedPosition(const ulong ticket, PMPosition &position)
      {
-      for(int i = 0; i < ArraySize(m_positions); i++)
-         if(m_positions[i].ticket == ticket)
-           {
-            position = m_positions[i];
-            return true;
-           }
+      for(int i = 0; i < ArraySize(m_positions); i++) if(m_positions[i].ticket == ticket) { position = m_positions[i]; return true; }
       return false;
      }
-
-   void ApplyStopTarget(const bool is_sl,
-                        CPositionService &positions,
-                        CTradeManager &trades,
-                        CValidationService &validator,
-                        CPositionActionService &actions)
+   void CloseNow(CPositionService &positions, CTradeManager &trades)
      {
-      if(ArraySize(m_selected) == 0)
-        {
-         SetStatus("No positions selected.");
-         return;
-        }
-      const string value_text = ObjectGetString(0, Name(is_sl ? "SL_VALUE" : "TP_VALUE"), OBJPROP_TEXT);
-      const double value = StringToDouble(value_text);
-      const PMPriceMode mode = is_sl ? m_sl_mode : m_tp_mode;
+      ulong tickets[];
+      positions.CollectTickets(FilterSymbol(), m_filter_direction, tickets);
+      if(ArraySize(tickets) == 0) { SetStatus("No matching positions."); return; }
+      if(MessageBox(BuildTicketSummary(StringFormat("Close %d %s %s positions?", ArraySize(tickets), FilterSymbol(), PMDirectionToString(m_filter_direction)), tickets), "MT5 Position Manager", MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) != IDYES)
+        { SetStatus("Close cancelled."); return; }
+      PMBatchResult result;
+      trades.CloseTickets(tickets, result);
+      SetStatus(BatchResultText("Close", result));
+     }
+   void CloseSelected(CTradeManager &trades)
+     {
+      if(ArraySize(m_selected) == 0) { SetStatus("No positions selected."); return; }
+      if(MessageBox(BuildTicketSummary(StringFormat("Close %d selected positions?", ArraySize(m_selected)), m_selected), "MT5 Position Manager", MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) != IDYES)
+        { SetStatus("Close cancelled."); return; }
+      PMBatchResult result;
+      trades.CloseTickets(m_selected, result);
+      SetStatus(BatchResultText("Close", result));
+     }
+   string BatchResultText(const string operation, PMBatchResult &result)
+     {
+      if(ArraySize(result.failures) > 0 && PMIsTradingUnavailableRetcode(result.failures[0].retcode))
+         return StringFormat("%s stopped: trading unavailable (%s)", operation, result.failures[0].description);
+      string text = StringFormat("%s: %d succeeded, %d queued, %d failed / %d", operation, result.successful, result.queued, ArraySize(result.failures), result.requested);
+      if(ArraySize(result.failures) > 0)
+         text += StringFormat("; ticket=%I64u (%s, retcode=%u)", result.failures[0].ticket, result.failures[0].description, result.failures[0].retcode);
+      return text;
+     }
+   void ApplyStopTarget(const bool is_sl, CPositionService &positions, CTradeManager &trades, CValidationService &validator, CPositionActionService &actions)
+     {
+      if(ArraySize(m_selected) == 0) { SetStatus("No positions selected."); return; }
+      const string suffix = is_sl ? "SL_VALUE" : "TP_VALUE";
+      const double value = StringToDouble(ObjectGetString(0, Name(suffix), OBJPROP_TEXT));
       PMBatchResult result;
       string validation_error = "";
-      if(!actions.ApplyStopTarget(m_selected, is_sl, mode, value,
-                                  positions, trades, validator,
-                                  result, validation_error))
-        {
-         SetStatus(validation_error);
-         return;
-        }
+      if(!actions.ApplyStopTarget(m_selected, is_sl, is_sl ? m_sl_mode : m_tp_mode, value, positions, trades, validator, result, validation_error))
+        { SetStatus(validation_error); return; }
       SetStatus(BatchResultText(is_sl ? "SL update" : "TP update", result));
      }
-
-   void ClearStopTarget(const bool is_sl,
-                        CPositionService &positions,
-                        CTradeManager &trades,
-                        CPositionActionService &actions)
+   void ClearStopTarget(const bool is_sl, CPositionService &positions, CTradeManager &trades, CPositionActionService &actions)
      {
-      if(ArraySize(m_selected) == 0)
-        {
-         SetStatus("No positions selected.");
-         return;
-        }
+      if(ArraySize(m_selected) == 0) { SetStatus("No positions selected."); return; }
       PMBatchResult result;
       actions.ClearStopTarget(m_selected, is_sl, positions, trades, result);
       SetStatus(BatchResultText(is_sl ? "SL clear" : "TP clear", result));
      }
-
-   void ShiftPanelObjects(const int delta_x, const int delta_y, const string exclude_name)
+   void CommitDoubleValue(const string suffix, double &target, const double maximum, const int digits)
      {
-      if(delta_x == 0 && delta_y == 0)
-         return;
-      const int total = ObjectsTotal(0, -1, -1);
-      for(int i = total - 1; i >= 0; i--)
+      double value = StringToDouble(ObjectGetString(0, Name(suffix), OBJPROP_TEXT));
+      if(!MathIsValidNumber(value) || value < 0.0) value = 0.0;
+      if(value > maximum) value = maximum;
+      target = value;
+      ObjectSetString(0, Name(suffix), OBJPROP_TEXT, DoubleToString(value, digits));
+     }
+   void CommitIntegerValue(const string suffix, int &target, const int maximum)
+     {
+      long value = StringToInteger(ObjectGetString(0, Name(suffix), OBJPROP_TEXT));
+      if(value < 0) value = 0;
+      if(value > maximum) value = maximum;
+      target = (int)value;
+      ObjectSetString(0, Name(suffix), OBJPROP_TEXT, IntegerToString(target));
+     }
+   bool HandleEditEnd(const string object_name)
+     {
+      if(object_name == Name("AUTO_MINUTES")) { const int value = AutoCloseMinutes(); ObjectSetString(0, Name("AUTO_MINUTES"), OBJPROP_TEXT, IntegerToString(value)); SetStatus(StringFormat("Auto Close minutes set to %d.", value)); }
+      else if(object_name == Name("EQ_LOSS_VALUE")) { CommitDoubleValue("EQ_LOSS_VALUE", m_equity_guard_loss_threshold, PM_MAX_EQUITY_THRESHOLD, 2); SetStatus(StringFormat("Equity Guard Max Loss set to %.2f.", m_equity_guard_loss_threshold)); }
+      else if(object_name == Name("EQ_PROFIT_VALUE")) { CommitDoubleValue("EQ_PROFIT_VALUE", m_equity_guard_profit_threshold, PM_MAX_EQUITY_THRESHOLD, 2); SetStatus(StringFormat("Equity Guard Max Profit set to %.2f.", m_equity_guard_profit_threshold)); }
+      else if(object_name == Name("BE_TRIGGER_VALUE")) { CommitIntegerValue("BE_TRIGGER_VALUE", m_be_trigger_points, PM_MAX_TRAILING_POINTS); SetStatus(StringFormat("Break Even Trigger set to %d.", m_be_trigger_points)); }
+      else if(object_name == Name("BE_LOCK_VALUE")) { CommitIntegerValue("BE_LOCK_VALUE", m_be_lock_points, PM_MAX_TRAILING_POINTS); SetStatus(StringFormat("Break Even Lock set to %d.", m_be_lock_points)); }
+      else if(object_name == Name("TRAIL_DIST_VALUE")) { CommitIntegerValue("TRAIL_DIST_VALUE", m_trail_points, PM_MAX_TRAILING_POINTS); SetStatus(StringFormat("Trailing Distance set to %d.", m_trail_points)); }
+      else if(object_name == Name("ENTRY_LOT"))
         {
-         const string name = ObjectName(0, i, -1, -1);
-         if(StringFind(name, PM_OBJECT_PREFIX) != 0 || name == exclude_name)
-            continue;
-         const int x = (int)ObjectGetInteger(0, name, OBJPROP_XDISTANCE);
-         const int y = (int)ObjectGetInteger(0, name, OBJPROP_YDISTANCE);
-         ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x + delta_x);
-         ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y + delta_y);
+         double volume = 0.0;
+         string reason = "";
+         if(NormalizeEntryVolume(volume, reason))
+            SetStatus("Entry lot updated.");
+         else
+            SetStatus(reason);
         }
-     }
-
-   bool IsInsideTitleBar(const int x, const int y)
-     {
-      return x >= m_origin_x && x < m_origin_x + m_panel_width &&
-             y >= m_origin_y && y < m_origin_y + PM_TITLEBAR_HEIGHT;
-     }
-
-   bool IsInsideResizeCorner(const int x, const int y)
-     {
-      return x >= m_origin_x + m_panel_width - PM_RESIZE_HANDLE_HIT_SIZE &&
-             x <= m_origin_x + m_panel_width &&
-             y >= m_origin_y + PanelHeight() - PM_RESIZE_HANDLE_HIT_SIZE &&
-             y <= m_origin_y + PanelHeight();
-     }
-
-   void BeginInteraction(const bool resize,
-                         const int x,
-                         const int y)
-     {
-      m_dragging = !resize;
-      m_resizing = resize;
-      m_interaction_start_x = x;
-      m_interaction_start_y = y;
-      m_interaction_origin_x = m_origin_x;
-      m_interaction_origin_y = m_origin_y;
-      m_interaction_width = m_panel_width;
-      m_interaction_height = PanelHeight();
-      long mouse_scroll_enabled = 1;
-      if(ChartGetInteger(0, CHART_MOUSE_SCROLL, 0, mouse_scroll_enabled))
-         m_chart_mouse_scroll_before_interaction = mouse_scroll_enabled != 0;
-      ChartSetInteger(0, CHART_MOUSE_SCROLL, 0, false);
-     }
-
-   void EndInteraction()
-     {
-      if(!m_dragging && !m_resizing)
-         return;
-      m_dragging = false;
-      m_resizing = false;
-      ChartSetInteger(0, CHART_MOUSE_SCROLL, 0,
-                     m_chart_mouse_scroll_before_interaction);
-      ChartRedraw();
-     }
-
-   void HandleMouseMove(const int x,
-                        const int y,
-                        const string state_text)
-     {
-      const uint state = (uint)StringToInteger(state_text);
-      const bool left_pressed = (state & 1) != 0;
-      if(!left_pressed)
+      else if(object_name == Name("ENTRY_SL_POINTS"))
         {
-         EndInteraction();
+         string reason = "";
+         if(NormalizeEntryPoints("ENTRY_SL_POINTS", reason))
+            SetStatus("Entry SL points updated.");
+         else
+            SetStatus(reason);
+        }
+      else if(object_name == Name("ENTRY_TP_POINTS"))
+        {
+         string reason = "";
+         if(NormalizeEntryPoints("ENTRY_TP_POINTS", reason))
+            SetStatus("Entry TP points updated.");
+         else
+            SetStatus(reason);
+        }
+      else if(object_name == Name("SL_VALUE")) { SetStatus("SL value updated."); }
+      else if(object_name == Name("TP_VALUE")) { SetStatus("TP value updated."); }
+      else return false;
+      Render();
+      return true;
+     }
+   int FindSymbol(const string symbol)
+     {
+      for(int i = 0; i < ArraySize(m_symbols); i++) if(m_symbols[i] == symbol) return i;
+      return -1;
+     }
+   void EnsureSymbolCandidate(const string symbol)
+     {
+      if(symbol == "" || FindSymbol(symbol) >= 0) return;
+      const int count = ArraySize(m_symbols);
+      ArrayResize(m_symbols, count + 1);
+      m_symbols[count] = symbol;
+     }
+   void CycleSymbol(string &selected)
+     {
+      EnsureSymbolCandidate(selected);
+      if(ArraySize(m_symbols) == 0) { selected = _Symbol; return; }
+      int index = FindSymbol(selected);
+      if(index < 0) index = 0;
+      selected = m_symbols[(index + 1) % ArraySize(m_symbols)];
+     }
+   bool HandleTabClick(const string object_name)
+     {
+      PMPanelTab tab = m_active_tab;
+      if(object_name == Name("TAB_ENTRY")) tab = PM_PANEL_TAB_ENTRY;
+      else if(object_name == Name("TAB_POSITIONS")) tab = PM_PANEL_TAB_POSITIONS;
+      else if(object_name == Name("TAB_STOPS")) tab = PM_PANEL_TAB_STOPS;
+      else if(object_name == Name("TAB_AUTO")) tab = PM_PANEL_TAB_AUTO;
+      else if(object_name == Name("TAB_GUARD")) tab = PM_PANEL_TAB_GUARD;
+      else if(object_name == Name("TAB_TRAIL")) tab = PM_PANEL_TAB_TRAIL;
+      else return false;
+      m_active_tab = tab;
+      m_expanded_height = ExpandedPanelHeight();
+      m_panel_height = m_expanded_height;
+      return true;
+     }
+   void ShiftEntryVolume(const double direction)
+     {
+      const double minimum = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
+      const double maximum = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MAX);
+      const double step = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
+      double value = StringToDouble(ObjectGetString(0, Name("ENTRY_LOT"), OBJPROP_TEXT));
+      if(!MathIsValidNumber(value) || value <= 0.0) value = minimum;
+      value = PMNormalizeVolume(value + direction * step, minimum, maximum, step);
+      ObjectSetString(0, Name("ENTRY_LOT"), OBJPROP_TEXT, DoubleToString(value, VolumeDigits(step)));
+     }
+   int VolumeDigits(const double step)
+     {
+      if(step <= 0.0) return 2;
+      double scaled = step;
+      int digits = 0;
+      while(digits < 8 && MathAbs(scaled - MathRound(scaled)) > 0.00000001)
+        {
+         scaled *= 10.0;
+         digits++;
+        }
+      return digits;
+     }
+   bool NormalizeEntryVolume(double &volume, string &reason)
+     {
+      volume = 0.0;
+      reason = "";
+      const string text = ObjectGetString(0, Name("ENTRY_LOT"), OBJPROP_TEXT);
+      if(!PMIsUnsignedDecimalText(text))
+        {
+         reason = "Entry lot must be a positive number.";
+         return false;
+        }
+      const double minimum = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
+      const double maximum = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MAX);
+      const double step = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
+      const double requested = StringToDouble(text);
+      if(!MathIsValidNumber(requested) || requested <= 0.0 ||
+         minimum <= 0.0 || maximum < minimum || step <= 0.0)
+        {
+         reason = "Entry lot or symbol volume settings are invalid.";
+         return false;
+        }
+      volume = PMNormalizeVolume(requested, minimum, maximum, step);
+      if(volume <= 0.0)
+        {
+         reason = "Entry lot could not be normalized.";
+         return false;
+        }
+      ObjectSetString(0, Name("ENTRY_LOT"), OBJPROP_TEXT,
+                      DoubleToString(volume, VolumeDigits(step)));
+      return true;
+     }
+   void ShiftEntryPoints(const string suffix, const int delta)
+     {
+      const string text = ObjectGetString(0, Name(suffix), OBJPROP_TEXT);
+      long value = PMIsUnsignedIntegerText(text) ? StringToInteger(text) : 0;
+      if(value < 0)
+         value = 0;
+      if(value > PM_MAX_TRAILING_POINTS)
+         value = PM_MAX_TRAILING_POINTS;
+      if(delta < 0 && value > 0)
+         value--;
+      else if(delta > 0 && value < PM_MAX_TRAILING_POINTS)
+         value++;
+      ObjectSetString(0, Name(suffix), OBJPROP_TEXT, IntegerToString((int)value));
+     }
+   bool NormalizeEntryPoints(const string suffix, string &reason)
+     {
+      reason = "";
+      const string text = ObjectGetString(0, Name(suffix), OBJPROP_TEXT);
+      if(!PMIsUnsignedIntegerText(text))
+        {
+         reason = "Entry SL/TP points must be a non-negative integer.";
+         return false;
+        }
+      long value = StringToInteger(text);
+      if(value < 0)
+        {
+         reason = "Entry SL/TP points are outside the supported range.";
+         return false;
+        }
+      if(value > PM_MAX_TRAILING_POINTS) value = PM_MAX_TRAILING_POINTS;
+      ObjectSetString(0, Name(suffix), OBJPROP_TEXT, IntegerToString((int)value));
+      return true;
+     }
+   bool ReadEntryPoints(int &sl_points, int &tp_points, string &reason)
+     {
+      sl_points = 0;
+      tp_points = 0;
+      reason = "";
+      const string sl_text = ObjectGetString(0, Name("ENTRY_SL_POINTS"), OBJPROP_TEXT);
+      const string tp_text = ObjectGetString(0, Name("ENTRY_TP_POINTS"), OBJPROP_TEXT);
+      if(!PMIsUnsignedIntegerText(sl_text) || !PMIsUnsignedIntegerText(tp_text))
+        {
+         reason = "Entry SL/TP points must be non-negative integers.";
+         return false;
+        }
+      const long parsed_sl = StringToInteger(sl_text);
+      const long parsed_tp = StringToInteger(tp_text);
+      if(parsed_sl < 0 || parsed_tp < 0 ||
+         parsed_sl > PM_MAX_TRAILING_POINTS || parsed_tp > PM_MAX_TRAILING_POINTS)
+        {
+         reason = StringFormat("Entry SL/TP points must not exceed %d.", PM_MAX_TRAILING_POINTS);
+         return false;
+        }
+      sl_points = (int)parsed_sl;
+      tp_points = (int)parsed_tp;
+      return true;
+     }
+   void ShiftStopEditor(const bool is_sl, const int direction)
+     {
+      const string suffix = is_sl ? "SL_VALUE" : "TP_VALUE";
+      double value = StringToDouble(ObjectGetString(0, Name(suffix), OBJPROP_TEXT));
+      if(!MathIsValidNumber(value)) value = 0.0;
+      if((is_sl ? m_sl_mode : m_tp_mode) == PM_PRICE_POINTS)
+         value = MathMax(0.0, value + direction);
+      else
+        {
+         PMPosition selected_position = {};
+         const bool has_selected_position = FirstSelectedPosition(selected_position);
+         const string symbol = has_selected_position ? selected_position.symbol : _Symbol;
+         const double tick_size = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
+         const double step = tick_size > 0.0 ? tick_size : SymbolInfoDouble(symbol, SYMBOL_POINT);
+         const int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
+         if(value <= 0.0 && has_selected_position)
+            value = is_sl ? selected_position.sl : selected_position.tp;
+         if(value <= 0.0)
+           {
+            MqlTick tick = {};
+            if(!SymbolInfoTick(symbol, tick) || tick.bid <= 0.0 || tick.ask <= 0.0 || step <= 0.0)
+              {
+               SetStatus("Current price is unavailable for " + symbol + ".");
+               return;
+              }
+            value = has_selected_position && selected_position.type == POSITION_TYPE_SELL ? tick.ask : tick.bid;
+           }
+         value = PMNormalizePrice(value + direction * step, tick_size, digits);
+         ObjectSetString(0, Name(suffix), OBJPROP_TEXT, DoubleToString(value, digits));
          return;
         }
-      if(!m_dragging && !m_resizing)
-        {
-         if(IsInsideResizeCorner(x, y))
-            BeginInteraction(true, x, y);
-         else if(IsInsideTitleBar(x, y))
-            BeginInteraction(false, x, y);
-        }
-      if(m_dragging)
-        {
-         MovePanelTo(m_interaction_origin_x + x - m_interaction_start_x,
-                     m_interaction_origin_y + y - m_interaction_start_y);
-         ChartRedraw();
-        }
-      else if(m_resizing)
-         ResizePanelTo(m_interaction_width + x - m_interaction_start_x,
-                       m_interaction_height + y - m_interaction_start_y);
+      ObjectSetString(0, Name(suffix), OBJPROP_TEXT, DoubleToString(value, 0));
      }
-
-   void MovePanelTo(const int requested_x, const int requested_y)
+   bool FirstSelectedPosition(PMPosition &position)
      {
-      long chart_width = 0;
-      long chart_height = 0;
-      ChartGetInteger(0, CHART_WIDTH_IN_PIXELS, 0, chart_width);
-      ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0, chart_height);
-      int max_x = (int)chart_width - m_panel_width;
-      int max_y = (int)chart_height - PanelHeight();
-      if(max_x < 0)
-         max_x = 0;
-      if(max_y < 0)
-         max_y = 0;
-      int new_x = requested_x;
-      int new_y = requested_y;
-      if(new_x < 0)
-         new_x = 0;
-      if(new_x > max_x)
-         new_x = max_x;
-      if(new_y < 0)
-         new_y = 0;
-      if(new_y > max_y)
-         new_y = max_y;
-      const int delta_x = new_x - m_origin_x;
-      const int delta_y = new_y - m_origin_y;
-      if(delta_x == 0 && delta_y == 0)
-         return;
-      m_origin_x = new_x;
-      m_origin_y = new_y;
-      ShiftPanelObjects(delta_x, delta_y, "");
+      for(int index = 0; index < ArraySize(m_selected); index++)
+         if(FindCachedPosition(m_selected[index], position))
+            return true;
+      return false;
      }
-
-   void ResizePanelTo(const int requested_width,
-                      const int requested_height)
+   void UpdateEntryPreview(const MqlTick &tick)
      {
-      const int previous_rows = m_max_rows;
-      long chart_width = 0;
-      long chart_height = 0;
-      ChartGetInteger(0, CHART_WIDTH_IN_PIXELS, 0, chart_width);
-      ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0, chart_height);
-      int maximum_width = PM_MAX_PANEL_WIDTH;
-      int maximum_height = MaximumPanelHeight();
-      if((int)chart_width - m_origin_x > PM_MIN_PANEL_WIDTH)
-         maximum_width = MathMin(maximum_width, (int)chart_width - m_origin_x);
-      if((int)chart_height - m_origin_y > MinimumPanelHeight())
-         maximum_height = MathMin(maximum_height, (int)chart_height - m_origin_y);
-      m_panel_width = MathMax(PM_MIN_PANEL_WIDTH,
-                              MathMin(requested_width, maximum_width));
-      m_panel_height = MathMax(MinimumPanelHeight(),
-                               MathMin(requested_height, maximum_height));
-      const int content_height = m_panel_height - (95 + PM_PANEL_CHROME_HEIGHT);
-      const int requested_rows = content_height / 21;
-      m_max_rows = MathMax(PM_MIN_POSITION_ROWS,
-                           MathMin(requested_rows, PM_MAX_POSITION_ROWS));
-      if(m_max_rows != previous_rows)
+      int sl_points = 0;
+      int tp_points = 0;
+      string reason = "";
+      if(!ReadEntryPoints(sl_points, tp_points, reason))
         {
-         ApplyLayout();
-         ClampPage();
-         Render();
+         ObjectSetString(0, Name("ENTRY_BUY_PREVIEW"), OBJPROP_TEXT, "Buy SL/TP: invalid input");
+         ObjectSetString(0, Name("ENTRY_SELL_PREVIEW"), OBJPROP_TEXT, "Sell SL/TP: invalid input");
          return;
         }
-      ApplyPanelFrameLayout();
-      ResizeVisibleRows();
-      ChartRedraw();
-     }
 
-   void ApplyPanelFrameLayout()
+      const double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+      const double tick_size = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
+      const int digits = (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS);
+      const long stops_level = SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL);
+      const long freeze_level = SymbolInfoInteger(_Symbol, SYMBOL_TRADE_FREEZE_LEVEL);
+      double buy_sl = 0.0;
+      double buy_tp = 0.0;
+      string buy_reason = "";
+      const bool buy_valid = PMCalculateEntryStops(PM_ENTRY_BUY, tick.bid, tick.ask,
+                                                    point, tick_size, digits,
+                                                    stops_level, freeze_level,
+                                                    sl_points, tp_points,
+                                                    buy_sl, buy_tp, buy_reason);
+      double sell_sl = 0.0;
+      double sell_tp = 0.0;
+      string sell_reason = "";
+      const bool sell_valid = PMCalculateEntryStops(PM_ENTRY_SELL, tick.bid, tick.ask,
+                                                     point, tick_size, digits,
+                                                     stops_level, freeze_level,
+                                                     sl_points, tp_points,
+                                                     sell_sl, sell_tp, sell_reason);
+      ObjectSetString(0, Name("ENTRY_BUY_PREVIEW"), OBJPROP_TEXT,
+                      buy_valid ? "Buy SL/TP: " + PMFormatPrice(_Symbol, buy_sl) + " / " + PMFormatPrice(_Symbol, buy_tp) :
+                                  "Buy SL/TP: invalid distance");
+      ObjectSetString(0, Name("ENTRY_SELL_PREVIEW"), OBJPROP_TEXT,
+                      sell_valid ? "Sell SL/TP: " + PMFormatPrice(_Symbol, sell_sl) + " / " + PMFormatPrice(_Symbol, sell_tp) :
+                                   "Sell SL/TP: invalid distance");
+     }
+   void OpenMarket(const PMEntrySide side, CTradeManager &trades, CValidationService &validator)
      {
-      ObjectSetInteger(0, Name("BACKGROUND"), OBJPROP_XSIZE, m_panel_width);
+      double volume = 0.0;
+      string reason = "";
+      if(!NormalizeEntryVolume(volume, reason))
+        {
+         SetStatus(reason);
+         return;
+        }
+      int sl_points = 0;
+      int tp_points = 0;
+      if(!ReadEntryPoints(sl_points, tp_points, reason))
+        {
+         SetStatus(reason);
+         return;
+        }
+      double sl = 0.0;
+      double tp = 0.0;
+      if(!validator.CalculateEntryStops(_Symbol, side, sl_points, tp_points, sl, tp, reason))
+        { SetStatus(reason); return; }
+      PMMarketEntryResult result;
+      if(!trades.OpenMarket(_Symbol, side, volume, sl, tp, result))
+        { SetStatus(StringFormat("%s failed: %s (retcode=%u)", side == PM_ENTRY_BUY ? "Buy" : "Sell", result.description, result.retcode)); return; }
+      SetStatus(StringFormat("%s accepted: %s requested=%s result=%s price=%s deal=%I64u order=%I64u retcode=%u",
+                             side == PM_ENTRY_BUY ? "Buy" : "Sell", _Symbol,
+                             DoubleToString(volume, VolumeDigits(SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP))),
+                             DoubleToString(result.volume, VolumeDigits(SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP))),
+                             PMFormatPrice(_Symbol, result.price), result.deal,
+                             result.order, result.retcode));
+     }
+   void RenderPositionRows()
+     {
+      const int start = m_page * m_max_rows;
+      const int visible_rows = VisiblePositionRows();
+      const int previous_rows = m_rendered_rows;
+      bool rows_created = true;
+      for(int row = 0; row < visible_rows; row++)
+        {
+         PMPosition position = m_positions[start + row];
+         const string selected = IsSelected(position.ticket) ? "[x] " : "[ ] ";
+         rows_created = CreateButton("ROW_" + IntegerToString(row), selected + position.symbol + " " + PMPositionTypeToString(position.type) + "  Lot=" + DoubleToString(position.volume, 2) + "  #" + StringFormat("%I64u", position.ticket), 12, ContentTop() + PM_PANEL_POSITIONS_HEADER_HEIGHT + row * PM_PANEL_POSITION_ROW_HEIGHT, m_panel_width - 25, 19, IsSelected(position.ticket) ? clrDarkGreen : clrDarkSlateGray) && rows_created;
+         rows_created = CreateButton("ROW_DETAIL_" + IntegerToString(row), "Entry=" + PMFormatPrice(position.symbol, position.open_price) + "  SL=" + PMFormatPrice(position.symbol, position.sl) + "  TP=" + PMFormatPrice(position.symbol, position.tp) + "  P=" + DoubleToString(position.profit, 2), 28, ContentTop() + PM_PANEL_POSITIONS_HEADER_HEIGHT + row * PM_PANEL_POSITION_ROW_HEIGHT + 19, m_panel_width - 41, 18, clrDarkSlateGray) && rows_created;
+        }
+      for(int row = visible_rows; row < previous_rows; row++)
+        {
+         ObjectDelete(0, RowName(row));
+         ObjectDelete(0, RowDetailName(row));
+        }
+      m_rendered_rows = visible_rows;
+      if(!rows_created && !m_row_render_error_reported)
+         PrintFormat("[ERROR] UI position row creation failed. last_error=%d", GetLastError());
+      m_row_render_error_reported = !rows_created;
+     }
+   void ClearPositionRows()
+     {
+      for(int row = 0; row < m_rendered_rows; row++)
+        {
+         ObjectDelete(0, RowName(row));
+         ObjectDelete(0, RowDetailName(row));
+        }
+      m_rendered_rows = 0;
+     }
+   void ApplyTabVisibility()
+     {
+      const bool expanded = !m_collapsed;
+      SetVisible("TAB_ENTRY", expanded);
+      SetVisible("TAB_POSITIONS", expanded);
+      SetVisible("TAB_STOPS", expanded);
+      SetVisible("TAB_AUTO", expanded);
+      SetVisible("TAB_GUARD", expanded);
+      SetVisible("TAB_TRAIL", expanded);
+      const bool entry = expanded && m_active_tab == PM_PANEL_TAB_ENTRY;
+      SetVisible("ENTRY_PRICE", entry);
+      SetVisible("ENTRY_LOT_LABEL", entry);
+      SetVisible("ENTRY_LOT_DEC", entry);
+      SetVisible("ENTRY_LOT", entry);
+      SetVisible("ENTRY_LOT_INC", entry);
+      SetVisible("ENTRY_SL_LABEL", entry);
+      SetVisible("ENTRY_SL_DEC", entry);
+      SetVisible("ENTRY_SL_POINTS", entry);
+      SetVisible("ENTRY_SL_INC", entry);
+      SetVisible("ENTRY_TP_LABEL", entry);
+      SetVisible("ENTRY_TP_DEC", entry);
+      SetVisible("ENTRY_TP_POINTS", entry);
+      SetVisible("ENTRY_TP_INC", entry);
+      SetVisible("ENTRY_BUY_PREVIEW", entry);
+      SetVisible("ENTRY_SELL_PREVIEW", entry);
+      SetVisible("ENTRY_BUY", entry);
+      SetVisible("ENTRY_SELL", entry);
+      SetVisible("ENTRY_HINT", entry);
+      const bool positions = expanded && m_active_tab == PM_PANEL_TAB_POSITIONS;
+      SetVisible("FILTER_LABEL", positions);
+      SetVisible("FILTER_SYMBOL", positions);
+      SetVisible("FILTER_DIRECTION", positions);
+      SetVisible("CLOSE_NOW", positions);
+      SetVisible("PAGE_PREV", positions);
+      SetVisible("PAGE_NEXT", positions);
+      SetVisible("PAGE_LABEL", positions);
+      SetVisible("SELECT_ALL", positions);
+      SetVisible("CLEAR_SELECTION", positions);
+      SetVisible("CLOSE_SELECTED", positions);
+      const bool stops = expanded && m_active_tab == PM_PANEL_TAB_STOPS;
+      SetVisible("SL_LABEL", stops);
+      SetVisible("SL_MODE", stops);
+      SetVisible("SL_DEC", stops);
+      SetVisible("SL_VALUE", stops);
+      SetVisible("SL_INC", stops);
+      SetVisible("SET_SL", stops);
+      SetVisible("CLEAR_SL", stops);
+      SetVisible("TP_LABEL", stops);
+      SetVisible("TP_MODE", stops);
+      SetVisible("TP_DEC", stops);
+      SetVisible("TP_VALUE", stops);
+      SetVisible("TP_INC", stops);
+      SetVisible("SET_TP", stops);
+      SetVisible("CLEAR_TP", stops);
+      SetVisible("STOPS_HINT", stops);
+      const bool auto_tab = expanded && m_active_tab == PM_PANEL_TAB_AUTO;
+      SetVisible("AUTO_LABEL", auto_tab);
+      SetVisible("AUTO_ENABLED", auto_tab);
+      SetVisible("AUTO_SYMBOL", auto_tab);
+      SetVisible("AUTO_DIRECTION", auto_tab);
+      SetVisible("MINUTES_LABEL", auto_tab);
+      SetVisible("AUTO_MINUTES", auto_tab);
+      SetVisible("PASSED_BEHAVIOR", auto_tab);
+      SetVisible("AUTO_HINT", auto_tab);
+      const bool guard = expanded && m_active_tab == PM_PANEL_TAB_GUARD;
+      SetVisible("EQ_LABEL", guard);
+      SetVisible("EQ_ENABLED", guard);
+      SetVisible("EQ_MODE", guard);
+      SetVisible("EQ_LOSS_LABEL", guard);
+      SetVisible("EQ_LOSS_VALUE", guard);
+      SetVisible("EQ_PROFIT_LABEL", guard);
+      SetVisible("EQ_PROFIT_VALUE", guard);
+      SetVisible("EQ_HINT", guard);
+      const bool trail = expanded && m_active_tab == PM_PANEL_TAB_TRAIL;
+      SetVisible("TS_LABEL", trail);
+      SetVisible("TS_SYMBOL", trail);
+      SetVisible("TS_DIRECTION", trail);
+      SetVisible("BE_LABEL", trail);
+      SetVisible("BE_ENABLED", trail);
+      SetVisible("BE_TRIGGER_LABEL", trail);
+      SetVisible("BE_TRIGGER_VALUE", trail);
+      SetVisible("BE_LOCK_LABEL", trail);
+      SetVisible("BE_LOCK_VALUE", trail);
+      SetVisible("TRAIL_LABEL", trail);
+      SetVisible("TRAIL_ENABLED", trail);
+      SetVisible("TRAIL_DIST_LABEL", trail);
+      SetVisible("TRAIL_DIST_VALUE", trail);
+      SetVisible("TRAIL_HINT", trail);
+      SetVisible("SESSION_LABEL", expanded);
+      for(int row = 0; row < m_rendered_rows; row++)
+        {
+         SetVisible("ROW_" + IntegerToString(row), positions);
+         SetVisible("ROW_DETAIL_" + IntegerToString(row), positions);
+        }
+      for(int line = 0; line < PM_MAX_STATUS_LINES; line++)
+         SetVisible("STATUS_LINE_" + IntegerToString(line), expanded);
+      SetVisible("RESIZE_GRIP", expanded);
+      ObjectSetString(0, Name("COLLAPSE"), OBJPROP_TEXT, m_collapsed ? "+" : "-");
       ObjectSetInteger(0, Name("BACKGROUND"), OBJPROP_YSIZE, PanelHeight());
-      Reposition("RESIZE_GRIP", m_panel_width - 24, PanelHeight() - 18);
+      ObjectSetInteger(0, Name("RESIZE_GRIP"), OBJPROP_XDISTANCE, m_origin_x + m_panel_width - 24);
+      ObjectSetInteger(0, Name("RESIZE_GRIP"), OBJPROP_YDISTANCE, m_origin_y + PanelHeight() - 18);
      }
-
-   void ResizeVisibleRows()
+   void UpdateStatusLayout()
      {
-      const int page_start = m_page * m_max_rows;
-      const int visible = MathMin(m_max_rows, ArraySize(m_positions) - page_start);
-      for(int row = 0; row < visible; row++)
-         ObjectSetInteger(0, RowName(row), OBJPROP_XSIZE, m_panel_width - 25);
+      if(m_collapsed) return;
+      string lines[];
+      const int max_chars = MathMax(24, (m_panel_width - 24) / 7);
+      PMWrapStatus("Status: " + m_status, max_chars, lines);
+      if(ArraySize(lines) > PM_MAX_STATUS_LINES)
+        {
+         ArrayResize(lines, PM_MAX_STATUS_LINES);
+         lines[PM_MAX_STATUS_LINES - 1] = lines[PM_MAX_STATUS_LINES - 1] + " ...";
+        }
+      const int base_y = ContentTop() + ContentHeight() + PM_PANEL_CONTENT_GAP;
+      ObjectSetInteger(0, Name("SESSION_LABEL"), OBJPROP_YDISTANCE, m_origin_y + base_y);
+      for(int line = 0; line < PM_MAX_STATUS_LINES; line++)
+        {
+         const bool visible = line < ArraySize(lines);
+         ObjectSetString(0, Name("STATUS_LINE_" + IntegerToString(line)), OBJPROP_TEXT, visible ? lines[line] : "");
+         ObjectSetInteger(0, Name("STATUS_LINE_" + IntegerToString(line)), OBJPROP_YDISTANCE, m_origin_y + base_y + PM_PANEL_STATUS_LINE_HEIGHT + line * PM_PANEL_STATUS_LINE_HEIGHT);
+         SetVisible("STATUS_LINE_" + IntegerToString(line), visible);
+        }
+      m_panel_height = base_y + PM_PANEL_STATUS_LINE_HEIGHT * (ArraySize(lines) + 1) + 10;
+      m_expanded_height = m_panel_height;
+      ObjectSetInteger(0, Name("BACKGROUND"), OBJPROP_YSIZE, PanelHeight());
+      ObjectSetInteger(0, Name("RESIZE_GRIP"), OBJPROP_YDISTANCE, m_origin_y + PanelHeight() - 18);
      }
-
-   void ApplyLayout()
+   void SetVisible(const string suffix, const bool visible)
      {
-      const int section_y = SectionY();
-      ApplyPanelFrameLayout();
-      RepositionY("SL_LABEL", section_y + PM_PANEL_SL_LABEL_Y);
-      RepositionY("SL_MODE", section_y + PM_PANEL_SL_Y);
-      RepositionY("SL_VALUE", section_y + PM_PANEL_SL_Y);
-      RepositionY("SET_SL", section_y + PM_PANEL_SL_Y);
-      RepositionY("CLEAR_SL", section_y + PM_PANEL_SL_Y);
-      RepositionY("TP_LABEL", section_y + PM_PANEL_TP_LABEL_Y);
-      RepositionY("TP_MODE", section_y + PM_PANEL_TP_Y);
-      RepositionY("TP_VALUE", section_y + PM_PANEL_TP_Y);
-      RepositionY("SET_TP", section_y + PM_PANEL_TP_Y);
-      RepositionY("CLEAR_TP", section_y + PM_PANEL_TP_Y);
-      RepositionY("AUTO_LABEL", section_y + PM_PANEL_AUTO_LABEL_Y);
-      RepositionY("AUTO_ENABLED", section_y + PM_PANEL_AUTO_Y);
-      RepositionY("AUTO_SYMBOL_LABEL", section_y + PM_PANEL_AUTO_LABEL_Y);
-      RepositionY("AUTO_SYMBOL", section_y + PM_PANEL_AUTO_Y);
-      RepositionY("AUTO_DIRECTION", section_y + PM_PANEL_AUTO_Y);
-      RepositionY("MINUTES_LABEL", section_y + PM_PANEL_AUTO_LABEL_Y);
-      RepositionY("AUTO_MINUTES", section_y + PM_PANEL_AUTO_Y);
-      RepositionY("PASSED_BEHAVIOR", section_y + PM_PANEL_AUTO_Y);
-      RepositionY("EQ_LABEL", section_y + PM_PANEL_EQUITY_LABEL_Y);
-      RepositionY("EQ_ENABLED", section_y + PM_PANEL_EQUITY_Y);
-      RepositionY("EQ_MODE", section_y + PM_PANEL_EQUITY_Y);
-      RepositionY("EQ_LOSS_LABEL", section_y + PM_PANEL_EQUITY_LABEL_Y);
-      RepositionY("EQ_LOSS_VALUE", section_y + PM_PANEL_EQUITY_Y);
-      RepositionY("EQ_PROFIT_LABEL", section_y + PM_PANEL_EQUITY_LABEL_Y);
-      RepositionY("EQ_PROFIT_VALUE", section_y + PM_PANEL_EQUITY_Y);
-      RepositionY("EQ_SCOPE_LABEL", section_y + PM_PANEL_EQUITY_LABEL_Y);
-      RepositionY("TS_LABEL", section_y + PM_PANEL_TRAILING_SCOPE_LABEL_Y);
-      RepositionY("TS_SYMBOL_LABEL", section_y + PM_PANEL_TRAILING_SCOPE_LABEL_Y);
-      RepositionY("TS_SYMBOL", section_y + PM_PANEL_TRAILING_SCOPE_Y);
-      RepositionY("TS_DIRECTION", section_y + PM_PANEL_TRAILING_SCOPE_Y);
-      RepositionY("BE_LABEL", section_y + PM_PANEL_BREAK_EVEN_LABEL_Y);
-      RepositionY("BE_ENABLED", section_y + PM_PANEL_BREAK_EVEN_Y);
-      RepositionY("BE_TRIGGER_LABEL", section_y + PM_PANEL_BREAK_EVEN_LABEL_Y);
-      RepositionY("BE_TRIGGER_VALUE", section_y + PM_PANEL_BREAK_EVEN_Y);
-      RepositionY("BE_LOCK_LABEL", section_y + PM_PANEL_BREAK_EVEN_LABEL_Y);
-      RepositionY("BE_LOCK_VALUE", section_y + PM_PANEL_BREAK_EVEN_Y);
-      RepositionY("TRAIL_LABEL", section_y + PM_PANEL_TRAIL_LABEL_Y);
-      RepositionY("TRAIL_ENABLED", section_y + PM_PANEL_TRAIL_Y);
-      RepositionY("TRAIL_DIST_LABEL", section_y + PM_PANEL_TRAIL_LABEL_Y);
-      RepositionY("TRAIL_DIST_VALUE", section_y + PM_PANEL_TRAIL_Y);
-      RepositionY("SESSION_LABEL", section_y + PM_PANEL_SESSION_Y);
-      RepositionY("STATUS_LABEL", section_y + PM_PANEL_STATUS_Y);
+      ObjectSetInteger(0, Name(suffix), OBJPROP_TIMEFRAMES,
+                       visible ? OBJ_ALL_PERIODS : OBJ_NO_PERIODS);
      }
-
-   void RepositionY(const string suffix, const int y)
-     {
-      ObjectSetInteger(0, Name(suffix), OBJPROP_YDISTANCE, m_origin_y + y);
-     }
-
-   void Reposition(const string suffix, const int x, const int y)
-     {
-      ObjectSetInteger(0, Name(suffix), OBJPROP_XDISTANCE, m_origin_x + x);
-      ObjectSetInteger(0, Name(suffix), OBJPROP_YDISTANCE, m_origin_y + y);
-     }
-
    bool CreateBackground(const int height)
      {
       const string object_name = Name("BACKGROUND");
@@ -1047,10 +1101,7 @@ private:
       ObjectSetInteger(0, object_name, OBJPROP_ZORDER, 0);
       return true;
      }
-
-   void PrepareObject(const string object_name,
-                      const int x,
-                      const int y)
+   void PrepareObject(const string object_name, const int x, const int y)
      {
       ObjectSetInteger(0, object_name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
       ObjectSetInteger(0, object_name, OBJPROP_XDISTANCE, m_origin_x + x);
@@ -1059,13 +1110,7 @@ private:
       ObjectSetInteger(0, object_name, OBJPROP_HIDDEN, true);
       ObjectSetInteger(0, object_name, OBJPROP_ZORDER, 1);
      }
-
-   bool CreateLabel(const string suffix,
-                    const string text,
-                    const int x,
-                    const int y,
-                    const color text_color,
-                    const int font_size)
+   bool CreateLabel(const string suffix, const string text, const int x, const int y, const color text_color, const int font_size)
      {
       const string object_name = Name(suffix);
       if(!ObjectCreate(0, object_name, OBJ_LABEL, 0, 0, 0))
@@ -1077,14 +1122,7 @@ private:
       ObjectSetInteger(0, object_name, OBJPROP_COLOR, text_color);
       return true;
      }
-
-   bool CreateButton(const string suffix,
-                     const string text,
-                     const int x,
-                     const int y,
-                     const int width,
-                     const int height = 22,
-                     const color background = clrDarkSlateGray)
+   bool CreateButton(const string suffix, const string text, const int x, const int y, const int width, const int height = 22, const color background = clrDarkSlateGray)
      {
       const string object_name = Name(suffix);
       if(!ObjectCreate(0, object_name, OBJ_BUTTON, 0, 0, 0))
@@ -1100,13 +1138,7 @@ private:
       ObjectSetInteger(0, object_name, OBJPROP_BORDER_COLOR, clrGray);
       return true;
      }
-
-   bool CreateEdit(const string suffix,
-                   const string text,
-                   const int x,
-                   const int y,
-                   const int width,
-                   const int height)
+   bool CreateEdit(const string suffix, const string text, const int x, const int y, const int width, const int height)
      {
       const string object_name = Name(suffix);
       if(!ObjectCreate(0, object_name, OBJ_EDIT, 0, 0, 0))
@@ -1120,6 +1152,131 @@ private:
       ObjectSetInteger(0, object_name, OBJPROP_COLOR, clrBlack);
       ObjectSetInteger(0, object_name, OBJPROP_BGCOLOR, clrWhite);
       return true;
+     }
+   bool IsInsideTitleBar(const int x, const int y)
+     {
+      return x >= m_origin_x && x < m_origin_x + m_panel_width &&
+             y >= m_origin_y && y < m_origin_y + PM_TITLEBAR_HEIGHT;
+     }
+   bool IsInsideCollapseButton(const int x, const int y)
+     {
+      return x >= m_origin_x + m_panel_width - 30 &&
+             x <= m_origin_x + m_panel_width - 6 &&
+             y >= m_origin_y + 4 && y <= m_origin_y + 24;
+     }
+   bool IsInsideResizeCorner(const int x, const int y)
+     {
+      return !m_collapsed &&
+             x >= m_origin_x + m_panel_width - PM_RESIZE_HANDLE_HIT_SIZE &&
+             x <= m_origin_x + m_panel_width &&
+             y >= m_origin_y + PanelHeight() - PM_RESIZE_HANDLE_HIT_SIZE &&
+             y <= m_origin_y + PanelHeight();
+     }
+   void BeginInteraction(const bool resize, const int x, const int y)
+     {
+      m_dragging = !resize;
+      m_resizing = resize;
+      m_interaction_start_x = x;
+      m_interaction_start_y = y;
+      m_interaction_origin_x = m_origin_x;
+      m_interaction_origin_y = m_origin_y;
+      m_interaction_width = m_panel_width;
+      long mouse_scroll_enabled = 1;
+      if(ChartGetInteger(0, CHART_MOUSE_SCROLL, 0, mouse_scroll_enabled))
+         m_chart_mouse_scroll_before_interaction = mouse_scroll_enabled != 0;
+      ChartSetInteger(0, CHART_MOUSE_SCROLL, 0, false);
+     }
+   void EndInteraction()
+     {
+      if(!m_dragging && !m_resizing)
+         return;
+      m_dragging = false;
+      m_resizing = false;
+      ChartSetInteger(0, CHART_MOUSE_SCROLL, 0,
+                      m_chart_mouse_scroll_before_interaction);
+      ChartRedraw();
+     }
+   void HandleMouseMove(const int x, const int y, const string state_text)
+     {
+      const uint state = (uint)StringToInteger(state_text);
+      const bool left_pressed = (state & 1) != 0;
+      if(!left_pressed)
+        {
+         EndInteraction();
+         return;
+        }
+      if(!m_dragging && !m_resizing)
+        {
+         if(IsInsideResizeCorner(x, y))
+            BeginInteraction(true, x, y);
+         else if(IsInsideTitleBar(x, y) && !IsInsideCollapseButton(x, y))
+            BeginInteraction(false, x, y);
+        }
+      if(m_dragging)
+         MovePanelTo(m_interaction_origin_x + x - m_interaction_start_x,
+                     m_interaction_origin_y + y - m_interaction_start_y);
+      else if(m_resizing)
+         ResizePanelTo(m_interaction_width + x - m_interaction_start_x);
+     }
+   void MovePanelTo(const int requested_x, const int requested_y)
+     {
+      long chart_width = 0;
+      long chart_height = 0;
+      ChartGetInteger(0, CHART_WIDTH_IN_PIXELS, 0, chart_width);
+      ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0, chart_height);
+      int max_x = (int)chart_width - m_panel_width;
+      int max_y = (int)chart_height - PanelHeight();
+      if(max_x < 0)
+         max_x = 0;
+      if(max_y < 0)
+         max_y = 0;
+      const int new_x = MathMax(0, MathMin(requested_x, max_x));
+      const int new_y = MathMax(0, MathMin(requested_y, max_y));
+      const int delta_x = new_x - m_origin_x;
+      const int delta_y = new_y - m_origin_y;
+      m_origin_x = new_x;
+      m_origin_y = new_y;
+      ShiftPanelObjects(delta_x, delta_y, "");
+     }
+   void ResizePanelTo(const int requested_width)
+     {
+      long chart_width = 0;
+      ChartGetInteger(0, CHART_WIDTH_IN_PIXELS, 0, chart_width);
+      const int available_width = MathMax(PM_MIN_PANEL_WIDTH,
+                                          (int)chart_width - m_origin_x);
+      const int maximum = MathMin(PM_MAX_PANEL_WIDTH, available_width);
+      m_panel_width = MathMax(PM_MIN_PANEL_WIDTH,
+                              MathMin(requested_width, maximum));
+      ApplyPanelFrameLayout();
+      Render();
+     }
+   void ShiftPanelObjects(const int delta_x, const int delta_y, const string exclude_name)
+     {
+      if(delta_x == 0 && delta_y == 0)
+         return;
+      const int total = ObjectsTotal(0, -1, -1);
+      for(int index = total - 1; index >= 0; index--)
+        {
+         const string object_name = ObjectName(0, index, -1, -1);
+         if(StringFind(object_name, PM_OBJECT_PREFIX) != 0 ||
+            object_name == exclude_name)
+            continue;
+         const int x = (int)ObjectGetInteger(0, object_name,
+                                             OBJPROP_XDISTANCE);
+         const int y = (int)ObjectGetInteger(0, object_name,
+                                             OBJPROP_YDISTANCE);
+         ObjectSetInteger(0, object_name, OBJPROP_XDISTANCE, x + delta_x);
+         ObjectSetInteger(0, object_name, OBJPROP_YDISTANCE, y + delta_y);
+        }
+     }
+   void ApplyPanelFrameLayout()
+     {
+      ObjectSetInteger(0, Name("BACKGROUND"), OBJPROP_XSIZE, m_panel_width);
+      ObjectSetInteger(0, Name("BACKGROUND"), OBJPROP_YSIZE, PanelHeight());
+      ObjectSetInteger(0, Name("COLLAPSE"), OBJPROP_XDISTANCE,
+                       m_origin_x + m_panel_width - 30);
+      ObjectSetInteger(0, Name("RESIZE_GRIP"), OBJPROP_XDISTANCE,
+                       m_origin_x + m_panel_width - 24);
      }
   };
 

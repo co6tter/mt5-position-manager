@@ -273,6 +273,69 @@ void TestBestStopCandidate()
               "Sell: break even wins when it is more favorable (lower) than trailing");
   }
 
+void TestEntryHelpers()
+  {
+   AssertTrue(MathAbs(PMNormalizeVolume(0.001, 0.01, 1.0, 0.01) - 0.01) < 0.0000001,
+              "Entry volume clamps to the symbol minimum");
+   AssertTrue(MathAbs(PMNormalizeVolume(0.037, 0.01, 1.0, 0.01) - 0.04) < 0.0000001,
+              "Entry volume rounds to the nearest volume step");
+   AssertTrue(MathAbs(PMNormalizeVolume(2.0, 0.01, 1.0, 0.01) - 1.0) < 0.0000001,
+              "Entry volume clamps to the symbol maximum");
+   AssertTrue(MathAbs(PMNormalizeVolume(2.0, 0.01, 1.0, 0.03) - 1.0) < 0.0000001,
+              "Entry volume stays aligned when the maximum is on the step grid");
+   AssertTrue(MathAbs(PMNormalizeVolume(2.0, 0.01, 0.99, 0.03) - 0.97) < 0.0000001,
+              "Entry volume does not return an off-step maximum");
+   AssertTrue(MathAbs(PMNormalizePrice(159.520, 0.001, 3) - 159.520) < 0.000001,
+              "Price normalization preserves the configured digits");
+   AssertTrue(PMIsUnsignedDecimalText("0.01") && PMIsUnsignedDecimalText(".5") &&
+              !PMIsUnsignedDecimalText("") && !PMIsUnsignedDecimalText(".") &&
+              !PMIsUnsignedDecimalText("1x"),
+              "Entry volume text accepts decimals and rejects invalid text");
+   AssertTrue(PMIsUnsignedIntegerText("0") && PMIsUnsignedIntegerText("250") &&
+              !PMIsUnsignedIntegerText("-1") && !PMIsUnsignedIntegerText("1.5"),
+              "Entry point text accepts only non-negative integers");
+   AssertTrue(PMIsMarketEntrySuccessRetcode(TRADE_RETCODE_DONE) &&
+              PMIsMarketEntrySuccessRetcode(TRADE_RETCODE_DONE_PARTIAL) &&
+              PMIsMarketEntrySuccessRetcode(TRADE_RETCODE_PLACED) &&
+              !PMIsMarketEntrySuccessRetcode(TRADE_RETCODE_INVALID_VOLUME),
+              "Market entry success includes partial fills but excludes failures");
+
+   double sl = 0.0;
+   double tp = 0.0;
+   string reason = "";
+   AssertTrue(PMCalculateEntryStops(PM_ENTRY_BUY, 159.500, 159.503,
+                                    0.001, 0.001, 3, 0, 0,
+                                    10, 20, sl, tp, reason) &&
+              MathAbs(sl - 159.490) < 0.000001 &&
+              MathAbs(tp - 159.520) < 0.000001,
+              "Buy entry stops use Bid and preserve three price digits");
+   AssertTrue(PMCalculateEntryStops(PM_ENTRY_SELL, 159.500, 159.503,
+                                    0.001, 0.001, 3, 0, 0,
+                                    10, 20, sl, tp, reason) &&
+              MathAbs(sl - 159.513) < 0.000001 &&
+              MathAbs(tp - 159.483) < 0.000001,
+              "Sell entry stops use Ask and preserve three price digits");
+   AssertTrue(PMCalculateEntryStops(PM_ENTRY_BUY, 159.500, 159.503,
+                                    0.001, 0.001, 3, 0, 0,
+                                    0, 0, sl, tp, reason) && sl == 0.0 && tp == 0.0,
+              "Zero entry distances disable both protective prices");
+   AssertTrue(!PMCalculateEntryStops(PM_ENTRY_BUY, 159.500, 159.503,
+                                     0.001, 0.001, 3, 5, 0,
+                                     5, 5, sl, tp, reason),
+              "Entry stops inside the broker distance are rejected");
+   AssertTrue(!PMCalculateEntryStops(PM_ENTRY_BUY, 159.500, 159.503,
+                                     0.001, 0.0, 3, 0, 0,
+                                     10, 20, sl, tp, reason),
+              "Entry stops are rejected when tick size is unavailable");
+
+   string lines[];
+   const int line_count = PMWrapStatus("Status: SL clear stopped: trading unavailable (auto trading disabled by client)", 24, lines);
+   AssertTrue(line_count > 1 && StringFind(lines[0], "Status:") == 0 &&
+              StringLen(lines[line_count - 1]) > 0 &&
+              StringLen(lines[0]) <= 24,
+              "Long status messages are split into non-empty lines");
+  }
+
 void OnStart()
   {
    TestDirectionMatching();
@@ -286,6 +349,7 @@ void OnStart()
    TestProfitPoints();
    TestIsMoreFavorableStop();
    TestBestStopCandidate();
+   TestEntryHelpers();
    if(g_failures == 0)
       Print("[PASS] All Position Manager pure tests passed.");
    else

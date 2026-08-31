@@ -15,6 +15,15 @@
 3. 1秒以上待ち、FilterとAuto CloseがXAUUSDのままであることを確認する。
 4. XAUUSDの全ポジションを外部から決済しても、対象が別Symbolへ変化しないことを確認する。
 
+## Tab、折り畳み、成り行きエントリー
+
+1. 6タブを切り替え、選択中タブの本文だけが表示されることを確認する。
+2. EntryタブでLot、SL/TP pointsを編集し、`-` / `+`クリックでVolume Stepまたは1 pointずつ変化することを確認する。
+3. Buy/Sellそれぞれで最新Bid/Ask基準のSL/TPプレビューを確認し、0 points、SLのみ、TPのみ、SL/TP両方をデモ口座で実行する。
+4. 成功時にStatusとExpertsログへside、symbol、要求Lot、結果Lot、約定価格、Deal、Order、retcodeが記録されることを確認する。部分約定は失敗表示にならないことを確認する。
+5. Lotへ空欄・文字列・0、SL/TP pointsへ小数・負数・文字列を入力し、注文要求が送信されず理由がStatusへ表示されることを確認する。Algo Trading無効、Stops Level違反でも同様に確認する。
+6. タイトルバーの`-`で折り畳み、タイトルと`+`以外が消えることを確認する。展開ボタン以外のタイトルバーをドラッグして移動し、`+`で再展開できることを確認する。
+
 ## ページングと選択
 
 1. 13件以上のhedgingポジションを用意する。
@@ -39,6 +48,11 @@
 2. 1件を検証後・要求前に外部決済し、そのTicketが失敗としてStatusまたはログへ残ることを確認する。
 3. Stops Level、Freeze Level、Tick Sizeに違反する値で取引要求が送信されないことを確認する。
 4. Clear SL / Clear TPで反対側の値が維持されることを確認する。
+
+## Position価格とStatus表示
+
+1. USDJPYでTPが`159.520`のポジションを表示し、末尾の0を含む`TP=159.520`、Profit、Ticketが確認できることを確認する。
+2. `SL clear stopped: trading unavailable (auto trading disabled by client)`とticket・retcodeを含む長文Statusを発生させ、Statusが複数行で全文表示されることを確認する。
 
 ## Auto Close
 

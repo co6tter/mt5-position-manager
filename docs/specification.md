@@ -2,7 +2,7 @@
 
 ## 目的
 
-既存の保有ポジションを、Symbol・売買方向・Ticketで安全に選択し、決済またはSL/TP変更する。EA自身は新規エントリーを行わない。
+既存の保有ポジションを、Symbol・売買方向・Ticketで安全に選択し、決済またはSL/TP変更する。Entryタブからチャート銘柄の成り行きBuy/Sellも実行する。
 
 ## 対象選択
 
@@ -14,7 +14,7 @@
 
 ## Trade結果
 
-`CTrade`のメソッドのbool戻り値だけで成功判定せず、`ResultRetcode()`と説明、Deal、Orderを確認する。決済はTicket指定の`PositionClose(ticket)`、変更はTicket指定の`PositionModify(ticket, sl, tp)`を使用する。
+`CTrade`のメソッドのbool戻り値だけで成功判定せず、`ResultRetcode()`と説明、Deal、Order、結果Volume、結果Priceを確認する。成り行き注文は`DONE`、`DONE_PARTIAL`、`PLACED`を受付成功として扱い、自動再送しない。決済はTicket指定の`PositionClose(ticket)`、変更はTicket指定の`PositionModify(ticket, sl, tp)`を使用する。
 
 一時エラーはTimer駆動キューへ登録し、EAスレッドを停止せずに再試行する。決済の恒久エラーも未解決の決済意図としてキューに保持し、設定間隔で再試行する。未解決の決済TicketはSL/TP自動変更の対象外とする。`PLACED`および既存Close Orderは重複送信せず、ポジション状態だけを確認する。
 
@@ -28,7 +28,9 @@ Price入力またはPoints入力を受け付ける。Pointsの基準価格はLon
 
 ## UI
 
-標準チャートオブジェクトだけでパネルを構成する。Symbol・Directionは候補を順番に切り替えるボタンとし、SL/TPとAuto Closeの数値は編集欄から入力する。処理結果はパネルのStatusとExpertsログへ出力する。
+標準チャートオブジェクトだけでパネルを構成する。Entry、Positions、SL/TP、Auto、Guard、Trailの6タブを持ち、非選択タブの本文は表示しない。タイトルバーの折り畳みボタンで本文を隠せ、折り畳み中もタイトルバーをドラッグできる。Symbol・Directionは候補を順番に切り替えるボタンとし、SL/TPとAuto Closeの数値は編集欄から入力する。処理結果は折り返し可能な複数行StatusとExpertsログへ出力する。Positionsの価格は銘柄のDigitsで表示する。
+
+EntryタブはLot、SL/TP points、最新Bid/Ask、Buy/Sell別の計算価格を表示する。LotはVolume Min/Max/Stepへ正規化し、SL/TPは注文直前のTickから計算してStops Level、Freeze Level、Tick Sizeを検証する。確認ダイアログは表示しない。
 
 選択中Symbolは候補配列の位置ではなく文字列で保持し、他Symbolの追加・削除によって変更しない。
 
@@ -58,4 +60,4 @@ Auto Close・Equity Guardと同様にOnTimer駆動の自動処理とし、確認
 
 ## 非対象
 
-新規エントリー、自動売買戦略、インジケーター、Risk %、Partial Close、Pending Order、Magic Numberフィルタ。
+自動売買戦略、インジケーター、Risk %、Partial Close、Pending Order、Magic Numberフィルタ。

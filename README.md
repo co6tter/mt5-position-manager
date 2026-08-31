@@ -2,7 +2,7 @@
 
 ## Overview
 
-保有ポジションの管理・決済に特化したMetaTrader 5 Expert Advisorです。Symbol、売買方向、Ticketを指定した手動操作に加え、Auto Close、Equity Guard、Break Even、Trailing Stopを提供します。EA自身は新規エントリーを行いません。
+保有ポジションの管理・決済とチャート上からの成り行きエントリーを行うMetaTrader 5 Expert Advisorです。Symbol、売買方向、Ticketを指定した手動操作に加え、Auto Close、Equity Guard、Break Even、Trailing Stopを提供します。
 
 ## Tech Stack
 
@@ -40,13 +40,18 @@ EAをチャートへ適用し、AutoTradingを有効にします。SymbolやDire
 
 ### 手動操作
 
+パネルは`Entry`、`Positions`、`SL/TP`、`Auto`、`Guard`、`Trail`のタブに分かれています。タイトルバーの`-`で折り畳め、折り畳み中もタイトルバーをドラッグして移動できます。
+
+- `Entry`: チャート銘柄の最新Bid/Askを表示し、Lot、初期SL/TP（points）を指定して`BUY MARKET` / `SELL MARKET`を実行します。確認ダイアログはありません。LotとSL/TP pointsは`-` / `+`をクリックして変更でき、SL/TPは注文直前の最新価格から計算されます。0 pointsは該当SL/TPなしです。
+- `Positions`: Position行をクリックして選択・選択解除します。Entry、SL、TP、Profit、Ticketは詳細行に分けて表示し、銘柄のDigitsを保持します（例: `TP=159.520`）。
+
 - `Close Now`: 上部のFilterに一致するポジションを確認後に決済します。
 - ポジション行: クリックして選択・選択解除します。
 - `<` / `>`: ポジション一覧のページを移動します。Page、Selected、Totalを確認してください。
 - `Close Selected`: 選択行だけを確認後に決済します。
 - `Set / Change SL` / `Set / Change TP`: 選択行を先に選び、ModeとValueを指定します。
 - `Clear SL` / `Clear TP`: 選択ポジションの該当保護注文を削除します。
-- タイトルバー部分を左ドラッグするとパネルを移動できます。右下の`///`付近を左ドラッグすると、幅と高さをピクセル単位で変更できます。
+- タイトルバー部分を左ドラッグするとパネルを移動できます。右下の`///`付近を左ドラッグすると幅を変更できます。
 
 Points指定では、LongはBidを基準にSLを下側、TPを上側へ、ShortはAskを基準にSLを上側、TPを下側へ計算します。表示行数は3〜50、Auto CloseのMinutes Before Closeは0〜1,440へ安全側に正規化されます。
 
@@ -84,9 +89,13 @@ TriggerやDistanceがブローカーのStops Levelより小さい場合、候補
 - Auto CloseはEA、端末、取引サーバー、通信状態に依存します。決済完了を必ず確認してください。
 - EAの停止・再起動後も実行済み状態を永続化する仕様ではありません。再起動時に`Passed`設定が適用されます。
 
+### 成り行きエントリーの注意
+
+成り行き注文は`CTrade::Buy` / `Sell`へ同期送信し、retcode、Deal、Order、約定価格を確認します。BrokerのVolume Min/Max/Step、Stops Level、Freeze Level、Tick Size、取引時間、Algo Trading設定により拒否される場合があります。netting口座では反対売買が既存ポジションの決済または反転になることがあります。実口座へ適用する前に必ずデモ口座で確認してください。
+
 ### 非対象
 
-新規Buy / Sell、自動エントリー、戦略、インジケーター、ロット計算、Partial Close、Pending Order管理、Magic Numberフィルタは対象外です。
+自動売買戦略、インジケーター、Risk %、Partial Close、Pending Order管理、Magic Numberフィルタは対象外です。
 
 ## Directory Structure
 

@@ -26,6 +26,22 @@ enum PMEquityThresholdMode
    PM_EQUITY_THRESHOLD_PERCENT = 1
   };
 
+enum PMPanelTab
+  {
+   PM_PANEL_TAB_ENTRY = 0,
+   PM_PANEL_TAB_POSITIONS = 1,
+   PM_PANEL_TAB_STOPS = 2,
+   PM_PANEL_TAB_AUTO = 3,
+   PM_PANEL_TAB_GUARD = 4,
+   PM_PANEL_TAB_TRAIL = 5
+  };
+
+enum PMEntrySide
+  {
+   PM_ENTRY_BUY = 0,
+   PM_ENTRY_SELL = 1
+  };
+
 enum PMTradeOperationType
   {
    PM_TRADE_OPERATION_CLOSE = 0,
@@ -80,6 +96,17 @@ struct PMBatchResult
    int successful;
    int queued;
    PMTradeFailure failures[];
+  };
+
+struct PMMarketEntryResult
+  {
+   bool request_ok;
+   uint retcode;
+   string description;
+   ulong deal;
+   ulong order;
+   double volume;
+   double price;
   };
 
 struct AutoCloseConfig

@@ -119,6 +119,68 @@ public:
                         1, wait_only, failure);
      }
 
+   bool OpenMarket(const string symbol,
+                   const PMEntrySide side,
+                   const double volume,
+                   const double sl,
+                   const double tp,
+                   PMMarketEntryResult &result)
+     {
+      PMResetMarketEntryResult(result);
+      if(symbol == "" || !MathIsValidNumber(volume) || volume <= 0.0 ||
+         !MathIsValidNumber(sl) || sl < 0.0 ||
+         !MathIsValidNumber(tp) || tp < 0.0 ||
+         (side != PM_ENTRY_BUY && side != PM_ENTRY_SELL))
+        {
+         result.description = "Entry symbol, side, volume, SL, or TP is invalid.";
+         PrintFormat("[ERROR] Market entry rejected before send symbol=%s volume=%s sl=%s tp=%s side=%d description=%s",
+                     symbol, DoubleToString(volume, 8), DoubleToString(sl, 8),
+                     DoubleToString(tp, 8), (int)side,
+                     result.description);
+         return false;
+        }
+      CTrade entry_trade;
+      entry_trade.SetAsyncMode(false);
+      entry_trade.SetDeviationInPoints(m_deviation_points);
+      entry_trade.LogLevel(LOG_LEVEL_ERRORS);
+      ResetLastError();
+      if(!entry_trade.SetTypeFillingBySymbol(symbol))
+        {
+         result.description = "Unable to determine the symbol filling mode.";
+         PrintFormat("[ERROR] Market entry setup failed symbol=%s description=%s last_error=%d",
+                     symbol, result.description, GetLastError());
+         return false;
+        }
+
+      ResetLastError();
+      const bool request_ok = side == PM_ENTRY_BUY ?
+         entry_trade.Buy(volume, symbol, 0.0, sl, tp, "MT5 Position Manager") :
+         entry_trade.Sell(volume, symbol, 0.0, sl, tp, "MT5 Position Manager");
+      const int last_error = GetLastError();
+      result.request_ok = request_ok;
+      result.retcode = entry_trade.ResultRetcode();
+      result.description = entry_trade.ResultRetcodeDescription();
+      result.deal = entry_trade.ResultDeal();
+      result.order = entry_trade.ResultOrder();
+      result.volume = entry_trade.ResultVolume();
+      result.price = entry_trade.ResultPrice();
+      if(request_ok && PMIsMarketEntrySuccessRetcode(result.retcode))
+        {
+         PrintFormat("[INFO] Market %s accepted symbol=%s requested_volume=%s result_volume=%s price=%s sl=%s tp=%s deal=%I64u order=%I64u retcode=%u",
+                     side == PM_ENTRY_BUY ? "Buy" : "Sell", symbol,
+                     DoubleToString(volume, 8), DoubleToString(result.volume, 8),
+                     DoubleToString(result.price, 8),
+                     DoubleToString(sl, 8), DoubleToString(tp, 8),
+                     result.deal, result.order, result.retcode);
+         return true;
+        }
+      PrintFormat("[ERROR] Market %s failed symbol=%s volume=%s retcode=%u description=%s last_error=%d",
+                  side == PM_ENTRY_BUY ? "Buy" : "Sell", symbol,
+                  DoubleToString(volume, 8), result.retcode,
+                  result.description, last_error);
+      return false;
+     }
+
    int ProcessRetries(const datetime now, string &status_text)
      {
       status_text = "";

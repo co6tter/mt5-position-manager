@@ -14,27 +14,21 @@
 #define PM_DEFAULT_DEVIATION_POINTS 20
 #define PM_DEFAULT_RETRY_COUNT 5
 #define PM_DEFAULT_RETRY_INTERVAL_SECONDS 3
-#define PM_DEFAULT_PANEL_WIDTH 780
-#define PM_MIN_PANEL_WIDTH 780
-#define PM_MAX_PANEL_WIDTH 1600
-#define PM_PANEL_CHROME_HEIGHT 301
-#define PM_PANEL_SL_Y 0
-#define PM_PANEL_SL_LABEL_Y 3
-#define PM_PANEL_TP_Y 33
-#define PM_PANEL_TP_LABEL_Y 36
-#define PM_PANEL_AUTO_Y 67
-#define PM_PANEL_AUTO_LABEL_Y 70
-#define PM_PANEL_EQUITY_Y 100
-#define PM_PANEL_EQUITY_LABEL_Y 103
-#define PM_PANEL_TRAILING_SCOPE_Y 134
-#define PM_PANEL_TRAILING_SCOPE_LABEL_Y 137
-#define PM_PANEL_BREAK_EVEN_Y 168
-#define PM_PANEL_BREAK_EVEN_LABEL_Y 171
-#define PM_PANEL_TRAIL_Y 202
-#define PM_PANEL_TRAIL_LABEL_Y 205
-#define PM_PANEL_SESSION_Y 236
-#define PM_PANEL_STATUS_Y 262
+#define PM_DEFAULT_PANEL_WIDTH 560
+#define PM_MIN_PANEL_WIDTH 460
+#define PM_MAX_PANEL_WIDTH 1200
+#define PM_PANEL_STATUS_LINE_HEIGHT 16
+#define PM_PANEL_CONTENT_GAP 8
+#define PM_PANEL_ENTRY_HEIGHT 178
+#define PM_PANEL_POSITIONS_HEADER_HEIGHT 38
+#define PM_PANEL_POSITION_ROW_HEIGHT 40
+#define PM_PANEL_STOPS_HEIGHT 92
+#define PM_PANEL_AUTO_HEIGHT 108
+#define PM_PANEL_GUARD_HEIGHT 92
+#define PM_PANEL_TRAIL_HEIGHT 138
+#define PM_MAX_STATUS_LINES 20
 #define PM_TITLEBAR_HEIGHT 28
+#define PM_TAB_BAR_HEIGHT 26
 #define PM_RESIZE_HANDLE_HIT_SIZE 28
 
 string PMDirectionToString(const PMDirection direction)
@@ -106,6 +100,172 @@ bool PMIsTradingUnavailableRetcode(const uint retcode)
           retcode == TRADE_RETCODE_CLIENT_DISABLES_AT;
   }
 
+bool PMIsMarketEntrySuccessRetcode(const uint retcode)
+  {
+   return retcode == TRADE_RETCODE_DONE ||
+          retcode == TRADE_RETCODE_DONE_PARTIAL ||
+          retcode == TRADE_RETCODE_PLACED;
+  }
+
+bool PMIsUnsignedIntegerText(const string text)
+  {
+   const int length = StringLen(text);
+   if(length == 0)
+      return false;
+   for(int index = 0; index < length; index++)
+     {
+      const ushort character = StringGetCharacter(text, index);
+      if(character < 48 || character > 57)
+         return false;
+     }
+   return true;
+  }
+
+bool PMIsUnsignedDecimalText(const string text)
+  {
+   const int length = StringLen(text);
+   if(length == 0)
+      return false;
+   bool decimal_point_seen = false;
+   int digit_count = 0;
+   for(int index = 0; index < length; index++)
+     {
+      const ushort character = StringGetCharacter(text, index);
+      if(character >= 48 && character <= 57)
+        {
+         digit_count++;
+         continue;
+        }
+      if(character == 46 && !decimal_point_seen)
+        {
+         decimal_point_seen = true;
+         continue;
+        }
+      return false;
+     }
+   return digit_count > 0;
+  }
+
+double PMNormalizeVolume(const double value,
+                         const double minimum,
+                         const double maximum,
+                         const double step)
+  {
+   if(!MathIsValidNumber(value) || !MathIsValidNumber(minimum) ||
+      !MathIsValidNumber(maximum) || !MathIsValidNumber(step) ||
+      minimum <= 0.0 || maximum < minimum || step <= 0.0)
+      return 0.0;
+   const double maximum_steps = MathFloor((maximum - minimum) / step + 0.00000001);
+   const double aligned_maximum = minimum + maximum_steps * step;
+   double clamped = MathMax(minimum, MathMin(value, aligned_maximum));
+   const double steps = MathFloor((clamped - minimum) / step + 0.5);
+   double normalized = minimum + steps * step;
+   if(normalized < minimum)
+      normalized = minimum;
+   if(normalized > aligned_maximum)
+      normalized = aligned_maximum;
+   return NormalizeDouble(normalized, 8);
+  }
+
+double PMNormalizePrice(const double price,
+                        const double tick_size,
+                        const int digits)
+  {
+   if(!MathIsValidNumber(price) || price <= 0.0)
+      return 0.0;
+   if(tick_size <= 0.0)
+      return NormalizeDouble(price, digits);
+   return NormalizeDouble(MathRound(price / tick_size) * tick_size, digits);
+  }
+
+bool PMCalculateEntryStops(const PMEntrySide side,
+                           const double bid,
+                           const double ask,
+                           const double point,
+                           const double tick_size,
+                           const int digits,
+                           const long stops_level,
+                           const long freeze_level,
+                           const int sl_points,
+                           const int tp_points,
+                           double &sl,
+                           double &tp,
+                           string &reason)
+  {
+   sl = 0.0;
+   tp = 0.0;
+   reason = "";
+   if((side != PM_ENTRY_BUY && side != PM_ENTRY_SELL) ||
+      bid <= 0.0 || ask <= 0.0 || point <= 0.0 || tick_size <= 0.0 ||
+      digits < 0 || stops_level < 0 || freeze_level < 0 ||
+      sl_points < 0 || tp_points < 0)
+     {
+      reason = "Current price or entry distance is invalid.";
+      return false;
+     }
+
+   const double reference = side == PM_ENTRY_BUY ? bid : ask;
+   const double minimum_distance = (double)MathMax(stops_level, freeze_level) * point;
+   if(sl_points > 0)
+     {
+      sl = side == PM_ENTRY_BUY ? reference - sl_points * point :
+                                  reference + sl_points * point;
+      sl = PMNormalizePrice(sl, tick_size, digits);
+      if(sl <= 0.0 || (side == PM_ENTRY_BUY ?
+                       sl >= reference - minimum_distance :
+                       sl <= reference + minimum_distance))
+        {
+         reason = side == PM_ENTRY_BUY ?
+                  "Buy SL is inside the broker's Stops/Freeze Level." :
+                  "Sell SL is inside the broker's Stops/Freeze Level.";
+         return false;
+        }
+     }
+   if(tp_points > 0)
+     {
+      tp = side == PM_ENTRY_BUY ? reference + tp_points * point :
+                                  reference - tp_points * point;
+      tp = PMNormalizePrice(tp, tick_size, digits);
+      if(tp <= 0.0 || (side == PM_ENTRY_BUY ?
+                       tp <= reference + minimum_distance :
+                       tp >= reference - minimum_distance))
+        {
+         reason = side == PM_ENTRY_BUY ?
+                  "Buy TP is inside the broker's Stops/Freeze Level." :
+                  "Sell TP is inside the broker's Stops/Freeze Level.";
+         return false;
+        }
+     }
+   return true;
+  }
+
+int PMWrapStatus(const string text,
+                 const int max_chars,
+                 string &lines[])
+  {
+   ArrayResize(lines, 0);
+   const int width = MathMax(1, max_chars);
+   string remaining = text;
+   while(StringLen(remaining) > width)
+     {
+      int cut = width;
+      while(cut > 1 && StringGetCharacter(remaining, cut) != 32)
+         cut--;
+      if(cut <= 1)
+         cut = width;
+      const int count = ArraySize(lines);
+      ArrayResize(lines, count + 1);
+      lines[count] = StringSubstr(remaining, 0, cut);
+      remaining = StringSubstr(remaining, cut);
+      while(StringLen(remaining) > 0 && StringGetCharacter(remaining, 0) == 32)
+         remaining = StringSubstr(remaining, 1);
+     }
+   const int count = ArraySize(lines);
+   ArrayResize(lines, count + 1);
+   lines[count] = remaining;
+   return ArraySize(lines);
+  }
+
 string PMFormatPrice(const string symbol, const double price)
   {
    const int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
@@ -142,6 +302,17 @@ void PMResetTradeFailure(PMTradeFailure &failure)
    failure.retcode = 0;
    failure.description = "";
    failure.attempts = 0;
+  }
+
+void PMResetMarketEntryResult(PMMarketEntryResult &result)
+  {
+   result.request_ok = false;
+   result.retcode = 0;
+   result.description = "";
+   result.deal = 0;
+   result.order = 0;
+   result.volume = 0.0;
+   result.price = 0.0;
   }
 
 void PMAddFailure(PMBatchResult &result,

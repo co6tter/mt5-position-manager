@@ -96,6 +96,35 @@ public:
       return true;
      }
 
+   bool CalculateEntryStops(const string symbol,
+                            const PMEntrySide side,
+                            const int sl_points,
+                            const int tp_points,
+                            double &sl,
+                            double &tp,
+                            string &reason)
+     {
+      sl = 0.0;
+      tp = 0.0;
+      reason = "";
+      MqlTick tick = {};
+      if(!SymbolInfoTick(symbol, tick) || tick.bid <= 0.0 || tick.ask <= 0.0)
+        {
+         reason = "No current tick is available for " + symbol + ".";
+         return false;
+        }
+      const double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+      const double tick_size = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
+      const int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
+      const long stops_level = SymbolInfoInteger(symbol, SYMBOL_TRADE_STOPS_LEVEL);
+      const long freeze_level = SymbolInfoInteger(symbol, SYMBOL_TRADE_FREEZE_LEVEL);
+      if(!PMCalculateEntryStops(side, tick.bid, tick.ask, point, tick_size, digits,
+                                stops_level, freeze_level, sl_points, tp_points,
+                                sl, tp, reason))
+         return false;
+      return true;
+     }
+
    double NormalizeToTick(const string symbol, const double price)
      {
       const double tick_size = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
