@@ -5,6 +5,7 @@
 #include "..\src\Constants.mqh"
 #include "..\src\SessionService.mqh"
 #include "..\src\EquityGuardService.mqh"
+#include "..\src\EquityLineService.mqh"
 #include "..\src\TrailingStopService.mqh"
 
 int g_failures = 0;
@@ -336,6 +337,55 @@ void TestEntryHelpers()
               "Long status messages are split into non-empty lines");
   }
 
+void TestPanelLayoutHelpers()
+  {
+   AssertTrue(PM_PANEL_POSITIONS_HEADER_HEIGHT >= 52,
+              "Position rows start below both header button rows");
+   AssertTrue(PMResolvePanelHeight(320, 500) == 500,
+              "A taller user-requested panel height is preserved");
+   AssertTrue(PMResolvePanelHeight(500, 320) == 500,
+              "Panel height never shrinks below required content");
+  }
+
+void TestEquityLineCalculation()
+  {
+   PMPosition positions[];
+   ArrayResize(positions, 3);
+   positions[0].symbol = "USDJPY";
+   positions[0].type = POSITION_TYPE_BUY;
+   positions[0].volume = 1.0;
+   positions[0].open_price = 100.0;
+   positions[1].symbol = "USDJPY";
+   positions[1].type = POSITION_TYPE_BUY;
+   positions[1].volume = 2.0;
+   positions[1].open_price = 110.0;
+   positions[2].symbol = "EURUSD";
+   positions[2].type = POSITION_TYPE_BUY;
+   positions[2].volume = 10.0;
+   positions[2].open_price = 1.1;
+
+   double price = 0.0;
+   AssertTrue(PMCalculateEquityLinePrice(positions, "USDJPY", price) &&
+              MathAbs(price - 106.66666667) < 0.00000001,
+              "Equity line uses the volume-weighted break-even price for the chart symbol");
+
+   ArrayResize(positions, 2);
+   positions[0].type = POSITION_TYPE_BUY;
+   positions[0].volume = 2.0;
+   positions[0].open_price = 100.0;
+   positions[1].type = POSITION_TYPE_SELL;
+   positions[1].volume = 1.0;
+   positions[1].open_price = 110.0;
+   AssertTrue(PMCalculateEquityLinePrice(positions, "USDJPY", price) &&
+              MathAbs(price - 90.0) < 0.00000001,
+              "Equity line accounts for mixed Buy and Sell positions");
+
+   positions[1].volume = 2.0;
+   AssertTrue(!PMCalculateEquityLinePrice(positions, "USDJPY", price) &&
+              price == 0.0,
+              "Equity line is unavailable when net volume is zero");
+  }
+
 void OnStart()
   {
    TestDirectionMatching();
@@ -350,6 +400,8 @@ void OnStart()
    TestIsMoreFavorableStop();
    TestBestStopCandidate();
    TestEntryHelpers();
+   TestPanelLayoutHelpers();
+   TestEquityLineCalculation();
    if(g_failures == 0)
       Print("[PASS] All Position Manager pure tests passed.");
    else

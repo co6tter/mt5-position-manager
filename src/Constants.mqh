@@ -20,7 +20,7 @@
 #define PM_PANEL_STATUS_LINE_HEIGHT 16
 #define PM_PANEL_CONTENT_GAP 8
 #define PM_PANEL_ENTRY_HEIGHT 178
-#define PM_PANEL_POSITIONS_HEADER_HEIGHT 38
+#define PM_PANEL_POSITIONS_HEADER_HEIGHT 56
 #define PM_PANEL_POSITION_ROW_HEIGHT 40
 #define PM_PANEL_STOPS_HEIGHT 92
 #define PM_PANEL_AUTO_HEIGHT 108
@@ -30,6 +30,7 @@
 #define PM_TITLEBAR_HEIGHT 28
 #define PM_TAB_BAR_HEIGHT 26
 #define PM_RESIZE_HANDLE_HIT_SIZE 28
+#define PM_EQUITY_LINE_COLOR C'255,182,193'
 
 string PMDirectionToString(const PMDirection direction)
   {
@@ -264,6 +265,17 @@ int PMWrapStatus(const string text,
    ArrayResize(lines, count + 1);
    lines[count] = remaining;
    return ArraySize(lines);
+  }
+
+int PMResolvePanelHeight(const int required_height,
+                         const int requested_height)
+  {
+   int resolved = required_height;
+   if(resolved < 1)
+      resolved = 1;
+   if(requested_height > resolved)
+      resolved = requested_height;
+   return resolved;
   }
 
 string PMFormatPrice(const string symbol, const double price)

@@ -51,9 +51,15 @@ EAをチャートへ適用し、AutoTradingを有効にします。SymbolやDire
 - `Close Selected`: 選択行だけを確認後に決済します。
 - `Set / Change SL` / `Set / Change TP`: 選択行を先に選び、ModeとValueを指定します。
 - `Clear SL` / `Clear TP`: 選択ポジションの該当保護注文を削除します。
-- タイトルバー部分を左ドラッグするとパネルを移動できます。右下の`///`付近を左ドラッグすると幅を変更できます。
+- タイトルバー部分を左ドラッグするとパネルを移動できます。右下の`///`付近を左ドラッグすると幅と高さを変更できます。高さを広げた場合、Statusはパネル下端側へ移動します。
 
 Points指定では、LongはBidを基準にSLを下側、TPを上側へ、ShortはAskを基準にSLを上側、TPを下側へ計算します。表示行数は3〜50、Auto CloseのMinutes Before Closeは0〜1,440へ安全側に正規化されます。
+
+### Equity / Break-evenライン
+
+EAを配置したチャートのSymbolに保有ポジションがある場合、全Ticketの方向とLotを合算した理論上の損益分岐価格を、チャート上へ細い薄ピンクの水平線として表示します。Buyだけ、またはSellだけの場合はLot加重平均の建値です。Buy/Sellが混在する場合はネットポジションの損益分岐価格を表示します。
+
+対象ポジションがない場合、またはBuyとSellのLotが一致してネットLotが0の場合は、一意な損益分岐価格を計算できないためラインを表示しません。SwapとCommissionは計算に含みません。ラインは1秒Timer周期で更新され、パネルの選択タブや折り畳み状態には依存しません。
 
 ### Auto Close
 
@@ -110,6 +116,7 @@ TriggerやDistanceがブローカーのStops Levelより小さい場合、候補
 │   ├── SessionService.mqh        # 取引セッション終了時刻の取得
 │   ├── AutoCloseService.mqh      # Auto Closeの日次判定
 │   ├── EquityGuardService.mqh    # Equity Guard判定
+│   ├── EquityLineService.mqh     # チャートSymbolの損益分岐ライン
 │   ├── TrailingStopService.mqh   # Break Even・Trailing StopのSL更新
 │   ├── UiPanel.mqh               # チャートオブジェクトによる操作パネル
 │   └── Models.mqh / Constants.mqh # 共通モデルと補助関数

@@ -47,6 +47,7 @@ private:
    int m_panel_width;
    int m_panel_height;
    int m_expanded_height;
+   int m_user_panel_height;
    bool m_dragging;
    bool m_resizing;
    int m_interaction_start_x;
@@ -54,6 +55,7 @@ private:
    int m_interaction_origin_x;
    int m_interaction_origin_y;
    int m_interaction_width;
+   int m_interaction_height;
    bool m_chart_mouse_scroll_before_interaction;
    bool m_chart_mouse_move_before_create;
 
@@ -93,6 +95,7 @@ public:
       m_panel_width = PM_DEFAULT_PANEL_WIDTH;
       m_panel_height = 0;
       m_expanded_height = 0;
+      m_user_panel_height = 0;
       m_dragging = false;
       m_resizing = false;
       m_interaction_start_x = 0;
@@ -100,6 +103,7 @@ public:
       m_interaction_origin_x = 0;
       m_interaction_origin_y = 0;
       m_interaction_width = 0;
+      m_interaction_height = 0;
       m_chart_mouse_scroll_before_interaction = true;
       m_chart_mouse_move_before_create = true;
      }
@@ -108,6 +112,7 @@ public:
      {
       m_max_rows = MathMax(PM_MIN_POSITION_ROWS, MathMin(max_rows, PM_MAX_POSITION_ROWS));
       m_panel_width = PM_DEFAULT_PANEL_WIDTH;
+      m_user_panel_height = 0;
       m_origin_x = 0;
       m_origin_y = 0;
       m_panel_height = ExpandedPanelHeight();
@@ -696,7 +701,8 @@ private:
       else if(object_name == Name("TAB_TRAIL")) tab = PM_PANEL_TAB_TRAIL;
       else return false;
       m_active_tab = tab;
-      m_expanded_height = ExpandedPanelHeight();
+      m_expanded_height = PMResolvePanelHeight(ExpandedPanelHeight(),
+                                               m_user_panel_height);
       m_panel_height = m_expanded_height;
       return true;
      }
@@ -1064,7 +1070,15 @@ private:
          ArrayResize(lines, PM_MAX_STATUS_LINES);
          lines[PM_MAX_STATUS_LINES - 1] = lines[PM_MAX_STATUS_LINES - 1] + " ...";
         }
-      const int base_y = ContentTop() + ContentHeight() + PM_PANEL_CONTENT_GAP;
+      const int content_bottom = ContentTop() + ContentHeight() +
+                                 PM_PANEL_CONTENT_GAP;
+      const int status_block_height = PM_PANEL_STATUS_LINE_HEIGHT *
+                                      (ArraySize(lines) + 1) + 10;
+      const int required_height = content_bottom + status_block_height;
+      m_panel_height = PMResolvePanelHeight(required_height,
+                                            m_user_panel_height);
+      m_expanded_height = m_panel_height;
+      const int base_y = content_bottom + m_panel_height - required_height;
       ObjectSetInteger(0, Name("SESSION_LABEL"), OBJPROP_YDISTANCE, m_origin_y + base_y);
       for(int line = 0; line < PM_MAX_STATUS_LINES; line++)
         {
@@ -1073,8 +1087,6 @@ private:
          ObjectSetInteger(0, Name("STATUS_LINE_" + IntegerToString(line)), OBJPROP_YDISTANCE, m_origin_y + base_y + PM_PANEL_STATUS_LINE_HEIGHT + line * PM_PANEL_STATUS_LINE_HEIGHT);
          SetVisible("STATUS_LINE_" + IntegerToString(line), visible);
         }
-      m_panel_height = base_y + PM_PANEL_STATUS_LINE_HEIGHT * (ArraySize(lines) + 1) + 10;
-      m_expanded_height = m_panel_height;
       ObjectSetInteger(0, Name("BACKGROUND"), OBJPROP_YSIZE, PanelHeight());
       ObjectSetInteger(0, Name("RESIZE_GRIP"), OBJPROP_YDISTANCE, m_origin_y + PanelHeight() - 18);
      }
@@ -1181,6 +1193,7 @@ private:
       m_interaction_origin_x = m_origin_x;
       m_interaction_origin_y = m_origin_y;
       m_interaction_width = m_panel_width;
+      m_interaction_height = PanelHeight();
       long mouse_scroll_enabled = 1;
       if(ChartGetInteger(0, CHART_MOUSE_SCROLL, 0, mouse_scroll_enabled))
          m_chart_mouse_scroll_before_interaction = mouse_scroll_enabled != 0;
@@ -1216,7 +1229,8 @@ private:
          MovePanelTo(m_interaction_origin_x + x - m_interaction_start_x,
                      m_interaction_origin_y + y - m_interaction_start_y);
       else if(m_resizing)
-         ResizePanelTo(m_interaction_width + x - m_interaction_start_x);
+         ResizePanelTo(m_interaction_width + x - m_interaction_start_x,
+                       m_interaction_height + y - m_interaction_start_y);
      }
    void MovePanelTo(const int requested_x, const int requested_y)
      {
@@ -1238,15 +1252,23 @@ private:
       m_origin_y = new_y;
       ShiftPanelObjects(delta_x, delta_y, "");
      }
-   void ResizePanelTo(const int requested_width)
+   void ResizePanelTo(const int requested_width,
+                      const int requested_height)
      {
       long chart_width = 0;
+      long chart_height = 0;
       ChartGetInteger(0, CHART_WIDTH_IN_PIXELS, 0, chart_width);
+      ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0, chart_height);
       const int available_width = MathMax(PM_MIN_PANEL_WIDTH,
                                           (int)chart_width - m_origin_x);
       const int maximum = MathMin(PM_MAX_PANEL_WIDTH, available_width);
       m_panel_width = MathMax(PM_MIN_PANEL_WIDTH,
                               MathMin(requested_width, maximum));
+      const int available_height = MathMax(PM_TITLEBAR_HEIGHT,
+                                           (int)chart_height - m_origin_y);
+      m_user_panel_height = MathMax(PM_TITLEBAR_HEIGHT,
+                                    MathMin(requested_height,
+                                            available_height));
       ApplyPanelFrameLayout();
       Render();
      }
@@ -1277,6 +1299,8 @@ private:
                        m_origin_x + m_panel_width - 30);
       ObjectSetInteger(0, Name("RESIZE_GRIP"), OBJPROP_XDISTANCE,
                        m_origin_x + m_panel_width - 24);
+      ObjectSetInteger(0, Name("RESIZE_GRIP"), OBJPROP_YDISTANCE,
+                       m_origin_y + PanelHeight() - 18);
      }
   };
 

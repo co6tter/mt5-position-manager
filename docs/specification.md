@@ -28,11 +28,17 @@ Price入力またはPoints入力を受け付ける。Pointsの基準価格はLon
 
 ## UI
 
-標準チャートオブジェクトだけでパネルを構成する。Entry、Positions、SL/TP、Auto、Guard、Trailの6タブを持ち、非選択タブの本文は表示しない。タイトルバーの折り畳みボタンで本文を隠せ、折り畳み中もタイトルバーをドラッグできる。Symbol・Directionは候補を順番に切り替えるボタンとし、SL/TPとAuto Closeの数値は編集欄から入力する。処理結果は折り返し可能な複数行StatusとExpertsログへ出力する。Positionsの価格は銘柄のDigitsで表示する。
+標準チャートオブジェクトだけでパネルを構成する。Entry、Positions、SL/TP、Auto、Guard、Trailの6タブを持ち、非選択タブの本文は表示しない。タイトルバーの折り畳みボタンで本文を隠せ、折り畳み中もタイトルバーをドラッグできる。右下のグリップでは幅と高さを変更でき、必要な本文より小さくはしない。Symbol・Directionは候補を順番に切り替えるボタンとし、SL/TPとAuto Closeの数値は編集欄から入力する。処理結果は折り返し可能な複数行StatusとExpertsログへ出力する。Positionsの価格は銘柄のDigitsで表示する。
 
 EntryタブはLot、SL/TP points、最新Bid/Ask、Buy/Sell別の計算価格を表示する。LotはVolume Min/Max/Stepへ正規化し、SL/TPは注文直前のTickから計算してStops Level、Freeze Level、Tick Sizeを検証する。確認ダイアログは表示しない。
 
 選択中Symbolは候補配列の位置ではなく文字列で保持し、他Symbolの追加・削除によって変更しない。
+
+## Equity / Break-evenライン
+
+チャートの`_Symbol`に属する全ポジションについて、Buyを正、Sellを負とした方向付きVolumeと建値の加重値から、ネットポジションの理論上の損益分岐価格を計算する。価格はTick Sizeへ正規化し、幅1pxの薄いピンクの`OBJ_HLINE`として全時間足へ表示する。OnInitと1秒Timerで更新し、パネルのタブ、折り畳み、移動、リサイズから独立させる。
+
+対象ポジションがない場合、ネットVolumeが0の場合、または有効な正価格を計算できない場合はラインを削除する。SwapとCommissionは計算対象外とする。
 
 ## Equity Guard
 

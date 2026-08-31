@@ -11,6 +11,7 @@
 #include "SessionService.mqh"
 #include "AutoCloseService.mqh"
 #include "EquityGuardService.mqh"
+#include "EquityLineService.mqh"
 #include "TrailingStopService.mqh"
 #include "UiPanel.mqh"
 
@@ -26,6 +27,7 @@ CPositionActionService g_actions;
 CSessionService g_sessions;
 CAutoCloseService g_auto_close;
 CEquityGuardService g_equity_guard;
+CEquityLineService g_equity_line;
 CTrailingStopService g_trailing_stop;
 CUiPanel g_ui;
 
@@ -35,11 +37,13 @@ int OnInit()
    if(!g_ui.Create(InpMaxPositionRows))
       return INIT_FAILED;
    g_ui.Refresh(g_positions);
+   g_equity_line.Render(_Symbol, g_positions);
    g_ui.Render();
    ResetLastError();
    if(!EventSetTimer(PM_TIMER_SECONDS))
      {
       PrintFormat("[ERROR] EventSetTimer failed. error=%d", GetLastError());
+      g_equity_line.Destroy();
       g_ui.Destroy();
       return INIT_FAILED;
      }
@@ -49,6 +53,7 @@ int OnInit()
 void OnDeinit(const int reason)
   {
    EventKillTimer();
+   g_equity_line.Destroy();
    g_ui.Destroy();
   }
 
@@ -65,6 +70,7 @@ void OnTimer()
    string retry_status = "";
    g_trades.ProcessRetries(now, retry_status);
    g_ui.Refresh(g_positions);
+   g_equity_line.Render(_Symbol, g_positions);
    AutoCloseConfig config = {};
    g_ui.GetAutoCloseConfig(config);
    string auto_status = "";
