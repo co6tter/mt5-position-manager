@@ -81,21 +81,22 @@ public:
             ReportError("create");
             return false;
            }
-         ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_COLOR,
-                          PM_EQUITY_LINE_COLOR);
-         ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_STYLE,
-                          STYLE_SOLID);
-         ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_WIDTH, 1);
-         ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_BACK, false);
-         ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME,
-                          OBJPROP_SELECTABLE, false);
-         ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_HIDDEN, true);
-         ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME,
-                          OBJPROP_TIMEFRAMES, OBJ_ALL_PERIODS);
-         ObjectSetString(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_TEXT,
-                         "Equity / Break-even");
         }
 
+      ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_COLOR,
+                       PM_EQUITY_LINE_COLOR);
+      ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_STYLE,
+                       STYLE_DASH);
+      ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_WIDTH, 1);
+      ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_BACK, true);
+      ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_ZORDER, 0);
+      ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME,
+                       OBJPROP_SELECTABLE, false);
+      ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_HIDDEN, true);
+      ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME,
+                       OBJPROP_TIMEFRAMES, OBJ_ALL_PERIODS);
+      ObjectSetString(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_TEXT,
+                      "Equity / Break-even");
       ResetLastError();
       if(!ObjectSetDouble(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_PRICE, price))
         {

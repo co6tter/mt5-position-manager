@@ -42,7 +42,7 @@ EAをチャートへ適用し、AutoTradingを有効にします。SymbolやDire
 
 パネルは`Entry`、`Positions`、`SL/TP`、`Auto`、`Guard`、`Trail`のタブに分かれています。タイトルバーの`-`で折り畳め、折り畳み中もタイトルバーをドラッグして移動できます。
 
-- `Entry`: チャート銘柄の最新Bid/Askを表示し、Lot、初期SL/TP（points）を指定して`BUY MARKET` / `SELL MARKET`を実行します。確認ダイアログはありません。LotとSL/TP pointsは`-` / `+`をクリックして変更でき、SL/TPは注文直前の最新価格から計算されます。0 pointsは該当SL/TPなしです。
+- `Entry`: チャート銘柄の最新Bid/Askを表示し、Lot、初期SL/TP（points）を指定して、MT5と同じ左`SELL MARKET` / 右`BUY MARKET`の順で実行します。確認ダイアログはありません。LotとSL/TP pointsは`-` / `+`をクリックして変更でき、SL/TPは注文直前の最新価格から計算されます。0 pointsは該当SL/TPなしです。
 - `Positions`: Position行をクリックして選択・選択解除します。Entry、SL、TP、Profit、Ticketは詳細行に分けて表示し、銘柄のDigitsを保持します（例: `TP=159.520`）。
 
 - `Close Now`: 上部のFilterに一致するポジションを確認後に決済します。
@@ -57,7 +57,7 @@ Points指定では、LongはBidを基準にSLを下側、TPを上側へ、Short�
 
 ### Equity / Break-evenライン
 
-EAを配置したチャートのSymbolに保有ポジションがある場合、全Ticketの方向とLotを合算した理論上の損益分岐価格を、チャート上へ細い薄ピンクの水平線として表示します。Buyだけ、またはSellだけの場合はLot加重平均の建値です。Buy/Sellが混在する場合はネットポジションの損益分岐価格を表示します。
+EAを配置したチャートのSymbolに保有ポジションがある場合、全Ticketの方向とLotを合算した理論上の損益分岐価格を、チャート上へ細い薄ピンクの破線として表示します。ラインは背景レイヤーへ描画し、操作パネルより前面には表示しません。Buyだけ、またはSellだけの場合はLot加重平均の建値です。Buy/Sellが混在する場合はネットポジションの損益分岐価格を表示します。
 
 対象ポジションがない場合、またはBuyとSellのLotが一致してネットLotが0の場合は、一意な損益分岐価格を計算できないためラインを表示しません。SwapとCommissionは計算に含みません。ラインは1秒Timer周期で更新され、パネルの選択タブや折り畳み状態には依存しません。
 

@@ -153,8 +153,8 @@ public:
       created = CreateButton("ENTRY_TP_INC", "+", 182, ContentTop() + 94, 26, 22) && created;
       created = CreateLabel("ENTRY_BUY_PREVIEW", "Buy SL/TP: - / -", 230, ContentTop() + 34, clrSilver, 9) && created;
       created = CreateLabel("ENTRY_SELL_PREVIEW", "Sell SL/TP: - / -", 230, ContentTop() + 51, clrSilver, 9) && created;
-      created = CreateButton("ENTRY_BUY", "BUY MARKET", 230, ContentTop() + 72, 105, 28, clrDarkGreen) && created;
-      created = CreateButton("ENTRY_SELL", "SELL MARKET", 343, ContentTop() + 72, 105, 28, clrMaroon) && created;
+      created = CreateButton("ENTRY_SELL", "SELL MARKET", 230, ContentTop() + 72, 105, 28, clrMaroon) && created;
+      created = CreateButton("ENTRY_BUY", "BUY MARKET", 343, ContentTop() + 72, 105, 28, clrDarkGreen) && created;
       created = CreateLabel("ENTRY_HINT", "Prices follow current Bid/Ask; 0 pts disables SL/TP.", 12, ContentTop() + 130, clrSilver, 8) && created;
 
       created = CreateLabel("FILTER_LABEL", "Filter", 12, ContentTop() + 4, clrSilver, 9) && created;
@@ -960,6 +960,7 @@ private:
    void ApplyTabVisibility()
      {
       const bool expanded = !m_collapsed;
+      UpdateTabColors();
       SetVisible("TAB_ENTRY", expanded);
       SetVisible("TAB_POSITIONS", expanded);
       SetVisible("TAB_STOPS", expanded);
@@ -1058,6 +1059,21 @@ private:
       ObjectSetInteger(0, Name("BACKGROUND"), OBJPROP_YSIZE, PanelHeight());
       ObjectSetInteger(0, Name("RESIZE_GRIP"), OBJPROP_XDISTANCE, m_origin_x + m_panel_width - 24);
       ObjectSetInteger(0, Name("RESIZE_GRIP"), OBJPROP_YDISTANCE, m_origin_y + PanelHeight() - 18);
+     }
+   void UpdateTabColors()
+     {
+      SetTabColor("TAB_ENTRY", PM_PANEL_TAB_ENTRY);
+      SetTabColor("TAB_POSITIONS", PM_PANEL_TAB_POSITIONS);
+      SetTabColor("TAB_STOPS", PM_PANEL_TAB_STOPS);
+      SetTabColor("TAB_AUTO", PM_PANEL_TAB_AUTO);
+      SetTabColor("TAB_GUARD", PM_PANEL_TAB_GUARD);
+      SetTabColor("TAB_TRAIL", PM_PANEL_TAB_TRAIL);
+     }
+   void SetTabColor(const string suffix, const PMPanelTab tab)
+     {
+      ObjectSetInteger(0, Name(suffix), OBJPROP_BGCOLOR,
+                       m_active_tab == tab ? PM_ACTIVE_TAB_COLOR :
+                                             clrDarkSlateGray);
      }
    void UpdateStatusLayout()
      {

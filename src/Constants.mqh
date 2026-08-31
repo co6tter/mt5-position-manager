@@ -31,6 +31,7 @@
 #define PM_TAB_BAR_HEIGHT 26
 #define PM_RESIZE_HANDLE_HIT_SIZE 28
 #define PM_EQUITY_LINE_COLOR C'255,182,193'
+#define PM_ACTIVE_TAB_COLOR C'70,130,180'
 
 string PMDirectionToString(const PMDirection direction)
   {
