@@ -18,7 +18,7 @@
 ## Tab、折り畳み、成り行きエントリー
 
 1. 6タブを切り替え、選択中タブが明るい青色・強調境界線・白文字、他のタブが暗い青灰色・控えめな境界線・銀文字になり、選択中タブの本文だけが表示されることを確認する。
-2. パネル内に上下左右の余白があり、四隅がわずかに角丸風に見えることを確認する。
+2. パネル内に上下左右の余白があり、四隅が通常の角形であることを確認する。
 3. EntryタブでLot、SL/TP pointsを編集し、`-` / `+`クリックでVolume Stepまたは1 pointずつ変化することを確認する。
 4. Buy/Sellそれぞれで最新Bid/Ask基準のSL/TPプレビューを確認し、0 points、SLのみ、TPのみ、SL/TP両方をデモ口座で実行する。
 5. 成功時にStatusとExpertsログへside、symbol、要求Lot、結果Lot、約定価格、Deal、Order、retcodeが記録されることを確認する。部分約定は失敗表示にならないことを確認する。
@@ -35,7 +35,7 @@
 3. 1ページ目と2ページ目から複数Ticketを選び、Selected件数が一致することを確認する。
 4. `Close Selected`の確認ダイアログに選択した全Ticket・Symbol・方向・Lotが表示されることを確認する。
 5. Noを選択し、1件も決済されないことを確認する。
-6. Filter、Close Now、ページング（`<` / Page / `>`）、選択操作（Select All / Clear / Close Selected）がそれぞれ分かれた行に配置され、先頭Position行と重ならないことを確認する。
+6. Filter、Close Now、ページング（`<` / `>` / Page / Selected / Total）、選択操作（Select All / Clear / Close Selected）がそれぞれ分かれた行に配置され、先頭Position行と重ならないことを確認する。
 7. Positionsタブで各ポジションが1行に収まり、Longだけ緑、Shortだけ赤で表示されることを確認する。
 8. 右下の`///`を斜めにドラッグし、パネルの幅と高さを拡大・縮小できることを確認する。必要な本文より小さくならず、高さを広げてもStatusとリサイズグリップがパネル内にあることを確認する。
 
@@ -51,11 +51,12 @@
 
 ## SL / TPと消失Ticket
 
-1. Long / Short混在選択でPrice・Pointsの有効値を設定する。
-2. 1件を検証後・要求前に外部決済し、そのTicketが失敗としてStatusまたはログへ残ることを確認する。
-3. Stops Level、Freeze Level、Tick Sizeに違反する値で取引要求が送信されないことを確認する。
-4. Clear SL / Clear TPで反対側の値が維持されることを確認する。
-5. SL/TPタブの通常幅では各行が入力欄、`Set / Change`、`Clear`の順に一行で収まり、狭幅では`Set / Change`と`Clear`が同じ折り返し行に移動することを確認する。
+1. Long / Short混在選択でPrice・Pipsの有効値を設定する。
+2. 5桁・3桁銘柄では入力Pipsが10倍、4桁・2桁銘柄では1倍の距離として反映されることを確認する。
+3. 1件を検証後・要求前に外部決済し、そのTicketが失敗としてStatusまたはログへ残ることを確認する。
+4. Stops Level、Freeze Level、Tick Sizeに違反する値で取引要求が送信されないことを確認する。
+5. Clear SL / Clear TPで反対側の値が維持されることを確認する。
+6. SL/TPタブの通常幅では各行が入力欄、`Set / Change`、`Clear`の順に一行で収まり、狭幅では`Set / Change`と`Clear`が同じ折り返し行に移動することを確認する。
 
 ## Position価格とStatus表示
 

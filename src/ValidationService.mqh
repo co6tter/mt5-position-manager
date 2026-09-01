@@ -22,7 +22,7 @@ public:
         }
 
       target = value;
-      if(mode == PM_PRICE_POINTS)
+      if(mode == PM_PRICE_PIPS)
         {
          MqlTick tick = {};
          if(!SymbolInfoTick(position.symbol, tick))
@@ -37,15 +37,17 @@ public:
             return false;
            }
          const double point = SymbolInfoDouble(position.symbol, SYMBOL_POINT);
+         const int digits = (int)SymbolInfoInteger(position.symbol, SYMBOL_DIGITS);
          if(point <= 0.0)
            {
             reason = "Point size is unavailable for " + position.symbol + ".";
             return false;
            }
+         const double points = PMPipsToPointDistance(value, digits);
          if(is_sl)
-            target = position.type == POSITION_TYPE_BUY ? base - value * point : base + value * point;
+            target = position.type == POSITION_TYPE_BUY ? base - points * point : base + points * point;
          else
-            target = position.type == POSITION_TYPE_BUY ? base + value * point : base - value * point;
+            target = position.type == POSITION_TYPE_BUY ? base + points * point : base - points * point;
         }
 
       target = NormalizeToTick(position.symbol, target);

@@ -134,7 +134,7 @@ public:
       created = CreateButton("TAB_ENTRY", "Entry", 14, PM_TITLEBAR_HEIGHT + 3, 68, PM_TAB_BAR_HEIGHT - 4) && created;
       created = CreateButton("TAB_POSITIONS", "Positions", 86, PM_TITLEBAR_HEIGHT + 3, 68, PM_TAB_BAR_HEIGHT - 4) && created;
       created = CreateButton("TAB_STOPS", "SL/TP", 158, PM_TITLEBAR_HEIGHT + 3, 68, PM_TAB_BAR_HEIGHT - 4) && created;
-      created = CreateButton("TAB_AUTO", "Auto", 230, PM_TITLEBAR_HEIGHT + 3, 68, PM_TAB_BAR_HEIGHT - 4) && created;
+      created = CreateButton("TAB_AUTO", "Auto Close", 230, PM_TITLEBAR_HEIGHT + 3, 68, PM_TAB_BAR_HEIGHT - 4) && created;
       created = CreateButton("TAB_GUARD", "Guard", 302, PM_TITLEBAR_HEIGHT + 3, 68, PM_TAB_BAR_HEIGHT - 4) && created;
       created = CreateButton("TAB_TRAIL", "Trail", 374, PM_TITLEBAR_HEIGHT + 3, 68, PM_TAB_BAR_HEIGHT - 4) && created;
 
@@ -162,20 +162,22 @@ public:
       created = CreateButton("FILTER_DIRECTION", "Both", 188, ContentTop(), 90, 22) && created;
       created = CreateButton("CLOSE_NOW", "Close Now", 284, ContentTop(), 100, 22, clrMaroon) && created;
       created = CreateButton("PAGE_PREV", "<", 12, ContentTop() + 26, 28, 22) && created;
-      created = CreateLabel("PAGE_LABEL", "Page 1/1 | Sel 0 | Total 0", 48, ContentTop() + 31, clrSilver, 9) && created;
-      created = CreateButton("PAGE_NEXT", ">", 220, ContentTop() + 26, 28, 22) && created;
+      created = CreateButton("PAGE_NEXT", ">", 48, ContentTop() + 26, 28, 22) && created;
+      created = CreateLabel("PAGE_LABEL", "Page 1/1", 100, ContentTop() + 31, clrSilver, 9) && created;
+      created = CreateLabel("SELECTED_LABEL", "Selected 0", 190, ContentTop() + 31, clrSilver, 9) && created;
+      created = CreateLabel("TOTAL_LABEL", "Total 0", 320, ContentTop() + 31, clrSilver, 9) && created;
       created = CreateButton("SELECT_ALL", "Select All", 12, ContentTop() + 52, 90, 22) && created;
       created = CreateButton("CLEAR_SELECTION", "Clear", 108, ContentTop() + 52, 65, 22) && created;
       created = CreateButton("CLOSE_SELECTED", "Close Selected", 179, ContentTop() + 52, 115, 22, clrMaroon) && created;
 
-      created = CreateLabel("SL_LABEL", "Stop Loss", 12, ContentTop() + 5, clrSilver, 9) && created;
+      created = CreateLabel("SL_LABEL", "SL", 12, ContentTop() + 5, clrSilver, 9) && created;
       created = CreateButton("SL_MODE", "Price", 95, ContentTop(), 75, 22) && created;
       created = CreateButton("SL_DEC", "-", 176, ContentTop(), 26, 22) && created;
       created = CreateEdit("SL_VALUE", "", 206, ContentTop(), 110, 22) && created;
       created = CreateButton("SL_INC", "+", 322, ContentTop(), 26, 22) && created;
       created = CreateButton("SET_SL", "Set / Change", PM_STOPS_SET_BUTTON_X, ContentTop(), PM_STOPS_SET_BUTTON_WIDTH, 22) && created;
       created = CreateButton("CLEAR_SL", "Clear SL", 12, ContentTop() + 32, 90, 22) && created;
-      created = CreateLabel("TP_LABEL", "Take Profit", 112, ContentTop() + 37, clrSilver, 9) && created;
+      created = CreateLabel("TP_LABEL", "TP", 112, ContentTop() + 37, clrSilver, 9) && created;
       created = CreateButton("TP_MODE", "Price", 195, ContentTop() + 32, 75, 22) && created;
       created = CreateButton("TP_DEC", "-", 276, ContentTop() + 32, 26, 22) && created;
       created = CreateEdit("TP_VALUE", "", 306, ContentTop() + 32, 110, 22) && created;
@@ -290,7 +292,11 @@ public:
                       " / Ask " + PMFormatPrice(_Symbol, tick.ask));
       UpdateEntryPreview(tick);
       ObjectSetString(0, Name("PAGE_LABEL"), OBJPROP_TEXT,
-                      StringFormat("Page %d/%d | Sel %d | Total %d", m_page + 1, PageCount(), ArraySize(m_selected), ArraySize(m_positions)));
+                      StringFormat("Page %d/%d", m_page + 1, PageCount()));
+      ObjectSetString(0, Name("SELECTED_LABEL"), OBJPROP_TEXT,
+                      StringFormat("Selected %d", ArraySize(m_selected)));
+      ObjectSetString(0, Name("TOTAL_LABEL"), OBJPROP_TEXT,
+                      StringFormat("Total %d", ArraySize(m_positions)));
       if(!m_collapsed && m_active_tab == PM_PANEL_TAB_POSITIONS)
          RenderPositionRows();
       else
@@ -421,7 +427,7 @@ public:
       else if(object_name == Name("CLOSE_SELECTED"))
          CloseSelected(trades);
       else if(object_name == Name("SL_MODE"))
-         m_sl_mode = m_sl_mode == PM_PRICE_ABSOLUTE ? PM_PRICE_POINTS : PM_PRICE_ABSOLUTE;
+         m_sl_mode = m_sl_mode == PM_PRICE_ABSOLUTE ? PM_PRICE_PIPS : PM_PRICE_ABSOLUTE;
       else if(object_name == Name("SL_DEC"))
          ShiftStopEditor(true, -1);
       else if(object_name == Name("SL_INC"))
@@ -431,7 +437,7 @@ public:
       else if(object_name == Name("CLEAR_SL"))
          ClearStopTarget(true, positions, trades, actions);
       else if(object_name == Name("TP_MODE"))
-         m_tp_mode = m_tp_mode == PM_PRICE_ABSOLUTE ? PM_PRICE_POINTS : PM_PRICE_ABSOLUTE;
+         m_tp_mode = m_tp_mode == PM_PRICE_ABSOLUTE ? PM_PRICE_PIPS : PM_PRICE_ABSOLUTE;
       else if(object_name == Name("TP_DEC"))
          ShiftStopEditor(false, -1);
       else if(object_name == Name("TP_INC"))
@@ -503,7 +509,7 @@ private:
       if(m_active_tab == PM_PANEL_TAB_ENTRY) return PM_PANEL_ENTRY_HEIGHT;
       if(m_active_tab == PM_PANEL_TAB_POSITIONS) return PM_PANEL_POSITIONS_HEADER_HEIGHT + MathMax(1, VisiblePositionRows()) * PM_PANEL_POSITION_ROW_HEIGHT;
       if(m_active_tab == PM_PANEL_TAB_STOPS)
-         return StopsUseInlineClear() ? PM_PANEL_STOPS_HEIGHT : PM_PANEL_STOPS_NARROW_HEIGHT;
+         return PM_PANEL_STOPS_HEIGHT;
       if(m_active_tab == PM_PANEL_TAB_AUTO) return PM_PANEL_AUTO_HEIGHT;
       if(m_active_tab == PM_PANEL_TAB_GUARD) return PM_PANEL_GUARD_HEIGHT;
       return PM_PANEL_TRAIL_HEIGHT;
@@ -517,7 +523,7 @@ private:
      {
       return direction == PM_DIRECTION_LONG ? PM_DIRECTION_SHORT : direction == PM_DIRECTION_SHORT ? PM_DIRECTION_BOTH : PM_DIRECTION_LONG;
      }
-   string PriceModeToString(const PMPriceMode mode) { return mode == PM_PRICE_ABSOLUTE ? "Price" : "Points"; }
+   string PriceModeToString(const PMPriceMode mode) { return mode == PM_PRICE_ABSOLUTE ? "Price" : "Pips"; }
    string EquityThresholdModeToString(const PMEquityThresholdMode mode) { return mode == PM_EQUITY_THRESHOLD_AMOUNT ? "Amount" : "Percent"; }
    bool IsSelected(const ulong ticket)
      {
@@ -828,7 +834,7 @@ private:
       const string suffix = is_sl ? "SL_VALUE" : "TP_VALUE";
       double value = StringToDouble(ObjectGetString(0, Name(suffix), OBJPROP_TEXT));
       if(!MathIsValidNumber(value)) value = 0.0;
-      if((is_sl ? m_sl_mode : m_tp_mode) == PM_PRICE_POINTS)
+      if((is_sl ? m_sl_mode : m_tp_mode) == PM_PRICE_PIPS)
          value = MathMax(0.0, value + direction);
       else
         {
@@ -1019,6 +1025,8 @@ private:
       SetVisible("PAGE_PREV", positions);
       SetVisible("PAGE_NEXT", positions);
       SetVisible("PAGE_LABEL", positions);
+      SetVisible("SELECTED_LABEL", positions);
+      SetVisible("TOTAL_LABEL", positions);
       SetVisible("SELECT_ALL", positions);
       SetVisible("CLEAR_SELECTION", positions);
       SetVisible("CLOSE_SELECTED", positions);
@@ -1083,7 +1091,6 @@ private:
       SetVisible("RESIZE_GRIP", expanded);
       ObjectSetString(0, Name("COLLAPSE"), OBJPROP_TEXT, m_collapsed ? "+" : "-");
       ObjectSetInteger(0, Name("BACKGROUND"), OBJPROP_YSIZE, PanelHeight());
-      UpdatePanelCornerMasks();
       ObjectSetInteger(0, Name("RESIZE_GRIP"), OBJPROP_XDISTANCE, m_origin_x + m_panel_width - 24);
       ObjectSetInteger(0, Name("RESIZE_GRIP"), OBJPROP_YDISTANCE, m_origin_y + PanelHeight() - 18);
      }
@@ -1188,7 +1195,6 @@ private:
          SetVisible("STATUS_LINE_" + IntegerToString(line), visible);
         }
       ObjectSetInteger(0, Name("BACKGROUND"), OBJPROP_YSIZE, PanelHeight());
-      UpdatePanelCornerMasks();
       ObjectSetInteger(0, Name("RESIZE_GRIP"), OBJPROP_YDISTANCE, m_origin_y + PanelHeight() - 18);
      }
    void SetVisible(const string suffix, const bool visible)
@@ -1212,78 +1218,7 @@ private:
       ObjectSetInteger(0, object_name, OBJPROP_SELECTABLE, false);
       ObjectSetInteger(0, object_name, OBJPROP_HIDDEN, true);
       ObjectSetInteger(0, object_name, OBJPROP_ZORDER, 0);
-      return CreatePanelCornerMasks();
-     }
-   bool CreateCornerMask(const string suffix,
-                         const int x,
-                         const int y,
-                         const int width,
-                         const int height)
-     {
-      const string object_name = Name(suffix);
-      if(!ObjectCreate(0, object_name, OBJ_RECTANGLE_LABEL, 0, 0, 0))
-         return false;
-      long chart_background = clrBlack;
-      ChartGetInteger(0, CHART_COLOR_BACKGROUND, 0, chart_background);
-      ObjectSetInteger(0, object_name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
-      ObjectSetInteger(0, object_name, OBJPROP_XDISTANCE, m_origin_x + x);
-      ObjectSetInteger(0, object_name, OBJPROP_YDISTANCE, m_origin_y + y);
-      ObjectSetInteger(0, object_name, OBJPROP_XSIZE, width);
-      ObjectSetInteger(0, object_name, OBJPROP_YSIZE, height);
-      ObjectSetInteger(0, object_name, OBJPROP_BGCOLOR, chart_background);
-      ObjectSetInteger(0, object_name, OBJPROP_BORDER_COLOR, chart_background);
-      ObjectSetInteger(0, object_name, OBJPROP_BACK, false);
-      ObjectSetInteger(0, object_name, OBJPROP_SELECTABLE, false);
-      ObjectSetInteger(0, object_name, OBJPROP_HIDDEN, true);
-      ObjectSetInteger(0, object_name, OBJPROP_ZORDER, 0);
       return true;
-     }
-   string CornerMaskName(const string corner, const int step)
-     {
-      return "PANEL_CORNER_" + corner + "_" + IntegerToString(step);
-     }
-   int CornerCutWidth(const int step)
-     {
-      if(step == 0)
-         return PM_PANEL_CORNER_RADIUS;
-      if(step == 1)
-         return MathMax(1, PM_PANEL_CORNER_RADIUS - 2);
-      if(step == 2)
-         return MathMax(1, PM_PANEL_CORNER_RADIUS - 3);
-      return 1;
-     }
-   bool CreatePanelCornerMasks()
-     {
-      bool created = true;
-      for(int step = 0; step < PM_PANEL_CORNER_RADIUS; step++)
-        {
-         const int width = CornerCutWidth(step);
-         const int top_y = step;
-         const int bottom_y = PanelHeight() - 1 - step;
-         created = CreateCornerMask(CornerMaskName("TL", step), 0, top_y, width, 1) && created;
-         created = CreateCornerMask(CornerMaskName("TR", step), m_panel_width - width, top_y, width, 1) && created;
-         created = CreateCornerMask(CornerMaskName("BL", step), 0, bottom_y, width, 1) && created;
-         created = CreateCornerMask(CornerMaskName("BR", step), m_panel_width - width, bottom_y, width, 1) && created;
-        }
-      return created;
-     }
-   void SetCornerMaskPosition(const string suffix, const int x, const int y)
-     {
-      ObjectSetInteger(0, Name(suffix), OBJPROP_XDISTANCE, m_origin_x + x);
-      ObjectSetInteger(0, Name(suffix), OBJPROP_YDISTANCE, m_origin_y + y);
-     }
-   void UpdatePanelCornerMasks()
-     {
-      for(int step = 0; step < PM_PANEL_CORNER_RADIUS; step++)
-        {
-         const int width = CornerCutWidth(step);
-         const int top_y = step;
-         const int bottom_y = PanelHeight() - 1 - step;
-         SetCornerMaskPosition(CornerMaskName("TL", step), 0, top_y);
-         SetCornerMaskPosition(CornerMaskName("TR", step), m_panel_width - width, top_y);
-         SetCornerMaskPosition(CornerMaskName("BL", step), 0, bottom_y);
-         SetCornerMaskPosition(CornerMaskName("BR", step), m_panel_width - width, bottom_y);
-        }
      }
    void PrepareObject(const string object_name, const int x, const int y)
      {
@@ -1467,7 +1402,6 @@ private:
      {
       ObjectSetInteger(0, Name("BACKGROUND"), OBJPROP_XSIZE, m_panel_width);
       ObjectSetInteger(0, Name("BACKGROUND"), OBJPROP_YSIZE, PanelHeight());
-      UpdatePanelCornerMasks();
       ObjectSetInteger(0, Name("COLLAPSE"), OBJPROP_XDISTANCE,
                        m_origin_x + m_panel_width - 30);
       ObjectSetInteger(0, Name("RESIZE_GRIP"), OBJPROP_XDISTANCE,
@@ -1475,10 +1409,6 @@ private:
       ObjectSetInteger(0, Name("RESIZE_GRIP"), OBJPROP_YDISTANCE,
                        m_origin_y + PanelHeight() - 18);
       ApplyStopsLayout();
-     }
-   bool StopsUseInlineClear()
-     {
-      return m_panel_width >= PM_STOPS_INLINE_MIN_WIDTH;
      }
    int StopsClearX()
      {
@@ -1492,29 +1422,15 @@ private:
    void ApplyStopsLayout()
      {
       const int top = ContentTop();
-      if(StopsUseInlineClear())
-        {
-         SetStopsObjectPosition("CLEAR_SL", StopsClearX(), top);
-         SetStopsObjectPosition("TP_LABEL", 12, top + 37);
-         SetStopsObjectPosition("TP_MODE", 95, top + 32);
-         SetStopsObjectPosition("TP_DEC", 176, top + 32);
-         SetStopsObjectPosition("TP_VALUE", 206, top + 32);
-         SetStopsObjectPosition("TP_INC", 322, top + 32);
-         SetStopsObjectPosition("SET_TP", PM_STOPS_SET_BUTTON_X, top + 32);
-         SetStopsObjectPosition("CLEAR_TP", StopsClearX(), top + 32);
-         SetStopsObjectPosition("STOPS_HINT", 12, top + 66);
-         return;
-        }
-      SetStopsObjectPosition("TP_LABEL", 12, top + 69);
-      SetStopsObjectPosition("TP_MODE", 95, top + 64);
-      SetStopsObjectPosition("TP_DEC", 176, top + 64);
-      SetStopsObjectPosition("TP_VALUE", 206, top + 64);
-      SetStopsObjectPosition("TP_INC", 322, top + 64);
-      SetStopsObjectPosition("SET_SL", 12, top + 32);
-      SetStopsObjectPosition("CLEAR_SL", 12 + PM_STOPS_SET_BUTTON_WIDTH + PM_STOPS_BUTTON_GAP, top + 32);
-      SetStopsObjectPosition("SET_TP", 12, top + 96);
-      SetStopsObjectPosition("CLEAR_TP", 12 + PM_STOPS_SET_BUTTON_WIDTH + PM_STOPS_BUTTON_GAP, top + 96);
-      SetStopsObjectPosition("STOPS_HINT", 220, top + 101);
+      SetStopsObjectPosition("CLEAR_SL", StopsClearX(), top);
+      SetStopsObjectPosition("TP_LABEL", 12, top + 37);
+      SetStopsObjectPosition("TP_MODE", 95, top + 32);
+      SetStopsObjectPosition("TP_DEC", 176, top + 32);
+      SetStopsObjectPosition("TP_VALUE", 206, top + 32);
+      SetStopsObjectPosition("TP_INC", 322, top + 32);
+      SetStopsObjectPosition("SET_TP", PM_STOPS_SET_BUTTON_X, top + 32);
+      SetStopsObjectPosition("CLEAR_TP", StopsClearX(), top + 32);
+      SetStopsObjectPosition("STOPS_HINT", 12, top + 66);
      }
   };
 

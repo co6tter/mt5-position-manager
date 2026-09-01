@@ -15,21 +15,18 @@
 #define PM_DEFAULT_RETRY_COUNT 5
 #define PM_DEFAULT_RETRY_INTERVAL_SECONDS 3
 #define PM_DEFAULT_PANEL_WIDTH 560
-#define PM_MIN_PANEL_WIDTH 460
+#define PM_MIN_PANEL_WIDTH 560
 #define PM_MAX_PANEL_WIDTH 1200
 #define PM_PANEL_STATUS_LINE_HEIGHT 18
 #define PM_PANEL_CONTENT_GAP 10
-#define PM_PANEL_CORNER_RADIUS 5
 #define PM_STATUS_FONT_SIZE 10
 #define PM_PANEL_ENTRY_HEIGHT 178
 #define PM_PANEL_POSITIONS_HEADER_HEIGHT 80
 #define PM_PANEL_POSITION_ROW_HEIGHT 24
 #define PM_PANEL_STOPS_HEIGHT 92
-#define PM_PANEL_STOPS_NARROW_HEIGHT 156
 #define PM_PANEL_AUTO_HEIGHT 108
 #define PM_PANEL_GUARD_HEIGHT 92
 #define PM_PANEL_TRAIL_HEIGHT 138
-#define PM_STOPS_INLINE_MIN_WIDTH 560
 #define PM_STOPS_SET_BUTTON_X 354
 #define PM_STOPS_SET_BUTTON_WIDTH 105
 #define PM_STOPS_BUTTON_GAP 6
@@ -93,6 +90,13 @@ int PMPipsToPoints(const int pips, const int digits)
   {
    if(pips <= 0)
       return 0;
+   return pips * PMPointsPerPip(digits);
+  }
+
+double PMPipsToPointDistance(const double pips, const int digits)
+  {
+   if(pips <= 0.0)
+      return 0.0;
    return pips * PMPointsPerPip(digits);
   }
 

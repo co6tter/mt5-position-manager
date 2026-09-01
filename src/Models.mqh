@@ -11,7 +11,7 @@ enum PMDirection
 enum PMPriceMode
   {
    PM_PRICE_ABSOLUTE = 0,
-   PM_PRICE_POINTS = 1
+   PM_PRICE_PIPS = 1
   };
 
 enum PMPassedCloseBehavior

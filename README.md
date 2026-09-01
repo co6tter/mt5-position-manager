@@ -40,7 +40,7 @@ EAをチャートへ適用し、AutoTradingを有効にします。SymbolやDire
 
 ### 手動操作
 
-パネルは内側に余白を持ち、四隅が少し角丸風になっています。`Entry`、`Positions`、`SL/TP`、`Auto`、`Guard`、`Trail`のタブは、選択中だけ明るい青色・白文字で強調されます。タイトルバーの`-`で折り畳め、折り畳み中もタイトルバーをドラッグして移動できます。
+パネルは内側に余白を持っています。`Entry`、`Positions`、`SL/TP`、`Auto Close`、`Guard`、`Trail`のタブは、選択中だけ明るい青色・白文字で強調されます。タイトルバーの`-`で折り畳め、折り畳み中もタイトルバーをドラッグして移動できます。
 
 - `Entry`: チャート銘柄の最新Bid/Askを表示し、Lot、初期SL/TP（points）を指定して、MT5と同じ左`SELL MARKET` / 右`BUY MARKET`の順で実行します。確認ダイアログはありません。LotとSL/TP pointsは`-` / `+`をクリックして変更でき、SL/TPは注文直前の最新価格から計算されます。0 pointsは該当SL/TPなしです。
 - `Positions`: Position行をクリックして選択・選択解除します。Symbol、Long/Short、Lot、Entry、SL、TP、Profit、Ticketを1行に表示し、Longは緑、Shortは赤で表示します。価格は銘柄のDigitsを保持します（例: `TP=159.520`）。
@@ -49,11 +49,11 @@ EAをチャートへ適用し、AutoTradingを有効にします。SymbolやDire
 - ポジション行: クリックして選択・選択解除します。
 - `<` / `>`: ポジション一覧のページを移動します。Page、Selected、Totalを確認してください。
 - `Close Selected`: 選択行だけを確認後に決済します。
-- `Set / Change SL` / `Set / Change TP`: 選択行を先に選び、ModeとValueを指定します。
+- `SL` / `TP`: 選択行を先に選び、`Price`または`Pips`のModeとValueを指定します。Pipsは銘柄の桁数に応じて内部でpointsへ変換されます。
 - `Clear SL` / `Clear TP`: 選択ポジションの該当保護注文を削除します。
 - タイトルバー部分を左ドラッグするとパネルを移動できます。右下の`///`付近を左ドラッグすると幅と高さを変更できます。高さを広げた場合、Statusはパネル下端側へ移動します。Statusは通常を明るい色、成功を緑、待機を黄色、失敗を赤で表示します。
 
-Points指定では、LongはBidを基準にSLを下側、TPを上側へ、ShortはAskを基準にSLを上側、TPを下側へ計算します。表示行数は3〜50、Auto CloseのMinutes Before Closeは0〜1,440へ安全側に正規化されます。
+Pips指定では、LongはBidを基準にSLを下側、TPを上側へ、ShortはAskを基準にSLを上側、TPを下側へ計算します。表示行数は3〜50、Auto CloseのMinutes Before Closeは0〜1,440へ安全側に正規化されます。
 
 ### Equity / Break-evenライン
 

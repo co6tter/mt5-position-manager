@@ -236,6 +236,9 @@ void TestPipConversion()
               "Pips convert to points for fractional-pip symbols");
    AssertTrue(PMPipsToPoints(20, 4) == 20 && PMPipsToPoints(20, 2) == 20,
               "Pips remain points for standard-digit symbols");
+   AssertTrue(MathAbs(PMPipsToPointDistance(1.5, 5) - 15.0) < 0.00001 &&
+              MathAbs(PMPipsToPointDistance(1.5, 4) - 1.5) < 0.00001,
+              "Fractional pips convert to point distance");
    AssertTrue(PMPipsToPoints(0, 5) == 0 && PMPipsToPoints(-1, 5) == 0,
               "Non-positive pips remain disabled");
   }
@@ -355,8 +358,10 @@ void TestPanelLayoutHelpers()
   {
    AssertTrue(PM_PANEL_POSITIONS_HEADER_HEIGHT >= 52,
               "Position rows start below both header button rows");
-   AssertTrue(PM_PANEL_STOPS_NARROW_HEIGHT > PM_PANEL_STOPS_HEIGHT,
-              "Narrow stops layout has room for separate Clear rows");
+   AssertTrue(PM_MIN_PANEL_WIDTH >= PM_STOPS_SET_BUTTON_X +
+              PM_STOPS_SET_BUTTON_WIDTH + PM_STOPS_BUTTON_GAP +
+              PM_STOPS_CLEAR_BUTTON_WIDTH,
+              "Minimum panel width keeps Set and Clear on one line");
    AssertTrue(PMResolvePanelHeight(320, 500) == 500,
               "A taller user-requested panel height is preserved");
    AssertTrue(PMResolvePanelHeight(500, 320) == 500,
