@@ -17,25 +17,36 @@
 #define PM_DEFAULT_PANEL_WIDTH 560
 #define PM_MIN_PANEL_WIDTH 460
 #define PM_MAX_PANEL_WIDTH 1200
-#define PM_PANEL_STATUS_LINE_HEIGHT 16
-#define PM_PANEL_CONTENT_GAP 8
+#define PM_PANEL_STATUS_LINE_HEIGHT 18
+#define PM_PANEL_CONTENT_GAP 10
+#define PM_PANEL_CORNER_RADIUS 5
+#define PM_STATUS_FONT_SIZE 10
 #define PM_PANEL_ENTRY_HEIGHT 178
-#define PM_PANEL_POSITIONS_HEADER_HEIGHT 56
-#define PM_PANEL_POSITION_ROW_HEIGHT 40
+#define PM_PANEL_POSITIONS_HEADER_HEIGHT 80
+#define PM_PANEL_POSITION_ROW_HEIGHT 24
 #define PM_PANEL_STOPS_HEIGHT 92
 #define PM_PANEL_STOPS_NARROW_HEIGHT 156
 #define PM_PANEL_AUTO_HEIGHT 108
 #define PM_PANEL_GUARD_HEIGHT 92
 #define PM_PANEL_TRAIL_HEIGHT 138
 #define PM_STOPS_INLINE_MIN_WIDTH 560
+#define PM_STOPS_SET_BUTTON_X 354
+#define PM_STOPS_SET_BUTTON_WIDTH 105
+#define PM_STOPS_BUTTON_GAP 6
 #define PM_STOPS_CLEAR_BUTTON_WIDTH 90
-#define PM_STOPS_CLEAR_RIGHT_MARGIN 5
 #define PM_MAX_STATUS_LINES 20
 #define PM_TITLEBAR_HEIGHT 28
 #define PM_TAB_BAR_HEIGHT 26
 #define PM_RESIZE_HANDLE_HIT_SIZE 28
 #define PM_EQUITY_LINE_COLOR C'255,182,193'
-#define PM_ACTIVE_TAB_COLOR C'70,130,180'
+#define PM_ACTIVE_TAB_COLOR C'65,105,145'
+#define PM_INACTIVE_TAB_COLOR C'38,48,62'
+#define PM_ACTIVE_TAB_BORDER_COLOR C'130,190,230'
+#define PM_INACTIVE_TAB_BORDER_COLOR C'70,85,105'
+#define PM_STATUS_COLOR C'220,230,245'
+#define PM_STATUS_SUCCESS_COLOR C'150,235,180'
+#define PM_STATUS_WARNING_COLOR C'255,210,120'
+#define PM_STATUS_ERROR_COLOR C'255,145,145'
 
 string PMDirectionToString(const PMDirection direction)
   {
@@ -71,6 +82,18 @@ double PMProfitPoints(const double open_price,
    return type == POSITION_TYPE_BUY ?
           (current_price - open_price) / point :
           (open_price - current_price) / point;
+  }
+
+int PMPointsPerPip(const int digits)
+  {
+   return digits == 3 || digits == 5 ? 10 : 1;
+  }
+
+int PMPipsToPoints(const int pips, const int digits)
+  {
+   if(pips <= 0)
+      return 0;
+   return pips * PMPointsPerPip(digits);
   }
 
 string PMAutoCloseConfigKey(const AutoCloseConfig &config)

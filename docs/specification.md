@@ -28,7 +28,7 @@ Price入力またはPoints入力を受け付ける。Pointsの基準価格はLon
 
 ## UI
 
-標準チャートオブジェクトだけでパネルを構成する。Entry、Positions、SL/TP、Auto、Guard、Trailの6タブを持ち、選択中タブはSteelBlue、非選択タブはDarkSlateGrayで表示し、非選択タブの本文は表示しない。タイトルバーの折り畳みボタンで本文を隠せ、折り畳み中もタイトルバーをドラッグできる。右下のグリップでは幅と高さを変更でき、必要な本文より小さくはしない。Symbol・Directionは候補を順番に切り替えるボタンとし、SL/TPとAuto Closeの数値は編集欄から入力する。処理結果は折り返し可能な複数行StatusとExpertsログへ出力する。Positionsの価格は銘柄のDigitsで表示する。
+標準チャートオブジェクトだけでパネルを構成する。パネル内には余白を設け、四隅は小さな角丸風の外観とする。Entry、Positions、SL/TP、Auto、Guard、Trailの6タブを持ち、選択中タブは明るい青色・強調境界線・白文字、非選択タブは暗い青灰色・控えめな境界線・銀文字で表示し、非選択タブの本文は表示しない。タイトルバーの折り畳みボタンで本文を隠せ、折り畳み中もタイトルバーをドラッグできる。右下のグリップでは幅と高さを変更でき、必要な本文より小さくはしない。Symbol・Directionは候補を順番に切り替えるボタンとし、SL/TPとAuto Closeの数値は編集欄から入力する。処理結果は本文より少し大きい、折り返し可能な複数行StatusとExpertsログへ出力する。Statusは通常を明るい色、成功を緑、待機を黄色、失敗を赤で表示する。Positionsの価格は銘柄のDigitsで表示する。
 
 EntryタブはLot、SL/TP points、最新Bid/Ask、Buy/Sell別の計算価格を表示する。LotはVolume Min/Max/Stepへ正規化し、SL/TPは注文直前のTickから計算してStops Level、Freeze Level、Tick Sizeを検証する。確認ダイアログは表示しない。
 
@@ -36,7 +36,7 @@ EntryタブはLot、SL/TP points、最新Bid/Ask、Buy/Sell別の計算価格を
 
 ## Equity / Break-evenライン
 
-チャートの`_Symbol`に属する全ポジションについて、Buyを正、Sellを負とした方向付きVolumeと建値の加重値から、ネットポジションの理論上の損益分岐価格を計算する。価格はTick Sizeへ正規化し、幅1pxの薄いピンクの破線`OBJ_HLINE`として全時間足へ表示する。`OBJPROP_BACK=true`で背景レイヤーへ固定し、操作パネルの前面へ重ねない。OnInitと1秒Timerで更新し、パネルのタブ、折り畳み、移動、リサイズから独立させる。
+チャートの`_Symbol`に属する全ポジションについて、Buyを正、Sellを負とした方向付きVolumeと建値の加重値から、ネットポジションの理論上の損益分岐価格を計算する。価格はTick Sizeへ正規化し、幅1pxの薄いピンクの破線`OBJ_HLINE`として全時間足へ表示する。`OBJPROP_BACK=false`でエントリーラインより前面へ描画し、操作パネルの前景UIより背面に置く。OnInitと1秒Timerで更新し、パネルのタブ、折り畳み、移動、リサイズから独立させる。
 
 対象ポジションがない場合、ネットVolumeが0の場合、または有効な正価格を計算できない場合はラインを削除する。SwapとCommissionは計算対象外とする。
 
@@ -56,11 +56,11 @@ Auto Closeと同様にOnTimer駆動の自動処理とし、確認ダイアログ
 
 対象は1つのSymbol・Directionを選択し、Auto Closeと同様に他の選択（Filter等）とは独立に保持する。
 
-Break Evenは、現在価格と建値の差（points）がTriggerに達したら、建値からLock（points）分有利な位置をSL候補とする。Trailingは、現在価格と建値の差（points）がTrail距離に達したら、現在価格からTrail距離分のSLを候補とする。
+Break Evenは、現在価格と建値の差（pips）がTriggerに達したら、建値からLock（pips）分有利な位置をSL候補とする。Trailingは、現在価格と建値の差（pips）がTrail距離に達したら、現在価格からTrail距離分のSLを候補とする。入力されたpipsは銘柄の桁数に応じて内部のpointsへ変換する。
 
 1秒Timer周期ごとに、対象Ticketごとに両候補のうち有利な方を採用し、現在の実際のSLより厳密に有利な場合のみSLを更新する（TPは変更しない）。SLを後退させることはない。状態は保持せず、既存のSL・建値・現在価格から都度再計算する。
 
-候補価格（Break Evenの建値ベース、Trailingの現在価格ベース）はどちらも自前で絶対値として計算し、Tick Sizeへの正規化・Stops Level・Freeze Levelチェックには既存の`CValidationService.CalculateTarget()`をAbsoluteモードで再利用する。両候補が有効な場合はより有利な方を先に検証し、Stops Level・Freeze Levelで却下されたらもう一方を検証する。両方とも却下された場合、およびそのTicketに未解決の決済・変更要求が残っている場合は、そのtickでは何もしない。Trigger/Lock/Trail距離の入力欄も、Equity Guardと同様に確定操作(ENDEDIT)まで値を確定しない。
+候補価格（Break Evenの建値ベース、Trailingの現在価格ベース）はどちらも自前で絶対値として計算し、Tick Sizeへの正規化・Stops Level・Freeze Levelチェックには既存の`CValidationService.CalculateTarget()`をAbsoluteモードで再利用する。両候補が有効な場合はより有利な方を先に検証し、Stops Level・Freeze Levelで却下されたらもう一方を検証する。両方とも却下された場合、およびそのTicketに未解決の決済・変更要求が残っている場合は、そのtickでは何もしない。Trigger/Lock/Trail距離の入力欄はpips単位で、Equity Guardと同様に確定操作(ENDEDIT)まで値を確定しない。
 
 Auto Close・Equity Guardと同様にOnTimer駆動の自動処理とし、確認ダイアログは表示しない。発動時のステータスはAuto Close・Equity Guard・Retryのメッセージより優先度が低い。
 

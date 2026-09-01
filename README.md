@@ -40,10 +40,10 @@ EAをチャートへ適用し、AutoTradingを有効にします。SymbolやDire
 
 ### 手動操作
 
-パネルは`Entry`、`Positions`、`SL/TP`、`Auto`、`Guard`、`Trail`のタブに分かれています。タイトルバーの`-`で折り畳め、折り畳み中もタイトルバーをドラッグして移動できます。
+パネルは内側に余白を持ち、四隅が少し角丸風になっています。`Entry`、`Positions`、`SL/TP`、`Auto`、`Guard`、`Trail`のタブは、選択中だけ明るい青色・白文字で強調されます。タイトルバーの`-`で折り畳め、折り畳み中もタイトルバーをドラッグして移動できます。
 
 - `Entry`: チャート銘柄の最新Bid/Askを表示し、Lot、初期SL/TP（points）を指定して、MT5と同じ左`SELL MARKET` / 右`BUY MARKET`の順で実行します。確認ダイアログはありません。LotとSL/TP pointsは`-` / `+`をクリックして変更でき、SL/TPは注文直前の最新価格から計算されます。0 pointsは該当SL/TPなしです。
-- `Positions`: Position行をクリックして選択・選択解除します。Entry、SL、TP、Profit、Ticketは詳細行に分けて表示し、銘柄のDigitsを保持します（例: `TP=159.520`）。
+- `Positions`: Position行をクリックして選択・選択解除します。Symbol、Long/Short、Lot、Entry、SL、TP、Profit、Ticketを1行に表示し、Longは緑、Shortは赤で表示します。価格は銘柄のDigitsを保持します（例: `TP=159.520`）。
 
 - `Close Now`: 上部のFilterに一致するポジションを確認後に決済します。
 - ポジション行: クリックして選択・選択解除します。
@@ -51,13 +51,13 @@ EAをチャートへ適用し、AutoTradingを有効にします。SymbolやDire
 - `Close Selected`: 選択行だけを確認後に決済します。
 - `Set / Change SL` / `Set / Change TP`: 選択行を先に選び、ModeとValueを指定します。
 - `Clear SL` / `Clear TP`: 選択ポジションの該当保護注文を削除します。
-- タイトルバー部分を左ドラッグするとパネルを移動できます。右下の`///`付近を左ドラッグすると幅と高さを変更できます。高さを広げた場合、Statusはパネル下端側へ移動します。
+- タイトルバー部分を左ドラッグするとパネルを移動できます。右下の`///`付近を左ドラッグすると幅と高さを変更できます。高さを広げた場合、Statusはパネル下端側へ移動します。Statusは通常を明るい色、成功を緑、待機を黄色、失敗を赤で表示します。
 
 Points指定では、LongはBidを基準にSLを下側、TPを上側へ、ShortはAskを基準にSLを上側、TPを下側へ計算します。表示行数は3〜50、Auto CloseのMinutes Before Closeは0〜1,440へ安全側に正規化されます。
 
 ### Equity / Break-evenライン
 
-EAを配置したチャートのSymbolに保有ポジションがある場合、全Ticketの方向とLotを合算した理論上の損益分岐価格を、チャート上へ細い薄ピンクの破線として表示します。ラインは背景レイヤーへ描画し、操作パネルより前面には表示しません。Buyだけ、またはSellだけの場合はLot加重平均の建値です。Buy/Sellが混在する場合はネットポジションの損益分岐価格を表示します。
+EAを配置したチャートのSymbolに保有ポジションがある場合、全Ticketの方向とLotを合算した理論上の損益分岐価格を、チャート上へ細い薄ピンクの破線として表示します。ラインはエントリーラインより前面、操作パネルより背面へ描画します。Buyだけ、またはSellだけの場合はLot加重平均の建値です。Buy/Sellが混在する場合はネットポジションの損益分岐価格を表示します。
 
 対象ポジションがない場合、またはBuyとSellのLotが一致してネットLotが0の場合は、一意な損益分岐価格を計算できないためラインを表示しません。SwapとCommissionは計算に含みません。ラインは1秒Timer周期で更新され、パネルの選択タブや折り畳み状態には依存しません。
 
@@ -79,11 +79,11 @@ Max Loss / Max Profitへの入力は、Tab／Enter／欄外クリックで確定
 
 Break EvenとTrailingは1つのSymbol・Direction選択を共有し、Filter・Auto Close・Equity Guardの選択とは独立です。
 
-Break Evenは、現在価格が建値からTrigger（points）以上有利に動いたら、建値からLock（points）分有利な位置へSLを移動します。Trailingは、現在価格が建値からDistance（points）以上有利に動いたら、現在価格からDistance分のSLで追従を開始します。どちらも1秒Timer周期で再計算され、SLが後退しないように更新されます。TPは変更しません。
+Break Evenは、現在価格が建値からTrigger（pips）以上有利に動いたら、建値からLock（pips）分有利な位置へSLを移動します。Trailingは、現在価格が建値からDistance（pips）以上有利に動いたら、現在価格からDistance分のSLで追従を開始します。入力されたpipsは銘柄の桁数に応じて内部でpointsへ変換されます。どちらも1秒Timer周期で再計算され、SLが後退しないように更新されます。TPは変更しません。
 
 両方を同時に有効にした場合は、その時点でより有利な方を採用します。Stops Level・Freeze Levelにより更新が拒否される場合は、もう一方の候補を試し、両方とも拒否された場合は次のTimer周期で再試行します。決済または変更に未解決の要求が残っているTicketは対象から除外されます。
 
-TriggerやDistanceがブローカーのStops Levelより小さい場合、候補が却下されてSLが動かないことがあります。ブローカーのStops Level以上の値を設定してください。Trigger pts / Lock pts / Distance ptsへの入力は、Tab／Enter／欄外クリックで確定するまで反映されません。
+TriggerやDistanceがブローカーのStops Levelより小さい場合、候補が却下されてSLが動かないことがあります。ブローカーのStops Level以上の値を設定してください。Trigger(pips) / Lock(pips) / Distance(pips)への入力は、Tab／Enter／欄外クリックで確定するまで反映されません。
 
 ### 安全上の注意
 

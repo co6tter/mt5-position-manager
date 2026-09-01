@@ -30,9 +30,9 @@ private:
    PMDirection m_trailing_direction;
    bool m_break_even_enabled;
    bool m_trailing_enabled;
-   int m_be_trigger_points;
-   int m_be_lock_points;
-   int m_trail_points;
+   int m_be_trigger_pips;
+   int m_be_lock_pips;
+   int m_trail_pips;
    int m_max_rows;
    PMPanelTab m_active_tab;
    bool m_collapsed;
@@ -78,9 +78,9 @@ public:
       m_trailing_direction = PM_DIRECTION_BOTH;
       m_break_even_enabled = false;
       m_trailing_enabled = false;
-      m_be_trigger_points = 0;
-      m_be_lock_points = 0;
-      m_trail_points = 0;
+      m_be_trigger_pips = 0;
+      m_be_lock_pips = 0;
+      m_trail_pips = 0;
       m_max_rows = PM_DEFAULT_MAX_ROWS;
       m_active_tab = PM_PANEL_TAB_ENTRY;
       m_collapsed = false;
@@ -129,14 +129,14 @@ public:
       ObjectsDeleteAll(0, PM_OBJECT_PREFIX);
       bool created = true;
       created = CreateBackground(PanelHeight()) && created;
-      created = CreateLabel("TITLE", "MT5 Position Manager", 12, 7, clrWhite, 12) && created;
+      created = CreateLabel("TITLE", "MT5 Position Manager", 16, 7, clrWhite, 12) && created;
       created = CreateButton("COLLAPSE", "-", m_panel_width - 30, 4, 24, 20) && created;
-      created = CreateButton("TAB_ENTRY", "Entry", 8, PM_TITLEBAR_HEIGHT + 3, 72, PM_TAB_BAR_HEIGHT - 4) && created;
-      created = CreateButton("TAB_POSITIONS", "Positions", 84, PM_TITLEBAR_HEIGHT + 3, 72, PM_TAB_BAR_HEIGHT - 4) && created;
-      created = CreateButton("TAB_STOPS", "SL/TP", 160, PM_TITLEBAR_HEIGHT + 3, 72, PM_TAB_BAR_HEIGHT - 4) && created;
-      created = CreateButton("TAB_AUTO", "Auto", 236, PM_TITLEBAR_HEIGHT + 3, 72, PM_TAB_BAR_HEIGHT - 4) && created;
-      created = CreateButton("TAB_GUARD", "Guard", 312, PM_TITLEBAR_HEIGHT + 3, 72, PM_TAB_BAR_HEIGHT - 4) && created;
-      created = CreateButton("TAB_TRAIL", "Trail", 388, PM_TITLEBAR_HEIGHT + 3, 72, PM_TAB_BAR_HEIGHT - 4) && created;
+      created = CreateButton("TAB_ENTRY", "Entry", 14, PM_TITLEBAR_HEIGHT + 3, 68, PM_TAB_BAR_HEIGHT - 4) && created;
+      created = CreateButton("TAB_POSITIONS", "Positions", 86, PM_TITLEBAR_HEIGHT + 3, 68, PM_TAB_BAR_HEIGHT - 4) && created;
+      created = CreateButton("TAB_STOPS", "SL/TP", 158, PM_TITLEBAR_HEIGHT + 3, 68, PM_TAB_BAR_HEIGHT - 4) && created;
+      created = CreateButton("TAB_AUTO", "Auto", 230, PM_TITLEBAR_HEIGHT + 3, 68, PM_TAB_BAR_HEIGHT - 4) && created;
+      created = CreateButton("TAB_GUARD", "Guard", 302, PM_TITLEBAR_HEIGHT + 3, 68, PM_TAB_BAR_HEIGHT - 4) && created;
+      created = CreateButton("TAB_TRAIL", "Trail", 374, PM_TITLEBAR_HEIGHT + 3, 68, PM_TAB_BAR_HEIGHT - 4) && created;
 
       created = CreateLabel("ENTRY_PRICE", "Bid - / Ask -", 12, ContentTop() + 5, clrSilver, 9) && created;
       created = CreateLabel("ENTRY_LOT_LABEL", "Lot", 12, ContentTop() + 35, clrSilver, 9) && created;
@@ -161,26 +161,26 @@ public:
       created = CreateButton("FILTER_SYMBOL", "Symbol", 62, ContentTop(), 120, 22) && created;
       created = CreateButton("FILTER_DIRECTION", "Both", 188, ContentTop(), 90, 22) && created;
       created = CreateButton("CLOSE_NOW", "Close Now", 284, ContentTop(), 100, 22, clrMaroon) && created;
-      created = CreateButton("PAGE_PREV", "<", 390, ContentTop(), 28, 22) && created;
-      created = CreateButton("PAGE_NEXT", ">", 422, ContentTop(), 28, 22) && created;
-      created = CreateLabel("PAGE_LABEL", "Page 1/1", 12, ContentTop() + 31, clrSilver, 9) && created;
-      created = CreateButton("SELECT_ALL", "Select All", 150, ContentTop() + 26, 100, 22) && created;
-      created = CreateButton("CLEAR_SELECTION", "Clear", 256, ContentTop() + 26, 75, 22) && created;
-      created = CreateButton("CLOSE_SELECTED", "Close Selected", 327, ContentTop() + 26, 125, 22, clrMaroon) && created;
+      created = CreateButton("PAGE_PREV", "<", 12, ContentTop() + 26, 28, 22) && created;
+      created = CreateLabel("PAGE_LABEL", "Page 1/1 | Sel 0 | Total 0", 48, ContentTop() + 31, clrSilver, 9) && created;
+      created = CreateButton("PAGE_NEXT", ">", 220, ContentTop() + 26, 28, 22) && created;
+      created = CreateButton("SELECT_ALL", "Select All", 12, ContentTop() + 52, 90, 22) && created;
+      created = CreateButton("CLEAR_SELECTION", "Clear", 108, ContentTop() + 52, 65, 22) && created;
+      created = CreateButton("CLOSE_SELECTED", "Close Selected", 179, ContentTop() + 52, 115, 22, clrMaroon) && created;
 
       created = CreateLabel("SL_LABEL", "Stop Loss", 12, ContentTop() + 5, clrSilver, 9) && created;
       created = CreateButton("SL_MODE", "Price", 95, ContentTop(), 75, 22) && created;
       created = CreateButton("SL_DEC", "-", 176, ContentTop(), 26, 22) && created;
       created = CreateEdit("SL_VALUE", "", 206, ContentTop(), 110, 22) && created;
       created = CreateButton("SL_INC", "+", 322, ContentTop(), 26, 22) && created;
-      created = CreateButton("SET_SL", "Set / Change", 354, ContentTop(), 105, 22) && created;
+      created = CreateButton("SET_SL", "Set / Change", PM_STOPS_SET_BUTTON_X, ContentTop(), PM_STOPS_SET_BUTTON_WIDTH, 22) && created;
       created = CreateButton("CLEAR_SL", "Clear SL", 12, ContentTop() + 32, 90, 22) && created;
       created = CreateLabel("TP_LABEL", "Take Profit", 112, ContentTop() + 37, clrSilver, 9) && created;
       created = CreateButton("TP_MODE", "Price", 195, ContentTop() + 32, 75, 22) && created;
       created = CreateButton("TP_DEC", "-", 276, ContentTop() + 32, 26, 22) && created;
       created = CreateEdit("TP_VALUE", "", 306, ContentTop() + 32, 110, 22) && created;
       created = CreateButton("TP_INC", "+", 422, ContentTop() + 32, 26, 22) && created;
-      created = CreateButton("SET_TP", "Set / Change", 12, ContentTop() + 62, 105, 22) && created;
+      created = CreateButton("SET_TP", "Set / Change", PM_STOPS_SET_BUTTON_X, ContentTop() + 62, PM_STOPS_SET_BUTTON_WIDTH, 22) && created;
       created = CreateButton("CLEAR_TP", "Clear TP", 123, ContentTop() + 62, 90, 22) && created;
       created = CreateLabel("STOPS_HINT", "Selection; +/- point.", 220, ContentTop() + 66, clrSilver, 8) && created;
       ApplyStopsLayout();
@@ -201,27 +201,31 @@ public:
       created = CreateEdit("EQ_LOSS_VALUE", "", 52, ContentTop() + 32, 120, 22) && created;
       created = CreateLabel("EQ_PROFIT_LABEL", "Profit", 184, ContentTop() + 37, clrSilver, 9) && created;
       created = CreateEdit("EQ_PROFIT_VALUE", "", 229, ContentTop() + 32, 120, 22) && created;
-      created = CreateLabel("EQ_HINT", "All symbols", 365, ContentTop() + 37, clrOrange, 8) && created;
+      created = CreateLabel("EQ_HINT", "Guard OFF | Loss: not set | Profit: not set", 12, ContentTop() + 69, clrOrange, 8) && created;
 
       created = CreateLabel("TS_LABEL", "Trailing Scope", 12, ContentTop() + 4, clrSilver, 9) && created;
       created = CreateButton("TS_SYMBOL", "Symbol", 105, ContentTop(), 105, 22) && created;
       created = CreateButton("TS_DIRECTION", "Both", 220, ContentTop(), 85, 22) && created;
       created = CreateLabel("BE_LABEL", "Break Even", 12, ContentTop() + 37, clrSilver, 9) && created;
       created = CreateButton("BE_ENABLED", "OFF", 95, ContentTop() + 32, 60, 22) && created;
-      created = CreateLabel("BE_TRIGGER_LABEL", "Trigger", 165, ContentTop() + 37, clrSilver, 9) && created;
-      created = CreateEdit("BE_TRIGGER_VALUE", "", 215, ContentTop() + 32, 70, 22) && created;
-      created = CreateLabel("BE_LOCK_LABEL", "Lock", 295, ContentTop() + 37, clrSilver, 9) && created;
-      created = CreateEdit("BE_LOCK_VALUE", "", 330, ContentTop() + 32, 70, 22) && created;
+      created = CreateLabel("BE_TRIGGER_LABEL", "Trigger(pips)", 165, ContentTop() + 37, clrSilver, 9) && created;
+      created = CreateEdit("BE_TRIGGER_VALUE", "", 235, ContentTop() + 32, 60, 22) && created;
+      created = CreateLabel("BE_LOCK_LABEL", "Lock(pips)", 305, ContentTop() + 37, clrSilver, 9) && created;
+      created = CreateEdit("BE_LOCK_VALUE", "", 365, ContentTop() + 32, 60, 22) && created;
       created = CreateLabel("TRAIL_LABEL", "Trailing", 12, ContentTop() + 70, clrSilver, 9) && created;
       created = CreateButton("TRAIL_ENABLED", "OFF", 95, ContentTop() + 65, 60, 22) && created;
-      created = CreateLabel("TRAIL_DIST_LABEL", "Distance", 165, ContentTop() + 70, clrSilver, 9) && created;
-      created = CreateEdit("TRAIL_DIST_VALUE", "", 220, ContentTop() + 65, 70, 22) && created;
-      created = CreateLabel("TRAIL_HINT", "Break-even and trailing rules use points.", 12, ContentTop() + 103, clrSilver, 8) && created;
+      created = CreateLabel("TRAIL_DIST_LABEL", "Distance(pips)", 165, ContentTop() + 70, clrSilver, 9) && created;
+      created = CreateEdit("TRAIL_DIST_VALUE", "", 250, ContentTop() + 65, 70, 22) && created;
+      created = CreateLabel("TRAIL_HINT", "Break-even and trailing rules use pips.", 12, ContentTop() + 103, clrSilver, 8) && created;
 
-      created = CreateLabel("SESSION_LABEL", "Today's Close: -    Auto Close At: -", 12, 0, clrSilver, 9) && created;
+      created = CreateLabel("SESSION_LABEL", "Session close: - | Auto close: -", 14, 0, clrSilver, 9) && created;
       for(int line = 0; line < PM_MAX_STATUS_LINES; line++)
-         created = CreateLabel("STATUS_LINE_" + IntegerToString(line), "", 12, 0, clrWhite, 9) && created;
+         created = CreateLabel("STATUS_LINE_" + IntegerToString(line), "", 14, 0, PM_STATUS_COLOR, PM_STATUS_FONT_SIZE) && created;
       created = CreateLabel("RESIZE_GRIP", "///", m_panel_width - 24, PanelHeight() - 18, clrSilver, 8) && created;
+      UpdateToggleButtonVisual("AUTO_ENABLED", m_auto_enabled);
+      UpdateToggleButtonVisual("BE_ENABLED", m_break_even_enabled);
+      UpdateToggleButtonVisual("TRAIL_ENABLED", m_trailing_enabled);
+      UpdateEquityGuardVisuals();
       ApplyTabVisibility();
       UpdateStatusLayout();
       ChartRedraw();
@@ -265,20 +269,20 @@ public:
       ObjectSetString(0, Name("FILTER_DIRECTION"), OBJPROP_TEXT, PMDirectionToString(m_filter_direction));
       ObjectSetString(0, Name("SL_MODE"), OBJPROP_TEXT, PriceModeToString(m_sl_mode));
       ObjectSetString(0, Name("TP_MODE"), OBJPROP_TEXT, PriceModeToString(m_tp_mode));
-      ObjectSetString(0, Name("AUTO_ENABLED"), OBJPROP_TEXT, m_auto_enabled ? "ON" : "OFF");
+      UpdateToggleButtonVisual("AUTO_ENABLED", m_auto_enabled);
       ObjectSetString(0, Name("AUTO_SYMBOL"), OBJPROP_TEXT, AutoSymbol());
       ObjectSetString(0, Name("AUTO_DIRECTION"), OBJPROP_TEXT, PMDirectionToString(m_auto_direction));
       ObjectSetString(0, Name("PASSED_BEHAVIOR"), OBJPROP_TEXT,
                       m_passed_behavior == PM_PASSED_CLOSE_IMMEDIATELY ? "Passed: Close Now" : "Passed: Do Nothing");
-      ObjectSetString(0, Name("EQ_ENABLED"), OBJPROP_TEXT, m_equity_guard_enabled ? "ON" : "OFF");
       ObjectSetString(0, Name("EQ_MODE"), OBJPROP_TEXT, EquityThresholdModeToString(m_equity_guard_mode));
+      UpdateEquityGuardVisuals();
       ObjectSetString(0, Name("TS_SYMBOL"), OBJPROP_TEXT, TrailingSymbol());
       ObjectSetString(0, Name("TS_DIRECTION"), OBJPROP_TEXT, PMDirectionToString(m_trailing_direction));
-      ObjectSetString(0, Name("BE_ENABLED"), OBJPROP_TEXT, m_break_even_enabled ? "ON" : "OFF");
-      ObjectSetString(0, Name("TRAIL_ENABLED"), OBJPROP_TEXT, m_trailing_enabled ? "ON" : "OFF");
+      UpdateToggleButtonVisual("BE_ENABLED", m_break_even_enabled);
+      UpdateToggleButtonVisual("TRAIL_ENABLED", m_trailing_enabled);
       ObjectSetString(0, Name("SESSION_LABEL"), OBJPROP_TEXT,
-                      "Today's Close: " + PMFormatDateTime(m_session_close) +
-                      "    Auto Close At: " + PMFormatDateTime(m_auto_close_at));
+                      "Session close: " + PMFormatDateTime(m_session_close) +
+                      " | Auto close: " + PMFormatDateTime(m_auto_close_at));
       MqlTick tick = {};
       SymbolInfoTick(_Symbol, tick);
       ObjectSetString(0, Name("ENTRY_PRICE"), OBJPROP_TEXT,
@@ -286,7 +290,7 @@ public:
                       " / Ask " + PMFormatPrice(_Symbol, tick.ask));
       UpdateEntryPreview(tick);
       ObjectSetString(0, Name("PAGE_LABEL"), OBJPROP_TEXT,
-                      StringFormat("Page %d/%d  Selected %d  Total %d", m_page + 1, PageCount(), ArraySize(m_selected), ArraySize(m_positions)));
+                      StringFormat("Page %d/%d | Sel %d | Total %d", m_page + 1, PageCount(), ArraySize(m_selected), ArraySize(m_positions)));
       if(!m_collapsed && m_active_tab == PM_PANEL_TAB_POSITIONS)
          RenderPositionRows();
       else
@@ -332,9 +336,10 @@ public:
       config.enabled_trailing = m_trailing_enabled;
       config.symbol = TrailingSymbol();
       config.direction = m_trailing_direction;
-      config.be_trigger_points = m_be_trigger_points;
-      config.be_lock_points = m_be_lock_points;
-      config.trail_points = m_trail_points;
+      const int digits = (int)SymbolInfoInteger(config.symbol, SYMBOL_DIGITS);
+      config.be_trigger_points = PMPipsToPoints(m_be_trigger_pips, digits);
+      config.be_lock_points = PMPipsToPoints(m_be_lock_pips, digits);
+      config.trail_points = PMPipsToPoints(m_trail_pips, digits);
      }
 
    bool HandleChartEvent(const long id,
@@ -465,6 +470,7 @@ private:
    string Name(const string suffix) { return PM_OBJECT_PREFIX + suffix; }
    string RowName(const int row) { return Name("ROW_" + IntegerToString(row)); }
    string RowDetailName(const int row) { return Name("ROW_DETAIL_" + IntegerToString(row)); }
+   string RowDirectionName(const int row) { return Name("ROW_DIRECTION_" + IntegerToString(row)); }
    string FilterSymbol() { return m_filter_symbol == "" ? _Symbol : m_filter_symbol; }
    string AutoSymbol() { return m_auto_symbol == "" ? _Symbol : m_auto_symbol; }
    string TrailingSymbol() { return m_trailing_symbol == "" ? _Symbol : m_trailing_symbol; }
@@ -546,7 +552,7 @@ private:
      {
       const int start = m_page * m_max_rows;
       for(int row = 0; row < VisiblePositionRows(); row++)
-         if(object_name == RowName(row) || object_name == RowDetailName(row))
+         if(object_name == RowName(row) || object_name == RowDetailName(row) || object_name == RowDirectionName(row))
            {
             ToggleSelection(m_positions[start + row].ticket);
             return;
@@ -636,11 +642,11 @@ private:
    bool HandleEditEnd(const string object_name)
      {
       if(object_name == Name("AUTO_MINUTES")) { const int value = AutoCloseMinutes(); ObjectSetString(0, Name("AUTO_MINUTES"), OBJPROP_TEXT, IntegerToString(value)); SetStatus(StringFormat("Auto Close minutes set to %d.", value)); }
-      else if(object_name == Name("EQ_LOSS_VALUE")) { CommitDoubleValue("EQ_LOSS_VALUE", m_equity_guard_loss_threshold, PM_MAX_EQUITY_THRESHOLD, 2); SetStatus(StringFormat("Equity Guard Max Loss set to %.2f.", m_equity_guard_loss_threshold)); }
-      else if(object_name == Name("EQ_PROFIT_VALUE")) { CommitDoubleValue("EQ_PROFIT_VALUE", m_equity_guard_profit_threshold, PM_MAX_EQUITY_THRESHOLD, 2); SetStatus(StringFormat("Equity Guard Max Profit set to %.2f.", m_equity_guard_profit_threshold)); }
-      else if(object_name == Name("BE_TRIGGER_VALUE")) { CommitIntegerValue("BE_TRIGGER_VALUE", m_be_trigger_points, PM_MAX_TRAILING_POINTS); SetStatus(StringFormat("Break Even Trigger set to %d.", m_be_trigger_points)); }
-      else if(object_name == Name("BE_LOCK_VALUE")) { CommitIntegerValue("BE_LOCK_VALUE", m_be_lock_points, PM_MAX_TRAILING_POINTS); SetStatus(StringFormat("Break Even Lock set to %d.", m_be_lock_points)); }
-      else if(object_name == Name("TRAIL_DIST_VALUE")) { CommitIntegerValue("TRAIL_DIST_VALUE", m_trail_points, PM_MAX_TRAILING_POINTS); SetStatus(StringFormat("Trailing Distance set to %d.", m_trail_points)); }
+      else if(object_name == Name("EQ_LOSS_VALUE")) { CommitDoubleValue("EQ_LOSS_VALUE", m_equity_guard_loss_threshold, PM_MAX_EQUITY_THRESHOLD, 2); UpdateEquityGuardVisuals(); SetStatus(StringFormat("Max Loss updated: %.2f (%s).", m_equity_guard_loss_threshold, m_equity_guard_enabled ? "Guard ON" : "Guard OFF")); }
+      else if(object_name == Name("EQ_PROFIT_VALUE")) { CommitDoubleValue("EQ_PROFIT_VALUE", m_equity_guard_profit_threshold, PM_MAX_EQUITY_THRESHOLD, 2); UpdateEquityGuardVisuals(); SetStatus(StringFormat("Max Profit updated: %.2f (%s).", m_equity_guard_profit_threshold, m_equity_guard_enabled ? "Guard ON" : "Guard OFF")); }
+      else if(object_name == Name("BE_TRIGGER_VALUE")) { CommitIntegerValue("BE_TRIGGER_VALUE", m_be_trigger_pips, PM_MAX_TRAILING_POINTS); SetStatus(StringFormat("Break Even Trigger updated: %d pips.", m_be_trigger_pips)); }
+      else if(object_name == Name("BE_LOCK_VALUE")) { CommitIntegerValue("BE_LOCK_VALUE", m_be_lock_pips, PM_MAX_TRAILING_POINTS); SetStatus(StringFormat("Break Even Lock updated: %d pips.", m_be_lock_pips)); }
+      else if(object_name == Name("TRAIL_DIST_VALUE")) { CommitIntegerValue("TRAIL_DIST_VALUE", m_trail_pips, PM_MAX_TRAILING_POINTS); SetStatus(StringFormat("Trailing Distance updated: %d pips.", m_trail_pips)); }
       else if(object_name == Name("ENTRY_LOT"))
         {
          double volume = 0.0;
@@ -938,13 +944,28 @@ private:
         {
          PMPosition position = m_positions[start + row];
          const string selected = IsSelected(position.ticket) ? "[x] " : "[ ] ";
-         rows_created = CreateButton("ROW_" + IntegerToString(row), selected + position.symbol + " " + PMPositionTypeToString(position.type) + "  Lot=" + DoubleToString(position.volume, 2) + "  #" + StringFormat("%I64u", position.ticket), 12, ContentTop() + PM_PANEL_POSITIONS_HEADER_HEIGHT + row * PM_PANEL_POSITION_ROW_HEIGHT, m_panel_width - 25, 19, IsSelected(position.ticket) ? clrDarkGreen : clrDarkSlateGray) && rows_created;
-         rows_created = CreateButton("ROW_DETAIL_" + IntegerToString(row), "Entry=" + PMFormatPrice(position.symbol, position.open_price) + "  SL=" + PMFormatPrice(position.symbol, position.sl) + "  TP=" + PMFormatPrice(position.symbol, position.tp) + "  P=" + DoubleToString(position.profit, 2), 28, ContentTop() + PM_PANEL_POSITIONS_HEADER_HEIGHT + row * PM_PANEL_POSITION_ROW_HEIGHT + 19, m_panel_width - 41, 18, clrDarkSlateGray) && rows_created;
+         const int row_y = ContentTop() + PM_PANEL_POSITIONS_HEADER_HEIGHT + row * PM_PANEL_POSITION_ROW_HEIGHT;
+         const bool is_selected = IsSelected(position.ticket);
+         const string row_text = selected + position.symbol + "  Lot=" + DoubleToString(position.volume, 2) +
+                                 "  Entry=" + PMFormatPrice(position.symbol, position.open_price) +
+                                 "  SL=" + PMFormatPrice(position.symbol, position.sl) +
+                                 "  TP=" + PMFormatPrice(position.symbol, position.tp) +
+                                 "  P=" + DoubleToString(position.profit, 2) +
+                                 "  #" + StringFormat("%I64u", position.ticket);
+         ObjectDelete(0, RowName(row));
+         ObjectDelete(0, RowDetailName(row));
+         ObjectDelete(0, RowDirectionName(row));
+         rows_created = CreateButton("ROW_" + IntegerToString(row), "", 12, row_y, m_panel_width - 24, 22, is_selected ? clrDarkGreen : clrDarkSlateGray) && rows_created;
+         rows_created = CreateLabel("ROW_DETAIL_" + IntegerToString(row), row_text, 75, row_y + 4, clrWhite, 8) && rows_created;
+         rows_created = CreateLabel("ROW_DIRECTION_" + IntegerToString(row),
+                                   PMPositionTypeToString(position.type), 40, row_y + 4,
+                                   position.type == POSITION_TYPE_BUY ? clrLimeGreen : clrTomato, 8) && rows_created;
         }
       for(int row = visible_rows; row < previous_rows; row++)
         {
          ObjectDelete(0, RowName(row));
          ObjectDelete(0, RowDetailName(row));
+         ObjectDelete(0, RowDirectionName(row));
         }
       m_rendered_rows = visible_rows;
       if(!rows_created && !m_row_render_error_reported)
@@ -957,6 +978,7 @@ private:
         {
          ObjectDelete(0, RowName(row));
          ObjectDelete(0, RowDetailName(row));
+         ObjectDelete(0, RowDirectionName(row));
         }
       m_rendered_rows = 0;
      }
@@ -1054,12 +1076,14 @@ private:
         {
          SetVisible("ROW_" + IntegerToString(row), positions);
          SetVisible("ROW_DETAIL_" + IntegerToString(row), positions);
+         SetVisible("ROW_DIRECTION_" + IntegerToString(row), positions);
         }
       for(int line = 0; line < PM_MAX_STATUS_LINES; line++)
          SetVisible("STATUS_LINE_" + IntegerToString(line), expanded);
       SetVisible("RESIZE_GRIP", expanded);
       ObjectSetString(0, Name("COLLAPSE"), OBJPROP_TEXT, m_collapsed ? "+" : "-");
       ObjectSetInteger(0, Name("BACKGROUND"), OBJPROP_YSIZE, PanelHeight());
+      UpdatePanelCornerMasks();
       ObjectSetInteger(0, Name("RESIZE_GRIP"), OBJPROP_XDISTANCE, m_origin_x + m_panel_width - 24);
       ObjectSetInteger(0, Name("RESIZE_GRIP"), OBJPROP_YDISTANCE, m_origin_y + PanelHeight() - 18);
      }
@@ -1074,15 +1098,70 @@ private:
      }
    void SetTabColor(const string suffix, const PMPanelTab tab)
      {
+      const bool active = m_active_tab == tab;
       ObjectSetInteger(0, Name(suffix), OBJPROP_BGCOLOR,
-                       m_active_tab == tab ? PM_ACTIVE_TAB_COLOR :
-                                             clrDarkSlateGray);
+                       active ? PM_ACTIVE_TAB_COLOR : PM_INACTIVE_TAB_COLOR);
+      ObjectSetInteger(0, Name(suffix), OBJPROP_BORDER_COLOR,
+                       active ? PM_ACTIVE_TAB_BORDER_COLOR : PM_INACTIVE_TAB_BORDER_COLOR);
+      ObjectSetInteger(0, Name(suffix), OBJPROP_COLOR,
+                       active ? clrWhite : clrSilver);
+      ObjectSetInteger(0, Name(suffix), OBJPROP_FONTSIZE, active ? 9 : 8);
+     }
+   string EquityGuardThresholdText(const double value)
+     {
+      return value > 0.0 ? DoubleToString(value, 2) : "not set";
+     }
+   void UpdateEquityThresholdVisual(const string suffix, const double value)
+     {
+      const bool configured = value > 0.0;
+      ObjectSetInteger(0, Name(suffix), OBJPROP_BGCOLOR,
+                       configured ? C'220,255,220' : clrWhite);
+      ObjectSetInteger(0, Name(suffix), OBJPROP_BORDER_COLOR,
+                       configured ? clrDarkGreen : clrGray);
+     }
+   void UpdateToggleButtonVisual(const string suffix, const bool enabled)
+     {
+      ObjectSetString(0, Name(suffix), OBJPROP_TEXT, enabled ? "ON" : "OFF");
+      ObjectSetInteger(0, Name(suffix), OBJPROP_BGCOLOR,
+                       enabled ? clrDarkGreen : clrMaroon);
+     }
+   color StatusTextColor()
+     {
+      if(StringFind(m_status, "failed") >= 0 ||
+         StringFind(m_status, "error") >= 0 ||
+         StringFind(m_status, "Error") >= 0)
+         return PM_STATUS_ERROR_COLOR;
+      if(StringFind(m_status, "scheduled") >= 0 ||
+         StringFind(m_status, "queued") >= 0 ||
+         StringFind(m_status, "retry") >= 0)
+         return PM_STATUS_WARNING_COLOR;
+      if(StringFind(m_status, "accepted") >= 0 ||
+         StringFind(m_status, "updated") >= 0 ||
+         StringFind(m_status, "Updated") >= 0 ||
+         StringFind(m_status, "set") >= 0 ||
+         StringFind(m_status, "closed") >= 0)
+         return PM_STATUS_SUCCESS_COLOR;
+      return PM_STATUS_COLOR;
+     }
+   void UpdateEquityGuardVisuals()
+     {
+      const bool enabled = m_equity_guard_enabled;
+      UpdateToggleButtonVisual("EQ_ENABLED", enabled);
+      ObjectSetString(0, Name("EQ_HINT"), OBJPROP_TEXT,
+                      StringFormat("Guard %s | Loss: %s | Profit: %s",
+                                   enabled ? "ON" : "OFF",
+                                   EquityGuardThresholdText(m_equity_guard_loss_threshold),
+                                   EquityGuardThresholdText(m_equity_guard_profit_threshold)));
+      ObjectSetInteger(0, Name("EQ_HINT"), OBJPROP_COLOR,
+                       enabled ? clrLimeGreen : clrOrange);
+      UpdateEquityThresholdVisual("EQ_LOSS_VALUE", m_equity_guard_loss_threshold);
+      UpdateEquityThresholdVisual("EQ_PROFIT_VALUE", m_equity_guard_profit_threshold);
      }
    void UpdateStatusLayout()
      {
       if(m_collapsed) return;
       string lines[];
-      const int max_chars = MathMax(24, (m_panel_width - 24) / 7);
+      const int max_chars = MathMax(24, (m_panel_width - 28) / 7);
       PMWrapStatus("Status: " + m_status, max_chars, lines);
       if(ArraySize(lines) > PM_MAX_STATUS_LINES)
         {
@@ -1099,14 +1178,17 @@ private:
       m_expanded_height = m_panel_height;
       const int base_y = content_bottom + m_panel_height - required_height;
       ObjectSetInteger(0, Name("SESSION_LABEL"), OBJPROP_YDISTANCE, m_origin_y + base_y);
+      const color status_color = StatusTextColor();
       for(int line = 0; line < PM_MAX_STATUS_LINES; line++)
         {
          const bool visible = line < ArraySize(lines);
          ObjectSetString(0, Name("STATUS_LINE_" + IntegerToString(line)), OBJPROP_TEXT, visible ? lines[line] : "");
+         ObjectSetInteger(0, Name("STATUS_LINE_" + IntegerToString(line)), OBJPROP_COLOR, status_color);
          ObjectSetInteger(0, Name("STATUS_LINE_" + IntegerToString(line)), OBJPROP_YDISTANCE, m_origin_y + base_y + PM_PANEL_STATUS_LINE_HEIGHT + line * PM_PANEL_STATUS_LINE_HEIGHT);
          SetVisible("STATUS_LINE_" + IntegerToString(line), visible);
         }
       ObjectSetInteger(0, Name("BACKGROUND"), OBJPROP_YSIZE, PanelHeight());
+      UpdatePanelCornerMasks();
       ObjectSetInteger(0, Name("RESIZE_GRIP"), OBJPROP_YDISTANCE, m_origin_y + PanelHeight() - 18);
      }
    void SetVisible(const string suffix, const bool visible)
@@ -1130,7 +1212,78 @@ private:
       ObjectSetInteger(0, object_name, OBJPROP_SELECTABLE, false);
       ObjectSetInteger(0, object_name, OBJPROP_HIDDEN, true);
       ObjectSetInteger(0, object_name, OBJPROP_ZORDER, 0);
+      return CreatePanelCornerMasks();
+     }
+   bool CreateCornerMask(const string suffix,
+                         const int x,
+                         const int y,
+                         const int width,
+                         const int height)
+     {
+      const string object_name = Name(suffix);
+      if(!ObjectCreate(0, object_name, OBJ_RECTANGLE_LABEL, 0, 0, 0))
+         return false;
+      long chart_background = clrBlack;
+      ChartGetInteger(0, CHART_COLOR_BACKGROUND, 0, chart_background);
+      ObjectSetInteger(0, object_name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+      ObjectSetInteger(0, object_name, OBJPROP_XDISTANCE, m_origin_x + x);
+      ObjectSetInteger(0, object_name, OBJPROP_YDISTANCE, m_origin_y + y);
+      ObjectSetInteger(0, object_name, OBJPROP_XSIZE, width);
+      ObjectSetInteger(0, object_name, OBJPROP_YSIZE, height);
+      ObjectSetInteger(0, object_name, OBJPROP_BGCOLOR, chart_background);
+      ObjectSetInteger(0, object_name, OBJPROP_BORDER_COLOR, chart_background);
+      ObjectSetInteger(0, object_name, OBJPROP_BACK, false);
+      ObjectSetInteger(0, object_name, OBJPROP_SELECTABLE, false);
+      ObjectSetInteger(0, object_name, OBJPROP_HIDDEN, true);
+      ObjectSetInteger(0, object_name, OBJPROP_ZORDER, 0);
       return true;
+     }
+   string CornerMaskName(const string corner, const int step)
+     {
+      return "PANEL_CORNER_" + corner + "_" + IntegerToString(step);
+     }
+   int CornerCutWidth(const int step)
+     {
+      if(step == 0)
+         return PM_PANEL_CORNER_RADIUS;
+      if(step == 1)
+         return MathMax(1, PM_PANEL_CORNER_RADIUS - 2);
+      if(step == 2)
+         return MathMax(1, PM_PANEL_CORNER_RADIUS - 3);
+      return 1;
+     }
+   bool CreatePanelCornerMasks()
+     {
+      bool created = true;
+      for(int step = 0; step < PM_PANEL_CORNER_RADIUS; step++)
+        {
+         const int width = CornerCutWidth(step);
+         const int top_y = step;
+         const int bottom_y = PanelHeight() - 1 - step;
+         created = CreateCornerMask(CornerMaskName("TL", step), 0, top_y, width, 1) && created;
+         created = CreateCornerMask(CornerMaskName("TR", step), m_panel_width - width, top_y, width, 1) && created;
+         created = CreateCornerMask(CornerMaskName("BL", step), 0, bottom_y, width, 1) && created;
+         created = CreateCornerMask(CornerMaskName("BR", step), m_panel_width - width, bottom_y, width, 1) && created;
+        }
+      return created;
+     }
+   void SetCornerMaskPosition(const string suffix, const int x, const int y)
+     {
+      ObjectSetInteger(0, Name(suffix), OBJPROP_XDISTANCE, m_origin_x + x);
+      ObjectSetInteger(0, Name(suffix), OBJPROP_YDISTANCE, m_origin_y + y);
+     }
+   void UpdatePanelCornerMasks()
+     {
+      for(int step = 0; step < PM_PANEL_CORNER_RADIUS; step++)
+        {
+         const int width = CornerCutWidth(step);
+         const int top_y = step;
+         const int bottom_y = PanelHeight() - 1 - step;
+         SetCornerMaskPosition(CornerMaskName("TL", step), 0, top_y);
+         SetCornerMaskPosition(CornerMaskName("TR", step), m_panel_width - width, top_y);
+         SetCornerMaskPosition(CornerMaskName("BL", step), 0, bottom_y);
+         SetCornerMaskPosition(CornerMaskName("BR", step), m_panel_width - width, bottom_y);
+        }
      }
    void PrepareObject(const string object_name, const int x, const int y)
      {
@@ -1314,6 +1467,7 @@ private:
      {
       ObjectSetInteger(0, Name("BACKGROUND"), OBJPROP_XSIZE, m_panel_width);
       ObjectSetInteger(0, Name("BACKGROUND"), OBJPROP_YSIZE, PanelHeight());
+      UpdatePanelCornerMasks();
       ObjectSetInteger(0, Name("COLLAPSE"), OBJPROP_XDISTANCE,
                        m_origin_x + m_panel_width - 30);
       ObjectSetInteger(0, Name("RESIZE_GRIP"), OBJPROP_XDISTANCE,
@@ -1328,7 +1482,7 @@ private:
      }
    int StopsClearX()
      {
-      return m_panel_width - PM_STOPS_CLEAR_BUTTON_WIDTH - PM_STOPS_CLEAR_RIGHT_MARGIN;
+      return PM_STOPS_SET_BUTTON_X + PM_STOPS_SET_BUTTON_WIDTH + PM_STOPS_BUTTON_GAP;
      }
    void SetStopsObjectPosition(const string suffix, const int x, const int y)
      {
@@ -1346,20 +1500,21 @@ private:
          SetStopsObjectPosition("TP_DEC", 176, top + 32);
          SetStopsObjectPosition("TP_VALUE", 206, top + 32);
          SetStopsObjectPosition("TP_INC", 322, top + 32);
-         SetStopsObjectPosition("SET_TP", 354, top + 32);
+         SetStopsObjectPosition("SET_TP", PM_STOPS_SET_BUTTON_X, top + 32);
          SetStopsObjectPosition("CLEAR_TP", StopsClearX(), top + 32);
          SetStopsObjectPosition("STOPS_HINT", 12, top + 66);
          return;
         }
-      SetStopsObjectPosition("CLEAR_SL", 12, top + 32);
       SetStopsObjectPosition("TP_LABEL", 12, top + 69);
       SetStopsObjectPosition("TP_MODE", 95, top + 64);
       SetStopsObjectPosition("TP_DEC", 176, top + 64);
       SetStopsObjectPosition("TP_VALUE", 206, top + 64);
       SetStopsObjectPosition("TP_INC", 322, top + 64);
-      SetStopsObjectPosition("SET_TP", 354, top + 64);
-      SetStopsObjectPosition("CLEAR_TP", 12, top + 96);
-      SetStopsObjectPosition("STOPS_HINT", 112, top + 101);
+      SetStopsObjectPosition("SET_SL", 12, top + 32);
+      SetStopsObjectPosition("CLEAR_SL", 12 + PM_STOPS_SET_BUTTON_WIDTH + PM_STOPS_BUTTON_GAP, top + 32);
+      SetStopsObjectPosition("SET_TP", 12, top + 96);
+      SetStopsObjectPosition("CLEAR_TP", 12 + PM_STOPS_SET_BUTTON_WIDTH + PM_STOPS_BUTTON_GAP, top + 96);
+      SetStopsObjectPosition("STOPS_HINT", 220, top + 101);
      }
   };
 

@@ -226,6 +226,20 @@ void TestProfitPoints()
               "Profit points are zero when point size is unavailable");
   }
 
+void TestPipConversion()
+  {
+   AssertTrue(PMPointsPerPip(5) == 10 && PMPointsPerPip(3) == 10,
+              "Five-digit and three-digit symbols use ten points per pip");
+   AssertTrue(PMPointsPerPip(4) == 1 && PMPointsPerPip(2) == 1,
+              "Four-digit and two-digit symbols use one point per pip");
+   AssertTrue(PMPipsToPoints(20, 5) == 200 && PMPipsToPoints(20, 3) == 200,
+              "Pips convert to points for fractional-pip symbols");
+   AssertTrue(PMPipsToPoints(20, 4) == 20 && PMPipsToPoints(20, 2) == 20,
+              "Pips remain points for standard-digit symbols");
+   AssertTrue(PMPipsToPoints(0, 5) == 0 && PMPipsToPoints(-1, 5) == 0,
+              "Non-positive pips remain disabled");
+  }
+
 void TestIsMoreFavorableStop()
   {
    AssertTrue(PMIsMoreFavorableStop(POSITION_TYPE_BUY, 1.1005, 0.0),
@@ -411,6 +425,7 @@ void OnStart()
    TestBreakEvenCandidate();
    TestTrailingCandidate();
    TestProfitPoints();
+   TestPipConversion();
    TestIsMoreFavorableStop();
    TestBestStopCandidate();
    TestEntryHelpers();
