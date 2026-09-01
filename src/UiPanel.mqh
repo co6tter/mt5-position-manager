@@ -831,8 +831,8 @@ private:
          const string symbol = has_selected_position ? selected_position.symbol : _Symbol;
          const double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
          const double tick_size = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
-         const double step = PMPriceEditorStep(point, tick_size, digits);
          const int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
+         const double step = PMPriceEditorStep(point, tick_size, digits);
          if(value <= 0.0 && has_selected_position)
             value = is_sl ? selected_position.sl : selected_position.tp;
          if(value <= 0.0)
