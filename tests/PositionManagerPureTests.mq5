@@ -351,12 +351,14 @@ void TestPanelLayoutHelpers()
 
 void TestPriceEditorHelpers()
   {
-   AssertTrue(MathAbs(PMPriceEditorStep(0.001, 0.01) - 0.001) < 0.0000001,
-              "Price editor prefers the symbol point over tick size");
-   AssertTrue(MathAbs(PMShiftPriceEditorValue(159.900, 0.001, 0.01, 1, 3) - 159.901) < 0.0000001,
-              "Price editor increases USDJPY by one displayed price unit");
-   AssertTrue(MathAbs(PMShiftPriceEditorValue(159.900, 0.001, 0.01, -1, 3) - 159.899) < 0.0000001,
-              "Price editor decreases USDJPY by one displayed price unit");
+   AssertTrue(MathAbs(PMPriceEditorStep(0.001, 0.01, 3) - 0.01) < 0.0000001,
+              "Price editor uses one pip for three-digit symbols");
+   AssertTrue(MathAbs(PMPriceEditorStep(0.00001, 0.00001, 5) - 0.0001) < 0.0000001,
+              "Price editor uses one pip for five-digit symbols");
+   AssertTrue(MathAbs(PMShiftPriceEditorValue(159.900, 0.001, 0.01, 1, 3) - 159.910) < 0.0000001,
+              "Price editor increases USDJPY by one pip");
+   AssertTrue(MathAbs(PMShiftPriceEditorValue(159.900, 0.001, 0.01, -1, 3) - 159.890) < 0.0000001,
+              "Price editor decreases USDJPY by one pip");
   }
 
 void TestEquityLineCalculation()

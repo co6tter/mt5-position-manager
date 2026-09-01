@@ -185,10 +185,11 @@ double PMNormalizePrice(const double price,
   }
 
 double PMPriceEditorStep(const double point,
-                         const double tick_size)
+                         const double tick_size,
+                         const int digits)
   {
    if(MathIsValidNumber(point) && point > 0.0)
-      return point;
+      return (digits == 3 || digits == 5) ? point * 10.0 : point;
    if(MathIsValidNumber(tick_size) && tick_size > 0.0)
       return tick_size;
    return 0.0;
@@ -202,7 +203,7 @@ double PMShiftPriceEditorValue(const double value,
   {
    if(!MathIsValidNumber(value) || value <= 0.0 || direction == 0)
       return value;
-   const double step = PMPriceEditorStep(point, tick_size);
+   const double step = PMPriceEditorStep(point, tick_size, digits);
    if(step <= 0.0)
       return value;
    return NormalizeDouble(value + direction * step, digits);
