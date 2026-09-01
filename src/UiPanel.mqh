@@ -211,13 +211,16 @@ public:
       created = CreateLabel("BE_LABEL", "Break Even", 12, ContentTop() + 37, clrSilver, 9) && created;
       created = CreateButton("BE_ENABLED", "OFF", 95, ContentTop() + 32, 60, 22) && created;
       created = CreateLabel("BE_TRIGGER_LABEL", "Trigger(pips)", 165, ContentTop() + 37, clrSilver, 9) && created;
-      created = CreateEdit("BE_TRIGGER_VALUE", "", 240, ContentTop() + 32, 60, 22) && created;
+      created = CreateEdit("BE_TRIGGER_VALUE", "", 250, ContentTop() + 32, 60, 22) && created;
       created = CreateLabel("BE_LOCK_LABEL", "Lock(pips)", 305, ContentTop() + 37, clrSilver, 9) && created;
-      created = CreateEdit("BE_LOCK_VALUE", "", 370, ContentTop() + 32, 60, 22) && created;
+      created = CreateEdit("BE_LOCK_VALUE", "", 380, ContentTop() + 32, 60, 22) && created;
       created = CreateLabel("TRAIL_LABEL", "Trailing", 12, ContentTop() + 70, clrSilver, 9) && created;
       created = CreateButton("TRAIL_ENABLED", "OFF", 95, ContentTop() + 65, 60, 22) && created;
       created = CreateLabel("TRAIL_DIST_LABEL", "Distance(pips)", 165, ContentTop() + 70, clrSilver, 9) && created;
-      created = CreateEdit("TRAIL_DIST_VALUE", "", 255, ContentTop() + 65, 70, 22) && created;
+      created = CreateEdit("TRAIL_DIST_VALUE", "", 265, ContentTop() + 65, 70, 22) && created;
+      AlignLabelToInput("BE_TRIGGER_LABEL", 238, ContentTop() + 37);
+      AlignLabelToInput("BE_LOCK_LABEL", 368, ContentTop() + 37);
+      AlignLabelToInput("TRAIL_DIST_LABEL", 253, ContentTop() + 70);
       created = CreateLabel("TRAIL_HINT", "Break-even and trailing rules use pips.", 12, ContentTop() + 103, clrSilver, 8) && created;
 
       created = CreateLabel("SESSION_LABEL", "Session close: - | Auto close: -", 14, 0, clrSilver, 9) && created;
@@ -1201,6 +1204,12 @@ private:
      {
       ObjectSetInteger(0, Name(suffix), OBJPROP_TIMEFRAMES,
                        visible ? OBJ_ALL_PERIODS : OBJ_NO_PERIODS);
+     }
+   void AlignLabelToInput(const string suffix, const int right_x, const int y)
+     {
+      ObjectSetInteger(0, Name(suffix), OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
+      ObjectSetInteger(0, Name(suffix), OBJPROP_XDISTANCE, m_origin_x + right_x);
+      ObjectSetInteger(0, Name(suffix), OBJPROP_YDISTANCE, m_origin_y + y);
      }
    bool CreateBackground(const int height)
      {
