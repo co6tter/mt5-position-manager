@@ -184,7 +184,7 @@ public:
       created = CreateButton("TP_INC", "+", PM_STOPS_INC_X, ContentTop() + 32, 26, 22) && created;
       created = CreateButton("SET_TP", "Set / Change", PM_STOPS_SET_BUTTON_X, ContentTop() + 62, PM_STOPS_SET_BUTTON_WIDTH, 22) && created;
       created = CreateButton("CLEAR_TP", "Clear TP", 123, ContentTop() + 62, 90, 22) && created;
-      created = CreateLabel("STOPS_HINT", "Selection; +/- point.", 220, ContentTop() + 66, clrSilver, 8) && created;
+      created = CreateLabel("STOPS_HINT", "Select positions; +/- uses the selected mode.", 220, ContentTop() + 66, clrSilver, 8) && created;
       ApplyStopsLayout();
 
       created = CreateLabel("AUTO_LABEL", "Auto Close", 12, ContentTop() + 4, clrSilver, 9) && created;
@@ -211,13 +211,13 @@ public:
       created = CreateLabel("BE_LABEL", "Break Even", 12, ContentTop() + 37, clrSilver, 9) && created;
       created = CreateButton("BE_ENABLED", "OFF", 95, ContentTop() + 32, 60, 22) && created;
       created = CreateLabel("BE_TRIGGER_LABEL", "Trigger(pips)", 165, ContentTop() + 37, clrSilver, 9) && created;
-      created = CreateEdit("BE_TRIGGER_VALUE", "", 235, ContentTop() + 32, 60, 22) && created;
+      created = CreateEdit("BE_TRIGGER_VALUE", "", 240, ContentTop() + 32, 60, 22) && created;
       created = CreateLabel("BE_LOCK_LABEL", "Lock(pips)", 305, ContentTop() + 37, clrSilver, 9) && created;
-      created = CreateEdit("BE_LOCK_VALUE", "", 365, ContentTop() + 32, 60, 22) && created;
+      created = CreateEdit("BE_LOCK_VALUE", "", 370, ContentTop() + 32, 60, 22) && created;
       created = CreateLabel("TRAIL_LABEL", "Trailing", 12, ContentTop() + 70, clrSilver, 9) && created;
       created = CreateButton("TRAIL_ENABLED", "OFF", 95, ContentTop() + 65, 60, 22) && created;
       created = CreateLabel("TRAIL_DIST_LABEL", "Distance(pips)", 165, ContentTop() + 70, clrSilver, 9) && created;
-      created = CreateEdit("TRAIL_DIST_VALUE", "", 250, ContentTop() + 65, 70, 22) && created;
+      created = CreateEdit("TRAIL_DIST_VALUE", "", 255, ContentTop() + 65, 70, 22) && created;
       created = CreateLabel("TRAIL_HINT", "Break-even and trailing rules use pips.", 12, ContentTop() + 103, clrSilver, 8) && created;
 
       created = CreateLabel("SESSION_LABEL", "Session close: - | Auto close: -", 14, 0, clrSilver, 9) && created;
