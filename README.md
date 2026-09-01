@@ -40,7 +40,7 @@ EAをチャートへ適用し、AutoTradingを有効にします。SymbolやDire
 
 ### 手動操作
 
-パネルは内側に余白を持っています。`Entry`、`Positions`、`SL/TP`、`Auto Close`、`Guard`、`Trail`のタブは、選択中だけ明るい青色・白文字で強調されます。タイトルバーの`-`で折り畳め、折り畳み中もタイトルバーをドラッグして移動できます。
+パネルは内側に余白を持っています。`Entry`、`Positions`、`SL/TP`、`Auto Close`、`Equity Guard`、`Trail`のタブは、選択中だけ明るい青色・白文字で強調されます。タイトルバーの`-`で折り畳め、折り畳み中もタイトルバーをドラッグして移動できます。
 
 - `Entry`: チャート銘柄の最新Bid/Askを表示し、Lot、初期SL/TP（points）を指定して、MT5と同じ左`SELL MARKET` / 右`BUY MARKET`の順で実行します。確認ダイアログはありません。LotとSL/TP pointsは`-` / `+`をクリックして変更でき、SL/TPは注文直前の最新価格から計算されます。0 pointsは該当SL/TPなしです。
 - `Positions`: Position行をクリックして選択・選択解除します。Symbol、Long/Short、Lot、Entry、SL、TP、Profit、Ticketを1行に表示し、Longは緑、Shortは赤で表示します。価格は銘柄のDigitsを保持します（例: `TP=159.520`）。
