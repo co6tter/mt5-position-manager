@@ -23,9 +23,13 @@
 #define PM_PANEL_POSITIONS_HEADER_HEIGHT 56
 #define PM_PANEL_POSITION_ROW_HEIGHT 40
 #define PM_PANEL_STOPS_HEIGHT 92
+#define PM_PANEL_STOPS_NARROW_HEIGHT 156
 #define PM_PANEL_AUTO_HEIGHT 108
 #define PM_PANEL_GUARD_HEIGHT 92
 #define PM_PANEL_TRAIL_HEIGHT 138
+#define PM_STOPS_INLINE_MIN_WIDTH 560
+#define PM_STOPS_CLEAR_BUTTON_WIDTH 90
+#define PM_STOPS_CLEAR_RIGHT_MARGIN 5
 #define PM_MAX_STATUS_LINES 20
 #define PM_TITLEBAR_HEIGHT 28
 #define PM_TAB_BAR_HEIGHT 26
@@ -178,6 +182,30 @@ double PMNormalizePrice(const double price,
    if(tick_size <= 0.0)
       return NormalizeDouble(price, digits);
    return NormalizeDouble(MathRound(price / tick_size) * tick_size, digits);
+  }
+
+double PMPriceEditorStep(const double point,
+                         const double tick_size)
+  {
+   if(MathIsValidNumber(point) && point > 0.0)
+      return point;
+   if(MathIsValidNumber(tick_size) && tick_size > 0.0)
+      return tick_size;
+   return 0.0;
+  }
+
+double PMShiftPriceEditorValue(const double value,
+                               const double point,
+                               const double tick_size,
+                               const int direction,
+                               const int digits)
+  {
+   if(!MathIsValidNumber(value) || value <= 0.0 || direction == 0)
+      return value;
+   const double step = PMPriceEditorStep(point, tick_size);
+   if(step <= 0.0)
+      return value;
+   return NormalizeDouble(value + direction * step, digits);
   }
 
 bool PMCalculateEntryStops(const PMEntrySide side,

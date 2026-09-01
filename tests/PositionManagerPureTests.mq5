@@ -341,10 +341,22 @@ void TestPanelLayoutHelpers()
   {
    AssertTrue(PM_PANEL_POSITIONS_HEADER_HEIGHT >= 52,
               "Position rows start below both header button rows");
+   AssertTrue(PM_PANEL_STOPS_NARROW_HEIGHT > PM_PANEL_STOPS_HEIGHT,
+              "Narrow stops layout has room for separate Clear rows");
    AssertTrue(PMResolvePanelHeight(320, 500) == 500,
               "A taller user-requested panel height is preserved");
    AssertTrue(PMResolvePanelHeight(500, 320) == 500,
               "Panel height never shrinks below required content");
+  }
+
+void TestPriceEditorHelpers()
+  {
+   AssertTrue(MathAbs(PMPriceEditorStep(0.001, 0.01) - 0.001) < 0.0000001,
+              "Price editor prefers the symbol point over tick size");
+   AssertTrue(MathAbs(PMShiftPriceEditorValue(159.900, 0.001, 0.01, 1, 3) - 159.901) < 0.0000001,
+              "Price editor increases USDJPY by one displayed price unit");
+   AssertTrue(MathAbs(PMShiftPriceEditorValue(159.900, 0.001, 0.01, -1, 3) - 159.899) < 0.0000001,
+              "Price editor decreases USDJPY by one displayed price unit");
   }
 
 void TestEquityLineCalculation()
@@ -401,6 +413,7 @@ void OnStart()
    TestBestStopCandidate();
    TestEntryHelpers();
    TestPanelLayoutHelpers();
+   TestPriceEditorHelpers();
    TestEquityLineCalculation();
    if(g_failures == 0)
       Print("[PASS] All Position Manager pure tests passed.");

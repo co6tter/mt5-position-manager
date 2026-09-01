@@ -182,7 +182,8 @@ public:
       created = CreateButton("TP_INC", "+", 422, ContentTop() + 32, 26, 22) && created;
       created = CreateButton("SET_TP", "Set / Change", 12, ContentTop() + 62, 105, 22) && created;
       created = CreateButton("CLEAR_TP", "Clear TP", 123, ContentTop() + 62, 90, 22) && created;
-      created = CreateLabel("STOPS_HINT", "Selection; +/- tick/point.", 220, ContentTop() + 66, clrSilver, 8) && created;
+      created = CreateLabel("STOPS_HINT", "Selection; +/- point.", 220, ContentTop() + 66, clrSilver, 8) && created;
+      ApplyStopsLayout();
 
       created = CreateLabel("AUTO_LABEL", "Auto Close", 12, ContentTop() + 4, clrSilver, 9) && created;
       created = CreateButton("AUTO_ENABLED", "OFF", 95, ContentTop(), 60, 22) && created;
@@ -495,7 +496,8 @@ private:
      {
       if(m_active_tab == PM_PANEL_TAB_ENTRY) return PM_PANEL_ENTRY_HEIGHT;
       if(m_active_tab == PM_PANEL_TAB_POSITIONS) return PM_PANEL_POSITIONS_HEADER_HEIGHT + MathMax(1, VisiblePositionRows()) * PM_PANEL_POSITION_ROW_HEIGHT;
-      if(m_active_tab == PM_PANEL_TAB_STOPS) return PM_PANEL_STOPS_HEIGHT;
+      if(m_active_tab == PM_PANEL_TAB_STOPS)
+         return StopsUseInlineClear() ? PM_PANEL_STOPS_HEIGHT : PM_PANEL_STOPS_NARROW_HEIGHT;
       if(m_active_tab == PM_PANEL_TAB_AUTO) return PM_PANEL_AUTO_HEIGHT;
       if(m_active_tab == PM_PANEL_TAB_GUARD) return PM_PANEL_GUARD_HEIGHT;
       return PM_PANEL_TRAIL_HEIGHT;
@@ -827,8 +829,9 @@ private:
          PMPosition selected_position = {};
          const bool has_selected_position = FirstSelectedPosition(selected_position);
          const string symbol = has_selected_position ? selected_position.symbol : _Symbol;
+         const double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
          const double tick_size = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
-         const double step = tick_size > 0.0 ? tick_size : SymbolInfoDouble(symbol, SYMBOL_POINT);
+         const double step = PMPriceEditorStep(point, tick_size);
          const int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
          if(value <= 0.0 && has_selected_position)
             value = is_sl ? selected_position.sl : selected_position.tp;
@@ -842,7 +845,7 @@ private:
               }
             value = has_selected_position && selected_position.type == POSITION_TYPE_SELL ? tick.ask : tick.bid;
            }
-         value = PMNormalizePrice(value + direction * step, tick_size, digits);
+         value = PMShiftPriceEditorValue(value, point, tick_size, direction, digits);
          ObjectSetString(0, Name(suffix), OBJPROP_TEXT, DoubleToString(value, digits));
          return;
         }
@@ -1317,6 +1320,46 @@ private:
                        m_origin_x + m_panel_width - 24);
       ObjectSetInteger(0, Name("RESIZE_GRIP"), OBJPROP_YDISTANCE,
                        m_origin_y + PanelHeight() - 18);
+      ApplyStopsLayout();
+     }
+   bool StopsUseInlineClear()
+     {
+      return m_panel_width >= PM_STOPS_INLINE_MIN_WIDTH;
+     }
+   int StopsClearX()
+     {
+      return m_panel_width - PM_STOPS_CLEAR_BUTTON_WIDTH - PM_STOPS_CLEAR_RIGHT_MARGIN;
+     }
+   void SetStopsObjectPosition(const string suffix, const int x, const int y)
+     {
+      ObjectSetInteger(0, Name(suffix), OBJPROP_XDISTANCE, m_origin_x + x);
+      ObjectSetInteger(0, Name(suffix), OBJPROP_YDISTANCE, m_origin_y + y);
+     }
+   void ApplyStopsLayout()
+     {
+      const int top = ContentTop();
+      if(StopsUseInlineClear())
+        {
+         SetStopsObjectPosition("CLEAR_SL", StopsClearX(), top);
+         SetStopsObjectPosition("TP_LABEL", 12, top + 37);
+         SetStopsObjectPosition("TP_MODE", 95, top + 32);
+         SetStopsObjectPosition("TP_DEC", 176, top + 32);
+         SetStopsObjectPosition("TP_VALUE", 206, top + 32);
+         SetStopsObjectPosition("TP_INC", 322, top + 32);
+         SetStopsObjectPosition("SET_TP", 354, top + 32);
+         SetStopsObjectPosition("CLEAR_TP", StopsClearX(), top + 32);
+         SetStopsObjectPosition("STOPS_HINT", 12, top + 66);
+         return;
+        }
+      SetStopsObjectPosition("CLEAR_SL", 12, top + 32);
+      SetStopsObjectPosition("TP_LABEL", 12, top + 69);
+      SetStopsObjectPosition("TP_MODE", 95, top + 64);
+      SetStopsObjectPosition("TP_DEC", 176, top + 64);
+      SetStopsObjectPosition("TP_VALUE", 206, top + 64);
+      SetStopsObjectPosition("TP_INC", 322, top + 64);
+      SetStopsObjectPosition("SET_TP", 354, top + 64);
+      SetStopsObjectPosition("CLEAR_TP", 12, top + 96);
+      SetStopsObjectPosition("STOPS_HINT", 112, top + 101);
      }
   };
 
