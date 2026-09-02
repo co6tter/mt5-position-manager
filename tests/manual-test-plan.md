@@ -89,8 +89,8 @@
 
 1. Break Even・Trailingを両方OFFのまま複数ポジションを保有し、SLが一切変化しないことを確認する。
 2. Break EvenをONにしTrigger(pips)/Lock(pips)を設定し、対象Symbol・Directionのポジションが含み益Trigger以上になった瞬間にSLが建値+Lock（Buy）または建値-Lock（Sell）へ1回だけ更新されることを確認する（Expertsログの`[INFO] Position modified...`が連続して出力されないこと）。
-3. TrailingをONにしDistance(pips)を設定し、含み益がDistance未満の間はSLが動かず、Distance以上になってから現在価格からDistance分の位置で追従を始めることを確認する。価格が反落してもSLが後退しないことを確認する。
+3. TrailingをONにしTrigger(pips)とDistance(pips)を別々に設定し、含み益がTrigger未満の間はSLが動かず、Trigger以上になってから現在価格からDistance分の位置で追従を始めることを確認する。価格が反落してもSLが後退しないことを確認する。
 4. Break Even・Trailing両方ONの状態で、含み益が小さい間はBreak Evenのロック位置、含み益が大きくなるとTrailingの位置に自然に切り替わることを確認する。
-5. Trigger(pips)/Lock(pips)/Distance(pips)欄に非数値・負数・空欄を入力し、その機能が実質的に無効になる（SLを一切動かさない）ことを確認する。
+5. Break EvenのTrigger/Lock、TrailingのDistance欄に非数値・負数・空欄を入力し、それぞれの機能が実質的に無効になる（SLを一切動かさない）ことを確認する。Trailing Triggerを0または空欄にした場合は、Distanceが開始条件にも使われることを確認する。
 6. Break EvenとTrailingがOFFのときボタンが赤、ONのとき緑になることを確認する。
 7. 対象外のSymbol・Directionのポジションが影響を受けないことを確認する。

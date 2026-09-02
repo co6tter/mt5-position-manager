@@ -56,11 +56,11 @@ Auto Closeと同様にOnTimer駆動の自動処理とし、確認ダイアログ
 
 対象は1つのSymbol・Directionを選択し、Auto Closeと同様に他の選択（Filter等）とは独立に保持する。
 
-Break Evenは、現在価格と建値の差（pips）がTriggerに達したら、建値からLock（pips）分有利な位置をSL候補とする。Trailingは、現在価格と建値の差（pips）がTrail距離に達したら、現在価格からTrail距離分のSLを候補とする。入力されたpipsは銘柄の桁数に応じて内部のpointsへ変換する。
+Break Evenは、現在価格と建値の差（pips）がTriggerに達したら、建値からLock（pips）分有利な位置をSL候補とする。Trailingは、現在価格と建値の差（pips）がTrailing Triggerに達したら開始し、現在価格からTrailing Distance（pips）分のSLを候補とする。入力されたpipsは銘柄の桁数に応じて内部のpointsへ変換する。Trailing Triggerが0または未入力の場合は、既存動作との互換性のためTrailing Distanceを開始条件にも使用する。
 
 1秒Timer周期ごとに、対象Ticketごとに両候補のうち有利な方を採用し、現在の実際のSLより厳密に有利な場合のみSLを更新する（TPは変更しない）。SLを後退させることはない。状態は保持せず、既存のSL・建値・現在価格から都度再計算する。
 
-候補価格（Break Evenの建値ベース、Trailingの現在価格ベース）はどちらも自前で絶対値として計算し、Tick Sizeへの正規化・Stops Level・Freeze Levelチェックには既存の`CValidationService.CalculateTarget()`をAbsoluteモードで再利用する。両候補が有効な場合はより有利な方を先に検証し、Stops Level・Freeze Levelで却下されたらもう一方を検証する。両方とも却下された場合、およびそのTicketに未解決の決済・変更要求が残っている場合は、そのtickでは何もしない。Trigger/Lock/Trail距離の入力欄はpips単位で、Equity Guardと同様に確定操作(ENDEDIT)まで値を確定しない。
+候補価格（Break Evenの建値ベース、Trailingの現在価格ベース）はどちらも自前で絶対値として計算し、Tick Sizeへの正規化・Stops Level・Freeze Levelチェックには既存の`CValidationService.CalculateTarget()`をAbsoluteモードで再利用する。両候補が有効な場合はより有利な方を先に検証し、Stops Level・Freeze Levelで却下されたらもう一方を検証する。両方とも却下された場合、およびそのTicketに未解決の決済・変更要求が残っている場合は、そのtickでは何もしない。Break Even Trigger/Lock、Trailing Trigger/Distanceの入力欄はpips単位で、Equity Guardと同様に確定操作(ENDEDIT)まで値を確定しない。
 
 Auto Close・Equity Guardと同様にOnTimer駆動の自動処理とし、確認ダイアログは表示しない。発動時のステータスはAuto Close・Equity Guard・Retryのメッセージより優先度が低い。
 

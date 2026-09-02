@@ -79,7 +79,7 @@ Max Loss / Max Profitへの入力は、Tab／Enter／欄外クリックで確定
 
 Break EvenとTrailingは1つのSymbol・Direction選択を共有し、Filter・Auto Close・Equity Guardの選択とは独立です。
 
-Break Evenは、現在価格が建値からTrigger（pips）以上有利に動いたら、建値からLock（pips）分有利な位置へSLを移動します。Trailingは、現在価格が建値からDistance（pips）以上有利に動いたら、現在価格からDistance分のSLで追従を開始します。入力されたpipsは銘柄の桁数に応じて内部でpointsへ変換されます。どちらも1秒Timer周期で再計算され、SLが後退しないように更新されます。TPは変更しません。
+Break Evenは、現在価格が建値からTrigger（pips）以上有利に動いたら、建値からLock（pips）分有利な位置へSLを移動します。Trailingは、現在価格が建値からTrigger（pips）以上有利に動いたら、現在価格からDistance（pips）分のSLで追従を開始します。Triggerが未入力または0の場合は、Distanceを開始条件にも使用します。入力されたpipsは銘柄の桁数に応じて内部でpointsへ変換されます。どちらも1秒Timer周期で再計算され、SLが後退しないように更新されます。TPは変更しません。
 
 両方を同時に有効にした場合は、その時点でより有利な方を採用します。Stops Level・Freeze Levelにより更新が拒否される場合は、もう一方の候補を試し、両方とも拒否された場合は次のTimer周期で再試行します。決済または変更に未解決の要求が残っているTicketは対象から除外されます。
 

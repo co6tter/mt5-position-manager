@@ -34,10 +34,14 @@ CUiPanel g_ui;
 int OnInit()
   {
    g_trades.Configure(InpDeviationPoints, InpRetryCount, InpRetryIntervalSeconds);
-   if(!g_ui.Create(InpMaxPositionRows))
-      return INIT_FAILED;
-   g_ui.Refresh(g_positions);
+   // Create the chart line before the foreground panel so the panel remains on top.
    g_equity_line.Render(_Symbol, g_positions);
+   if(!g_ui.Create(InpMaxPositionRows))
+     {
+      g_equity_line.Destroy();
+      return INIT_FAILED;
+     }
+   g_ui.Refresh(g_positions);
    g_ui.Render();
    ResetLastError();
    if(!EventSetTimer(PM_TIMER_SECONDS))

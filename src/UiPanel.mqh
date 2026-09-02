@@ -32,6 +32,7 @@ private:
    bool m_trailing_enabled;
    int m_be_trigger_pips;
    int m_be_lock_pips;
+   int m_trail_trigger_pips;
    int m_trail_pips;
    int m_max_rows;
    PMPanelTab m_active_tab;
@@ -80,6 +81,7 @@ public:
       m_trailing_enabled = false;
       m_be_trigger_pips = 0;
       m_be_lock_pips = 0;
+      m_trail_trigger_pips = 0;
       m_trail_pips = 0;
       m_max_rows = PM_DEFAULT_MAX_ROWS;
       m_active_tab = PM_PANEL_TAB_ENTRY;
@@ -216,12 +218,15 @@ public:
       created = CreateEdit("BE_LOCK_VALUE", "", 390, ContentTop() + 32, 60, 22) && created;
       created = CreateLabel("TRAIL_LABEL", "Trailing", 12, ContentTop() + 70, clrSilver, 9) && created;
       created = CreateButton("TRAIL_ENABLED", "OFF", 95, ContentTop() + 65, 60, 22) && created;
-      created = CreateLabel("TRAIL_DIST_LABEL", "Distance(pips)", 165, ContentTop() + 70, clrSilver, 9) && created;
-      created = CreateEdit("TRAIL_DIST_VALUE", "", 265, ContentTop() + 65, 70, 22) && created;
+      created = CreateLabel("TRAIL_TRIGGER_LABEL", "Trigger(pips)", 165, ContentTop() + 70, clrSilver, 9) && created;
+      created = CreateEdit("TRAIL_TRIGGER_VALUE", "", 265, ContentTop() + 65, 70, 22) && created;
+      created = CreateLabel("TRAIL_DIST_LABEL", "Distance(pips)", 350, ContentTop() + 70, clrSilver, 9) && created;
+      created = CreateEdit("TRAIL_DIST_VALUE", "", 450, ContentTop() + 65, 70, 22) && created;
       AlignLabelToInput("BE_TRIGGER_LABEL", 238, ContentTop() + 37);
       AlignLabelToInput("BE_LOCK_LABEL", 378, ContentTop() + 37);
-      AlignLabelToInput("TRAIL_DIST_LABEL", 253, ContentTop() + 70);
-      created = CreateLabel("TRAIL_HINT", "Break-even and trailing rules use pips.", 12, ContentTop() + 103, clrSilver, 8) && created;
+      AlignLabelToInput("TRAIL_TRIGGER_LABEL", 253, ContentTop() + 70);
+      AlignLabelToInput("TRAIL_DIST_LABEL", 438, ContentTop() + 70);
+      created = CreateLabel("TRAIL_HINT", "Break-even and trailing rules use pips. Trigger 0 uses Distance.", 12, ContentTop() + 103, clrSilver, 8) && created;
 
       created = CreateLabel("SESSION_LABEL", "Session close: - | Auto close: -", 14, 0, clrSilver, 9) && created;
       for(int line = 0; line < PM_MAX_STATUS_LINES; line++)
@@ -348,6 +353,9 @@ public:
       const int digits = (int)SymbolInfoInteger(config.symbol, SYMBOL_DIGITS);
       config.be_trigger_points = PMPipsToPoints(m_be_trigger_pips, digits);
       config.be_lock_points = PMPipsToPoints(m_be_lock_pips, digits);
+      const int trail_trigger_pips = m_trail_trigger_pips > 0 ?
+                                     m_trail_trigger_pips : m_trail_pips;
+      config.trail_trigger_points = PMPipsToPoints(trail_trigger_pips, digits);
       config.trail_points = PMPipsToPoints(m_trail_pips, digits);
      }
 
@@ -658,6 +666,7 @@ private:
       else if(object_name == Name("EQ_PROFIT_VALUE")) { CommitDoubleValue("EQ_PROFIT_VALUE", m_equity_guard_profit_threshold, PM_MAX_EQUITY_THRESHOLD, 2); UpdateEquityGuardVisuals(); SetStatus(StringFormat("Max Profit updated: %.2f (%s).", m_equity_guard_profit_threshold, m_equity_guard_enabled ? "Guard ON" : "Guard OFF")); }
       else if(object_name == Name("BE_TRIGGER_VALUE")) { CommitIntegerValue("BE_TRIGGER_VALUE", m_be_trigger_pips, PM_MAX_TRAILING_POINTS); SetStatus(StringFormat("Break Even Trigger updated: %d pips.", m_be_trigger_pips)); }
       else if(object_name == Name("BE_LOCK_VALUE")) { CommitIntegerValue("BE_LOCK_VALUE", m_be_lock_pips, PM_MAX_TRAILING_POINTS); SetStatus(StringFormat("Break Even Lock updated: %d pips.", m_be_lock_pips)); }
+      else if(object_name == Name("TRAIL_TRIGGER_VALUE")) { CommitIntegerValue("TRAIL_TRIGGER_VALUE", m_trail_trigger_pips, PM_MAX_TRAILING_POINTS); SetStatus(StringFormat("Trailing Trigger updated: %d pips.", m_trail_trigger_pips)); }
       else if(object_name == Name("TRAIL_DIST_VALUE")) { CommitIntegerValue("TRAIL_DIST_VALUE", m_trail_pips, PM_MAX_TRAILING_POINTS); SetStatus(StringFormat("Trailing Distance updated: %d pips.", m_trail_pips)); }
       else if(object_name == Name("ENTRY_LOT"))
         {
@@ -1082,6 +1091,8 @@ private:
       SetVisible("BE_LOCK_VALUE", trail);
       SetVisible("TRAIL_LABEL", trail);
       SetVisible("TRAIL_ENABLED", trail);
+      SetVisible("TRAIL_TRIGGER_LABEL", trail);
+      SetVisible("TRAIL_TRIGGER_VALUE", trail);
       SetVisible("TRAIL_DIST_LABEL", trail);
       SetVisible("TRAIL_DIST_VALUE", trail);
       SetVisible("TRAIL_HINT", trail);

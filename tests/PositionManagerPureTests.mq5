@@ -201,19 +201,23 @@ void TestTrailingCandidate()
   {
    double candidate = 0.0;
 
-   AssertTrue(!PMTrailingCandidate(1.1000, POSITION_TYPE_BUY, 1.1015, 0.0001, 20, candidate),
-              "Trailing does not start before price has moved the full trail distance");
+   AssertTrue(!PMTrailingCandidate(1.1000, POSITION_TYPE_BUY, 1.1015, 0.0001, 20, 10, candidate),
+              "Trailing does not start before the trigger distance");
 
-   AssertTrue(PMTrailingCandidate(1.1000, POSITION_TYPE_BUY, 1.1030, 0.0001, 20, candidate) &&
+   AssertTrue(PMTrailingCandidate(1.1000, POSITION_TYPE_BUY, 1.1020, 0.0001, 20, 10, candidate) &&
               MathAbs(candidate - 1.1010) < 0.00001,
-              "Buy trailing candidate sits trail distance behind current price, already above entry");
+              "Buy trailing starts at the trigger and uses the separate distance");
 
-   AssertTrue(PMTrailingCandidate(1.1000, POSITION_TYPE_SELL, 1.0970, 0.0001, 20, candidate) &&
+   AssertTrue(PMTrailingCandidate(1.1000, POSITION_TYPE_SELL, 1.0980, 0.0001, 20, 10, candidate) &&
               MathAbs(candidate - 1.0990) < 0.00001,
-              "Sell trailing candidate sits trail distance above current price, already below entry");
+              "Sell trailing starts at the trigger and uses the separate distance");
+   AssertTrue(!PMTrailingCandidate(1.1000, POSITION_TYPE_BUY, 1.1010, 0.0001, 10, 20, candidate),
+              "Trailing does not place the first stop below the entry price");
 
-   AssertTrue(!PMTrailingCandidate(1.1000, POSITION_TYPE_BUY, 1.1050, 0.0001, 0, candidate),
-              "Trailing is disabled when trail_points is zero");
+   AssertTrue(!PMTrailingCandidate(1.1000, POSITION_TYPE_BUY, 1.1050, 0.0001, 0, 10, candidate),
+              "Trailing is disabled when the trigger is zero");
+   AssertTrue(!PMTrailingCandidate(1.1000, POSITION_TYPE_BUY, 1.1050, 0.0001, 20, 0, candidate),
+              "Trailing is disabled when the distance is zero");
   }
 
 void TestProfitPoints()

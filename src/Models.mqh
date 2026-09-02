@@ -142,6 +142,7 @@ struct TrailingStopConfig
    PMDirection direction;
    int be_trigger_points;
    int be_lock_points;
+   int trail_trigger_points;
    int trail_points;
   };
 

@@ -57,7 +57,9 @@ public:
       double price = 0.0;
       if(!PMCalculateEquityLinePrice(positions, symbol, price))
         {
-         Delete();
+         if(!EnsureCreated(PlaceholderPrice(symbol)))
+            return false;
+         SetLineVisibility(false);
          m_error_reported = false;
          return false;
         }
@@ -68,20 +70,12 @@ public:
       price = PMNormalizePrice(price, tick_size, digits);
       if(price <= 0.0)
         {
-         Delete();
+         SetLineVisibility(false);
          return false;
         }
 
-      if(ObjectFind(0, PM_EQUITY_LINE_OBJECT_NAME) < 0)
-        {
-         ResetLastError();
-         if(!ObjectCreate(0, PM_EQUITY_LINE_OBJECT_NAME, OBJ_HLINE,
-                          0, 0, price))
-           {
-            ReportError("create");
-            return false;
-           }
-        }
+      if(!EnsureCreated(price))
+         return false;
 
       ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_COLOR,
                        PM_EQUITY_LINE_COLOR);
@@ -95,8 +89,7 @@ public:
       ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME,
                        OBJPROP_SELECTABLE, false);
       ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_HIDDEN, true);
-      ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME,
-                       OBJPROP_TIMEFRAMES, OBJ_ALL_PERIODS);
+      SetLineVisibility(true);
       ObjectSetString(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_TEXT,
                       "Equity / Break-even");
       ResetLastError();
@@ -115,6 +108,32 @@ public:
      }
 
 private:
+   bool EnsureCreated(const double price)
+     {
+      if(ObjectFind(0, PM_EQUITY_LINE_OBJECT_NAME) >= 0)
+         return true;
+      ResetLastError();
+      if(!ObjectCreate(0, PM_EQUITY_LINE_OBJECT_NAME, OBJ_HLINE,
+                       0, 0, price))
+        {
+         ReportError("create");
+         return false;
+        }
+      return true;
+     }
+   double PlaceholderPrice(const string symbol)
+     {
+      const double bid = SymbolInfoDouble(symbol, SYMBOL_BID);
+      if(MathIsValidNumber(bid) && bid > 0.0)
+         return bid;
+      return 1.0;
+     }
+   void SetLineVisibility(const bool visible)
+     {
+      ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME,
+                       OBJPROP_TIMEFRAMES,
+                       visible ? OBJ_ALL_PERIODS : OBJ_NO_PERIODS);
+     }
    void Delete()
      {
       if(ObjectFind(0, PM_EQUITY_LINE_OBJECT_NAME) >= 0)

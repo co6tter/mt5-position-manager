@@ -34,18 +34,22 @@ bool PMTrailingCandidate(const double open_price,
                          const ENUM_POSITION_TYPE type,
                          const double current_price,
                          const double point,
+                         const int trigger_points,
                          const int trail_points,
                          double &candidate)
   {
    candidate = 0.0;
-   if(trail_points <= 0 || point <= 0.0)
+   if(trigger_points <= 0 || trail_points <= 0 || point <= 0.0)
       return false;
    const double profit_points = PMProfitPoints(open_price, type, current_price, point);
-   if(profit_points < trail_points - 0.0000001)
+   if(profit_points < trigger_points - 0.0000001)
       return false;
    candidate = type == POSITION_TYPE_BUY ?
               current_price - trail_points * point :
               current_price + trail_points * point;
+   if((type == POSITION_TYPE_BUY && candidate < open_price) ||
+      (type == POSITION_TYPE_SELL && candidate > open_price))
+      return false;
    return true;
   }
 
@@ -142,7 +146,8 @@ public:
          double trailing_candidate = 0.0;
          const bool has_trailing = config.enabled_trailing &&
             PMTrailingCandidate(position.open_price, position.type, position.current_price,
-                                point, config.trail_points, trailing_candidate);
+                                point, config.trail_trigger_points, config.trail_points,
+                                trailing_candidate);
 
          double best = 0.0;
          if(!PMBestStopCandidate(position.type, has_break_even, break_even_candidate,
