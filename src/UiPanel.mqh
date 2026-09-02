@@ -59,6 +59,7 @@ private:
    int m_interaction_height;
    bool m_chart_mouse_scroll_before_interaction;
    bool m_chart_mouse_move_before_create;
+   bool m_created;
 
 public:
    CUiPanel()
@@ -108,6 +109,7 @@ public:
       m_interaction_height = 0;
       m_chart_mouse_scroll_before_interaction = true;
       m_chart_mouse_move_before_create = true;
+      m_created = false;
      }
 
    bool Create(const int max_rows)
@@ -117,6 +119,7 @@ public:
       m_user_panel_height = 0;
       m_origin_x = 0;
       m_origin_y = 0;
+      LoadPanelPosition();
       m_panel_height = ExpandedPanelHeight();
       m_expanded_height = m_panel_height;
       long mouse_move_enabled = 0;
@@ -244,7 +247,17 @@ public:
          PrintFormat("[ERROR] UI panel creation failed. last_error=%d", GetLastError());
          Destroy();
         }
+      else
+         m_created = true;
       return created;
+     }
+
+   void SavePosition()
+     {
+      if(!m_created)
+         return;
+      GlobalVariableSet(PanelPositionKey("X"), (double)m_origin_x);
+      GlobalVariableSet(PanelPositionKey("Y"), (double)m_origin_y);
      }
 
    void Destroy()
@@ -252,6 +265,7 @@ public:
       EndInteraction();
       ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, 0, m_chart_mouse_move_before_create);
       ObjectsDeleteAll(0, PM_OBJECT_PREFIX);
+      m_created = false;
      }
 
    void Refresh(CPositionService &positions)
@@ -488,6 +502,23 @@ public:
 
 private:
    string Name(const string suffix) { return PM_OBJECT_PREFIX + suffix; }
+   string PanelPositionKey(const string axis)
+     {
+      return StringFormat("%s%I64d_%s", PM_PANEL_POSITION_KEY_PREFIX,
+                          ChartID(), axis);
+     }
+   void LoadPanelPosition()
+     {
+      double saved_x = 0.0;
+      double saved_y = 0.0;
+      if(!GlobalVariableGet(PanelPositionKey("X"), saved_x) ||
+         !GlobalVariableGet(PanelPositionKey("Y"), saved_y))
+         return;
+      if(!MathIsValidNumber(saved_x) || !MathIsValidNumber(saved_y))
+         return;
+      m_origin_x = (int)MathMax(0.0, MathRound(saved_x));
+      m_origin_y = (int)MathMax(0.0, MathRound(saved_y));
+     }
    string RowName(const int row) { return Name("ROW_" + IntegerToString(row)); }
    string RowDetailName(const int row) { return Name("ROW_DETAIL_" + IntegerToString(row)); }
    string RowDirectionName(const int row) { return Name("ROW_DIRECTION_" + IntegerToString(row)); }

@@ -76,10 +76,24 @@ public:
       for(int i = 0; i < ArraySize(positions); i++)
          AddUniqueSymbol(symbols, positions[i].symbol);
       AddUniqueSymbol(symbols, _Symbol);
+      CollectPanelChartSymbols(symbols);
       return ArraySize(symbols);
      }
 
 private:
+   void CollectPanelChartSymbols(string &symbols[])
+     {
+      long chart_id = ChartFirst();
+      int chart_count = 0;
+      while(chart_id >= 0 && chart_count < 100)
+        {
+         if(ObjectFind(chart_id, PM_OBJECT_PREFIX + "BACKGROUND") >= 0)
+            AddUniqueSymbol(symbols, ChartSymbol(chart_id));
+         chart_id = ChartNext(chart_id);
+         chart_count++;
+        }
+     }
+
    void AddUniqueSymbol(string &symbols[], const string symbol)
      {
       if(symbol == "")
