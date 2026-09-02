@@ -458,7 +458,10 @@ public:
       else if(object_name == Name("PASSED_BEHAVIOR"))
          m_passed_behavior = m_passed_behavior == PM_PASSED_CLOSE_DO_NOTHING ? PM_PASSED_CLOSE_IMMEDIATELY : PM_PASSED_CLOSE_DO_NOTHING;
       else if(object_name == Name("EQ_ENABLED"))
+        {
          m_equity_guard_enabled = !m_equity_guard_enabled;
+         SetStatus(StringFormat("Equity Guard %s.", m_equity_guard_enabled ? "ON" : "OFF"));
+        }
       else if(object_name == Name("EQ_MODE"))
          m_equity_guard_mode = m_equity_guard_mode == PM_EQUITY_THRESHOLD_AMOUNT ? PM_EQUITY_THRESHOLD_PERCENT : PM_EQUITY_THRESHOLD_AMOUNT;
       else if(object_name == Name("TS_SYMBOL"))
