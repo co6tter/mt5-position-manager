@@ -328,6 +328,66 @@ int PMWrapStatus(const string text,
    return ArraySize(lines);
   }
 
+bool PMStatusHasNonZeroFailure(const string text)
+  {
+   const string marker = "failed";
+   int search_from = 0;
+   while(true)
+     {
+      const int marker_at = StringFind(text, marker, search_from);
+      if(marker_at < 0)
+         return false;
+
+      int number_end = marker_at - 1;
+      while(number_end >= 0 && StringGetCharacter(text, number_end) == 32)
+         number_end--;
+      int number_start = number_end;
+      while(number_start >= 0)
+        {
+         const ushort character = StringGetCharacter(text, number_start);
+         if(character < 48 || character > 57)
+            break;
+         number_start--;
+        }
+      number_start++;
+      if(number_start > number_end ||
+         StringToInteger(StringSubstr(text, number_start, number_end - number_start + 1)) > 0)
+         return true;
+      search_from = marker_at + StringLen(marker);
+     }
+  }
+
+PMStatusSeverity PMResolveStatusSeverity(const string text)
+  {
+   if(PMStatusHasNonZeroFailure(text) ||
+      StringFind(text, "error") >= 0 ||
+      StringFind(text, "Error") >= 0 ||
+      StringFind(text, "ERROR") >= 0 ||
+      StringFind(text, "stopped") >= 0 ||
+      StringFind(text, "unavailable") >= 0 ||
+      StringFind(text, "invalid") >= 0 ||
+      StringFind(text, "Invalid") >= 0 ||
+      StringFind(text, "could not") >= 0 ||
+      StringFind(text, "must be") >= 0)
+      return PM_STATUS_ERROR;
+
+   if(StringFind(text, "scheduled") >= 0 ||
+      StringFind(text, "queued") >= 0 ||
+      StringFind(text, "retry") >= 0 ||
+      StringFind(text, "pending") >= 0)
+      return PM_STATUS_WARNING;
+
+   if(StringFind(text, "accepted") >= 0 ||
+      StringFind(text, "updated") >= 0 ||
+      StringFind(text, "Updated") >= 0 ||
+      StringFind(text, "set") >= 0 ||
+      StringFind(text, "closed") >= 0 ||
+      StringFind(text, "succeeded") >= 0)
+      return PM_STATUS_SUCCESS;
+
+   return PM_STATUS_NORMAL;
+  }
+
 int PMResolvePanelHeight(const int required_height,
                          const int requested_height)
   {

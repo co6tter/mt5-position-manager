@@ -55,6 +55,14 @@ enum PMTradeAttemptStatus
    PM_TRADE_ATTEMPT_FAILED = 2
   };
 
+enum PMStatusSeverity
+  {
+   PM_STATUS_NORMAL = 0,
+   PM_STATUS_SUCCESS = 1,
+   PM_STATUS_WARNING = 2,
+   PM_STATUS_ERROR = 3
+  };
+
 struct PMPosition
   {
    ulong ticket;

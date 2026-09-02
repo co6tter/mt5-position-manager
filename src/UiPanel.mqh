@@ -1137,19 +1137,12 @@ private:
      }
    color StatusTextColor()
      {
-      if(StringFind(m_status, "failed") >= 0 ||
-         StringFind(m_status, "error") >= 0 ||
-         StringFind(m_status, "Error") >= 0)
+      const PMStatusSeverity severity = PMResolveStatusSeverity(m_status);
+      if(severity == PM_STATUS_ERROR)
          return PM_STATUS_ERROR_COLOR;
-      if(StringFind(m_status, "scheduled") >= 0 ||
-         StringFind(m_status, "queued") >= 0 ||
-         StringFind(m_status, "retry") >= 0)
+      if(severity == PM_STATUS_WARNING)
          return PM_STATUS_WARNING_COLOR;
-      if(StringFind(m_status, "accepted") >= 0 ||
-         StringFind(m_status, "updated") >= 0 ||
-         StringFind(m_status, "Updated") >= 0 ||
-         StringFind(m_status, "set") >= 0 ||
-         StringFind(m_status, "closed") >= 0)
+      if(severity == PM_STATUS_SUCCESS)
          return PM_STATUS_SUCCESS_COLOR;
       return PM_STATUS_COLOR;
      }
@@ -1171,8 +1164,8 @@ private:
      {
       if(m_collapsed) return;
       string lines[];
-      const int max_chars = MathMax(24, (m_panel_width - 28) / 7);
-      PMWrapStatus("Status: " + m_status, max_chars, lines);
+      const int available_width = MathMax(1, m_panel_width - 28);
+      WrapStatusToPixelWidth("Status: " + m_status, available_width, lines);
       if(ArraySize(lines) > PM_MAX_STATUS_LINES)
         {
          ArrayResize(lines, PM_MAX_STATUS_LINES);
@@ -1199,6 +1192,69 @@ private:
         }
       ObjectSetInteger(0, Name("BACKGROUND"), OBJPROP_YSIZE, PanelHeight());
       ObjectSetInteger(0, Name("RESIZE_GRIP"), OBJPROP_YDISTANCE, m_origin_y + PanelHeight() - 18);
+     }
+   int StatusTextWidth(const string text)
+     {
+      TextSetFont("Arial", -PM_STATUS_FONT_SIZE * 10, FW_NORMAL);
+      uint width = 0;
+      uint height = 0;
+      if(TextGetSize(text, width, height))
+         return (int)width;
+      return StringLen(text) * 7;
+     }
+   int StatusFittingCharacters(const string text, const int max_width)
+     {
+      const int length = StringLen(text);
+      if(length == 0 || StatusTextWidth(text) <= max_width)
+         return length;
+
+      int low = 1;
+      int high = length;
+      while(low < high)
+        {
+         const int middle = (low + high + 1) / 2;
+         if(StatusTextWidth(StringSubstr(text, 0, middle)) <= max_width)
+            low = middle;
+         else
+            high = middle - 1;
+        }
+      return low;
+     }
+   void WrapStatusToPixelWidth(const string text,
+                               const int max_width,
+                               string &lines[])
+     {
+      ArrayResize(lines, 0);
+      const int width = MathMax(1, max_width);
+      string remaining = text;
+      while(StringLen(remaining) > 0)
+        {
+         const int fitting = StatusFittingCharacters(remaining, width);
+         if(fitting >= StringLen(remaining))
+           {
+            const int count = ArraySize(lines);
+            ArrayResize(lines, count + 1);
+            lines[count] = remaining;
+            break;
+           }
+
+         int cut = fitting;
+         while(cut > 1 && StringGetCharacter(remaining, cut - 1) != 32)
+            cut--;
+         if(cut <= 1)
+            cut = fitting;
+         const int count = ArraySize(lines);
+         ArrayResize(lines, count + 1);
+         lines[count] = StringSubstr(remaining, 0, cut);
+         remaining = StringSubstr(remaining, cut);
+         while(StringLen(remaining) > 0 && StringGetCharacter(remaining, 0) == 32)
+            remaining = StringSubstr(remaining, 1);
+        }
+      if(ArraySize(lines) == 0)
+        {
+         ArrayResize(lines, 1);
+         lines[0] = "";
+        }
      }
    void SetVisible(const string suffix, const bool visible)
      {

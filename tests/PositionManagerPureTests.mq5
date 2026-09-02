@@ -352,6 +352,17 @@ void TestEntryHelpers()
               StringLen(lines[line_count - 1]) > 0 &&
               StringLen(lines[0]) <= 24,
               "Long status messages are split into non-empty lines");
+
+   AssertTrue(PMResolveStatusSeverity("Close: 7 succeeded, 0 queued, 0 failed / 7") == PM_STATUS_SUCCESS,
+              "Zero failed results are successful");
+   AssertTrue(PMResolveStatusSeverity("Close: 7 closed, 1 queued, 0 failed / 8") == PM_STATUS_WARNING,
+              "Queued results are waiting status even with zero failures");
+   AssertTrue(PMResolveStatusSeverity("Close: 6 succeeded, 0 queued, 1 failed / 7") == PM_STATUS_ERROR,
+              "Non-zero failed results are errors");
+   AssertTrue(PMResolveStatusSeverity("Close: 0 succeeded, 0 queued, 10 failed / 10") == PM_STATUS_ERROR,
+              "Double-digit failed results are not mistaken for zero");
+   AssertTrue(PMResolveStatusSeverity("SL clear stopped: trading unavailable") == PM_STATUS_ERROR,
+              "Stopped unavailable results are errors");
   }
 
 void TestPanelLayoutHelpers()
