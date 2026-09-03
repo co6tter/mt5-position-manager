@@ -223,12 +223,12 @@ public:
       created = CreateButton("TRAIL_ENABLED", "OFF", 95, ContentTop() + 65, 60, 22) && created;
       created = CreateLabel("TRAIL_TRIGGER_LABEL", "Trigger(pips)", 165, ContentTop() + 70, clrSilver, 9) && created;
       created = CreateEdit("TRAIL_TRIGGER_VALUE", "", 250, ContentTop() + 65, 60, 22) && created;
-      created = CreateLabel("TRAIL_DIST_LABEL", "Distance(pips)", 350, ContentTop() + 70, clrSilver, 9) && created;
-      created = CreateEdit("TRAIL_DIST_VALUE", "", 450, ContentTop() + 65, 70, 22) && created;
+      created = CreateLabel("TRAIL_DIST_LABEL", "Distance(pips)", 310, ContentTop() + 70, clrSilver, 9) && created;
+      created = CreateEdit("TRAIL_DIST_VALUE", "", 390, ContentTop() + 65, 60, 22) && created;
       AlignLabelToInput("BE_TRIGGER_LABEL", 238, ContentTop() + 37);
       AlignLabelToInput("BE_LOCK_LABEL", 378, ContentTop() + 37);
       AlignLabelToInput("TRAIL_TRIGGER_LABEL", 238, ContentTop() + 70);
-      AlignLabelToInput("TRAIL_DIST_LABEL", 438, ContentTop() + 70);
+      AlignLabelToInput("TRAIL_DIST_LABEL", 378, ContentTop() + 70);
       created = CreateLabel("TRAIL_HINT", "Break-even and trailing rules use pips. Trigger 0 uses Distance.", 12, ContentTop() + 103, clrSilver, 8) && created;
 
       created = CreateLabel("SESSION_LABEL", "Session close: - | Auto close: -", 14, 0, clrSilver, 9) && created;
