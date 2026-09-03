@@ -21,18 +21,72 @@
 
 ## Setup
 
-1. `src/`のファイルを、MetaTrader 5のデータフォルダ内にある`MQL5/Experts/MT5PositionManager/`へコピーします。
-2. MetaEditorで`src/PositionManager.mq5`を開きます。
-3. Compileを実行し、エラーがないことを確認します。
-4. コンパイルされたEAをチャートへ適用し、AutoTradingを有効にします。
+このEAには追加のパッケージやライブラリのインストールは必要ありません。MetaTrader 5とMetaEditorだけで導入できます。
 
-このリポジトリにはMetaEditorのCLIコンパイラは含まれていません。Windowsでは、MetaEditorの実行ファイルを指定して次のスクリプトでコンパイル結果を検証できます。
+### 1. EA用フォルダを開く
+
+1. MetaTrader 5を起動します。
+2. メニューの`File` → `Open Data Folder`を選びます。
+3. 開いたフォルダから`MQL5` → `Experts`へ移動します。
+4. `MT5PositionManager`フォルダを作成します。
+
+最終的な配置先は次の場所です。
+
+```text
+<MetaTrader 5のデータフォルダ>/MQL5/Experts/MT5PositionManager/
+```
+
+### 2. ソースファイルをコピーする
+
+リポジトリの`src/`にある**ファイルの中身をすべて**、作成した`MT5PositionManager`フォルダへコピーします。`Models.mqh`や`Constants.mqh`などのincludeファイルも、`PositionManager.mq5`と同じフォルダに置いてください。
+
+```text
+MT5PositionManager/
+├── PositionManager.mq5
+├── Models.mqh
+├── Constants.mqh
+├── PositionService.mqh
+├── TradeManager.mqh
+└── その他の.mqhファイル
+```
+
+### 3. MetaEditorでコンパイルする
+
+1. MetaTrader 5のNavigatorで`Expert Advisors`を右クリックし、`Refresh`を選びます。
+2. `MT5PositionManager/PositionManager.mq5`をMetaEditorで開きます。
+3. `Compile`（または`F7`）を実行します。
+4. 下部の結果に`0 errors`と表示されることを確認します。
+
+コンパイルに成功すると、同じフォルダに`PositionManager.ex5`が生成されます。
+
+### 4. チャートへ追加する
+
+1. MetaTrader 5へ戻り、対象のチャートを開きます。
+2. Navigatorの`Expert Advisors`から`MT5PositionManager/PositionManager`をチャートへドラッグします。
+3. 必要に応じて`InpMaxPositionRows`などの入力値を設定します。Positionsの既定表示件数は10件です。
+4. 自動売買を使用する場合は、EA設定の`Allow Algo Trading`と端末上部の`Algo Trading`を有効にします。
+5. まずはデモ口座で、パネル表示と操作を確認します。
+
+USDJPYやXAUUSDなど複数チャートへ表示する場合は、それぞれのチャートへ同じ手順でEAを追加します。
+
+### Windows PowerShellでのコンパイル確認（任意）
+
+このリポジトリにはMetaEditor本体は含まれていません。Windowsでは、リポジトリのルートで次のコマンドを実行すると、`src/PositionManager.mq5`をコンパイルして結果を検証できます。
 
 ```powershell
+Set-Location "C:\path\to\mt5-position-manager"
 .\scripts\compile.ps1 -MetaEditorPath "C:\Program Files\MetaTrader 5\metaeditor64.exe"
 ```
 
-`scripts/compile.ps1`は、MetaEditorの終了コードが0以外の場合、またはログに単語境界付きの`0 errors`が含まれない場合に失敗として扱います。Pure Testsを検証する場合は`-SourcePath`に`tests/PositionManagerPureTests.mq5`を指定します。
+Pure Testsをコンパイルする場合は、次のように`-SourcePath`を指定します。
+
+```powershell
+.\scripts\compile.ps1 `
+  -MetaEditorPath "C:\Program Files\MetaTrader 5\metaeditor64.exe" `
+  -SourcePath ".\tests\PositionManagerPureTests.mq5"
+```
+
+`scripts/compile.ps1`は、MetaEditorの終了コードが0以外の場合、またはログに単語境界付きの`0 errors`が含まれない場合に失敗として扱います。
 
 ## Usage
 
@@ -53,7 +107,7 @@ EAをチャートへ適用し、AutoTradingを有効にします。SymbolやDire
 - `Clear SL` / `Clear TP`: 選択ポジションの該当保護注文を削除します。
 - タイトルバー部分を左ドラッグするとパネルを移動できます。右下の`///`付近を左ドラッグすると幅と高さを変更できます。高さを広げた場合、Statusはパネル下端側へ移動します。時間足を変更してEAが再初期化されても、パネル位置はチャート単位で維持されます。Statusは通常を明るい色、成功を緑、待機を黄色、失敗を赤で表示します。
 
-Pips指定では、LongはBidを基準にSLを下側、TPを上側へ、ShortはAskを基準にSLを上側、TPを下側へ計算します。表示行数は3〜50、Auto CloseのMinutes Before Closeは0〜1,440へ安全側に正規化されます。
+Pips指定では、LongはBidを基準にSLを下側、TPを上側へ、ShortはAskを基準にSLを上側、TPを下側へ計算します。Positionsの表示件数は既定10件で、3〜50へ設定できます。Auto CloseのMinutes Before Closeは0〜1,440へ安全側に正規化されます。
 
 ### Equity / Break-evenライン
 
@@ -83,7 +137,7 @@ Break Evenは、現在価格が建値からTrigger（pips）以上有利に動�
 
 両方を同時に有効にした場合は、その時点でより有利な方を採用します。Stops Level・Freeze Levelにより更新が拒否される場合は、もう一方の候補を試し、両方とも拒否された場合は次のTimer周期で再試行します。決済または変更に未解決の要求が残っているTicketは対象から除外されます。
 
-TriggerやDistanceがブローカーのStops Levelより小さい場合、候補が却下されてSLが動かないことがあります。ブローカーのStops Level以上の値を設定してください。Trigger(pips) / Lock(pips) / Distance(pips)への入力は、Tab／Enter／欄外クリックで確定するまで反映されません。
+TriggerやDistanceがブローカーのStops Levelより小さい場合、候補が却下されてSLが動かないことがあります。ブローカーのStops Level以上の値を設定してください。Trigger / Lock / Distanceへの入力は、Tab／Enter／欄外クリックで確定するまで反映されません。入力単位はpipsです。
 
 ### 安全上の注意
 
