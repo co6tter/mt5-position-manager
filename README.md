@@ -131,11 +131,11 @@ Max Loss / Max Profitへの入力は、Tab／Enter／欄外クリックで確定
 
 ### Trailing Stop / Break Even
 
-Break EvenとTrailingは1つのSymbol・Direction選択を共有し、Filter・Auto Close・Equity Guardの選択とは独立です。
+Break EvenとTrailingは1つのSymbol・Direction選択を共有し、Filter・Auto Close・Equity Guardの選択とは独立です。同じSymbol・Directionに複数ポジションがある場合は1つのバスケットとして扱い、BuyとSellは別バスケットです。
 
-Break Evenは、現在価格が建値からTrigger（pips）以上有利に動いたら、建値からLock（pips）分有利な位置へSLを移動します。Trailingは、現在価格が建値からTrigger（pips）以上有利に動いたら、現在価格からDistance（pips）分のSLで追従を開始します。Triggerが未入力または0の場合は、Distanceを開始条件にも使用します。入力されたpipsは銘柄の桁数に応じて内部でpointsへ変換されます。どちらも1秒Timer周期で再計算され、SLが後退しないように更新されます。TPは変更しません。
+Break Evenは、バスケットのVolume加重平均建値から現在価格がTrigger（pips）以上有利に動いたら、加重平均建値からLock（pips）分有利な共通SLを全Ticketへ設定します。Trailingは、バスケットの加重平均建値から現在価格がTrigger（pips）以上有利に動いたら、現在価格からDistance（pips）分の共通SLで全Ticketの追従を開始します。共通SLはバスケット全体の加重平均建値より不利にはしませんが、個別の高値掴みポジションでは建値より不利な位置になる場合があります。Triggerが未入力または0の場合は、Distanceを開始条件にも使用します。入力されたpipsは銘柄の桁数に応じて内部でpointsへ変換されます。どちらも1秒Timer周期で再計算され、各TicketのSLが後退しないように更新されます。TPは変更しません。
 
-両方を同時に有効にした場合は、その時点でより有利な方を採用します。Stops Level・Freeze Levelにより更新が拒否される場合は、もう一方の候補を試し、両方とも拒否された場合は次のTimer周期で再試行します。決済または変更に未解決の要求が残っているTicketは対象から除外されます。
+両方を同時に有効にした場合は、バスケットごとにその時点でより有利な方を採用します。Stops Level・Freeze Levelにより共通候補が拒否される場合は、もう一方の候補を試します。バスケット内に決済または変更の未解決要求がある場合は、全TicketをそのTimer周期の対象から除外します。
 
 TriggerやDistanceがブローカーのStops Levelより小さい場合、候補が却下されてSLが動かないことがあります。ブローカーのStops Level以上の値を設定してください。Trigger / Lock / Distanceへの入力は、Tab／Enter／欄外クリックで確定するまで反映されません。入力単位はpipsです。
 

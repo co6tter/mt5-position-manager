@@ -53,6 +53,51 @@ bool PMTrailingCandidate(const double open_price,
    return true;
   }
 
+bool PMBuildPositionBasket(const PMPosition &positions[],
+                           const string symbol,
+                           const ENUM_POSITION_TYPE type,
+                           double &open_price,
+                           double &current_price,
+                           ulong &tickets[])
+  {
+   open_price = 0.0;
+   current_price = 0.0;
+   ArrayResize(tickets, 0);
+   if(symbol == "")
+      return false;
+
+   double total_volume = 0.0;
+   double open_price_volume = 0.0;
+   double current_price_volume = 0.0;
+   for(int index = 0; index < ArraySize(positions); index++)
+     {
+      if(positions[index].symbol != symbol ||
+         positions[index].type != type ||
+         positions[index].ticket == 0 ||
+         !MathIsValidNumber(positions[index].volume) ||
+         !MathIsValidNumber(positions[index].open_price) ||
+         !MathIsValidNumber(positions[index].current_price) ||
+         positions[index].volume <= 0.0 ||
+         positions[index].open_price <= 0.0 ||
+         positions[index].current_price <= 0.0)
+         continue;
+
+      total_volume += positions[index].volume;
+      open_price_volume += positions[index].open_price * positions[index].volume;
+      current_price_volume += positions[index].current_price * positions[index].volume;
+      const int count = ArraySize(tickets);
+      ArrayResize(tickets, count + 1);
+      tickets[count] = positions[index].ticket;
+     }
+
+   if(total_volume <= 0.0 || ArraySize(tickets) == 0)
+      return false;
+   open_price = open_price_volume / total_volume;
+   current_price = current_price_volume / total_volume;
+   return MathIsValidNumber(open_price) && open_price > 0.0 &&
+          MathIsValidNumber(current_price) && current_price > 0.0;
+  }
+
 bool PMIsMoreFavorableStop(const ENUM_POSITION_TYPE type,
                            const double candidate,
                            const double current)
@@ -121,73 +166,117 @@ public:
       int failed = 0;
       ulong first_failed_ticket = 0;
       string first_failure_description = "";
+      bool processed[];
+      ArrayResize(processed, ArraySize(all_positions));
+      ArrayInitialize(processed, false);
 
       for(int i = 0; i < ArraySize(all_positions); i++)
         {
-         if(has_symbol_scope && all_positions[i].symbol != config.symbol)
+         if(processed[i])
             continue;
-         if(!PMDirectionMatches(config.direction, all_positions[i].type))
+         if((has_symbol_scope && all_positions[i].symbol != config.symbol) ||
+            !PMDirectionMatches(config.direction, all_positions[i].type))
+           {
+            processed[i] = true;
             continue;
-         if(trades.HasPending(all_positions[i].ticket))
+           }
+
+         const string basket_symbol = all_positions[i].symbol;
+         const ENUM_POSITION_TYPE basket_type = all_positions[i].type;
+         ulong basket_tickets[];
+         double basket_open_price = 0.0;
+         double basket_current_price = 0.0;
+         if(!PMBuildPositionBasket(all_positions, basket_symbol, basket_type,
+                                    basket_open_price, basket_current_price,
+                                    basket_tickets))
+           {
+            processed[i] = true;
+            continue;
+           }
+         for(int position_index = 0; position_index < ArraySize(all_positions); position_index++)
+            if(all_positions[position_index].symbol == basket_symbol &&
+               all_positions[position_index].type == basket_type)
+               processed[position_index] = true;
+
+         if(HasPendingBasket(basket_tickets, trades))
             continue;
 
-         PMPosition position = all_positions[i];
          const double point = has_symbol_scope ? scoped_point :
-                              SymbolInfoDouble(position.symbol, SYMBOL_POINT);
+                              SymbolInfoDouble(basket_symbol, SYMBOL_POINT);
          if(point <= 0.0)
             continue;
 
          double break_even_candidate = 0.0;
          const bool has_break_even = config.enabled_break_even &&
-            PMBreakEvenCandidate(position.open_price, position.type, position.current_price,
+            PMBreakEvenCandidate(basket_open_price, basket_type, basket_current_price,
                                  point, config.be_trigger_points, config.be_lock_points,
                                  break_even_candidate);
 
          double trailing_candidate = 0.0;
          const bool has_trailing = config.enabled_trailing &&
-            PMTrailingCandidate(position.open_price, position.type, position.current_price,
+            PMTrailingCandidate(basket_open_price, basket_type, basket_current_price,
                                 point, config.trail_trigger_points, config.trail_points,
                                 trailing_candidate);
 
          double best = 0.0;
-         if(!PMBestStopCandidate(position.type, has_break_even, break_even_candidate,
+         if(!PMBestStopCandidate(basket_type, has_break_even, break_even_candidate,
                                  has_trailing, trailing_candidate, best))
             continue;
 
-         double target = 0.0;
+         double targets[];
          string reason = "";
-         bool accepted = validator.CalculateTarget(position, true, PM_PRICE_ABSOLUTE, best, target, reason);
+         bool accepted = CalculateBasketTargets(basket_tickets, best, positions,
+                                                validator, targets, reason);
          if(!accepted && has_break_even && has_trailing)
            {
             const double fallback = best == trailing_candidate ? break_even_candidate : trailing_candidate;
-            accepted = validator.CalculateTarget(position, true, PM_PRICE_ABSOLUTE, fallback, target, reason);
+            accepted = CalculateBasketTargets(basket_tickets, fallback, positions,
+                                              validator, targets, reason);
            }
          if(!accepted)
            {
-            PrintFormat("[WARN] Trailing/Break Even candidate rejected ticket=%I64u reason=%s",
-                        position.ticket, reason);
+            PrintFormat("[WARN] Trailing/Break Even candidate rejected basket=%s %s reason=%s",
+                        basket_symbol, PMPositionTypeToString(basket_type), reason);
             continue;
            }
-         if(!PMIsMoreFavorableStop(position.type, target, position.sl))
-            continue;
 
-         PMTradeFailure failure = {};
-         const PMTradeAttemptStatus attempt_status =
-            trades.ModifyTicket(position.ticket, target, position.tp, failure);
-         if(attempt_status == PM_TRADE_ATTEMPT_SUCCESS)
-            modified++;
-         else if(attempt_status == PM_TRADE_ATTEMPT_QUEUED)
-            queued++;
-         else
+         for(int ticket_index = 0; ticket_index < ArraySize(basket_tickets); ticket_index++)
            {
-            failed++;
-            if(first_failed_ticket == 0)
+            PMPosition position = {};
+            if(!positions.Get(basket_tickets[ticket_index], position))
              {
-               first_failed_ticket = position.ticket;
-               first_failure_description = failure.description;
-            }
-            PrintFormat("[ERROR] Trailing/Break Even modify failed ticket=%I64u description=%s",
-                        position.ticket, failure.description);
+               failed++;
+               if(first_failed_ticket == 0)
+                 {
+                  first_failed_ticket = basket_tickets[ticket_index];
+                  first_failure_description = "Position no longer exists.";
+                 }
+               PrintFormat("[ERROR] Trailing/Break Even modify skipped ticket=%I64u description=%s",
+                           basket_tickets[ticket_index], "Position no longer exists.");
+               continue;
+             }
+
+            if(!PMIsMoreFavorableStop(position.type, targets[ticket_index], position.sl))
+               continue;
+
+            PMTradeFailure failure = {};
+            const PMTradeAttemptStatus attempt_status =
+               trades.ModifyTicket(position.ticket, targets[ticket_index], position.tp, failure);
+            if(attempt_status == PM_TRADE_ATTEMPT_SUCCESS)
+               modified++;
+            else if(attempt_status == PM_TRADE_ATTEMPT_QUEUED)
+               queued++;
+            else
+              {
+               failed++;
+               if(first_failed_ticket == 0)
+                 {
+                  first_failed_ticket = position.ticket;
+                  first_failure_description = failure.description;
+                 }
+               PrintFormat("[ERROR] Trailing/Break Even modify failed ticket=%I64u description=%s",
+                           position.ticket, failure.description);
+              }
            }
         }
 
@@ -199,6 +288,39 @@ public:
       if(first_failed_ticket != 0)
          status += StringFormat("; ticket=%I64u (%s)",
                                 first_failed_ticket, first_failure_description);
+      return true;
+     }
+
+private:
+   bool HasPendingBasket(const ulong &tickets[], CTradeManager &trades)
+     {
+      for(int index = 0; index < ArraySize(tickets); index++)
+         if(trades.HasPending(tickets[index]))
+            return true;
+      return false;
+     }
+
+   bool CalculateBasketTargets(const ulong &tickets[],
+                              const double candidate,
+                              CPositionService &positions,
+                              CValidationService &validator,
+                              double &targets[],
+                              string &reason)
+     {
+      reason = "";
+      ArrayResize(targets, ArraySize(tickets));
+      for(int index = 0; index < ArraySize(tickets); index++)
+        {
+         PMPosition position = {};
+         if(!positions.Get(tickets[index], position))
+           {
+            reason = "Position no longer exists.";
+            return false;
+           }
+         if(!validator.CalculateTarget(position, true, PM_PRICE_ABSOLUTE,
+                                       candidate, targets[index], reason))
+            return false;
+        }
       return true;
      }
   };

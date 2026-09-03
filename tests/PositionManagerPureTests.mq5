@@ -220,6 +220,54 @@ void TestTrailingCandidate()
               "Trailing is disabled when the distance is zero");
   }
 
+void TestPositionBasket()
+  {
+   PMPosition positions[];
+   ArrayResize(positions, 3);
+   positions[0].ticket = 101;
+   positions[0].symbol = "USDJPY";
+   positions[0].type = POSITION_TYPE_BUY;
+   positions[0].volume = 1.0;
+   positions[0].open_price = 100.0;
+   positions[0].current_price = 108.0;
+   positions[1].ticket = 102;
+   positions[1].symbol = "USDJPY";
+   positions[1].type = POSITION_TYPE_BUY;
+   positions[1].volume = 2.0;
+   positions[1].open_price = 110.0;
+   positions[1].current_price = 108.0;
+   positions[2].ticket = 103;
+   positions[2].symbol = "USDJPY";
+   positions[2].type = POSITION_TYPE_SELL;
+   positions[2].volume = 1.0;
+   positions[2].open_price = 109.0;
+   positions[2].current_price = 108.0;
+
+   double open_price = 0.0;
+   double current_price = 0.0;
+   ulong tickets[];
+   AssertTrue(PMBuildPositionBasket(positions, "USDJPY", POSITION_TYPE_BUY,
+                                    open_price, current_price, tickets) &&
+              MathAbs(open_price - 106.66666667) < 0.00001 &&
+              MathAbs(current_price - 108.0) < 0.00001 &&
+              ArraySize(tickets) == 2 && tickets[0] == 101 && tickets[1] == 102,
+              "Basket uses the volume-weighted entry and keeps same-direction tickets");
+
+   double candidate = 0.0;
+   AssertTrue(!PMTrailingCandidate(open_price, POSITION_TYPE_BUY, 107.5,
+                                   0.1, 10, 2, candidate),
+              "Basket trailing waits until the weighted entry reaches the trigger");
+   AssertTrue(PMTrailingCandidate(open_price, POSITION_TYPE_BUY, current_price,
+                                  0.1, 10, 2, candidate) &&
+              MathAbs(candidate - 107.8) < 0.00001,
+              "Basket trailing triggers from the weighted entry even when one layer is losing");
+
+   AssertTrue(PMBuildPositionBasket(positions, "USDJPY", POSITION_TYPE_SELL,
+                                    open_price, current_price, tickets) &&
+              ArraySize(tickets) == 1 && tickets[0] == 103,
+              "Buy and Sell positions are kept in separate baskets");
+  }
+
 void TestProfitPoints()
   {
    AssertTrue(MathAbs(PMProfitPoints(1.1000, POSITION_TYPE_BUY, 1.1020, 0.0001) - 20.0) < 0.00001,
@@ -444,6 +492,7 @@ void OnStart()
    TestEquityGuardLatch();
    TestBreakEvenCandidate();
    TestTrailingCandidate();
+   TestPositionBasket();
    TestProfitPoints();
    TestPipConversion();
    TestIsMoreFavorableStop();

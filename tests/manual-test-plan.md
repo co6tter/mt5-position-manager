@@ -90,9 +90,10 @@
 ## Trailing Stop / Break Even
 
 1. Break Even・Trailingを両方OFFのまま複数ポジションを保有し、SLが一切変化しないことを確認する。
-2. Break EvenをONにしTrigger(pips)/Lock(pips)を設定し、対象Symbol・Directionのポジションが含み益Trigger以上になった瞬間にSLが建値+Lock（Buy）または建値-Lock（Sell）へ1回だけ更新されることを確認する（Expertsログの`[INFO] Position modified...`が連続して出力されないこと）。
-3. TrailingをONにしTrigger(pips)とDistance(pips)を別々に設定し、含み益がTrigger未満の間はSLが動かず、Trigger以上になってから現在価格からDistance分の位置で追従を始めることを確認する。価格が反落してもSLが後退しないことを確認する。
-4. Break Even・Trailing両方ONの状態で、含み益が小さい間はBreak Evenのロック位置、含み益が大きくなるとTrailingの位置に自然に切り替わることを確認する。
-5. Break EvenのTrigger/Lock、TrailingのDistance欄に非数値・負数・空欄を入力し、それぞれの機能が実質的に無効になる（SLを一切動かさない）ことを確認する。Trailing Triggerを0または空欄にした場合は、Distanceが開始条件にも使われることを確認する。
-6. Break EvenとTrailingがOFFのときボタンが赤、ONのとき緑になることを確認する。
-7. 対象外のSymbol・Directionのポジションが影響を受けないことを確認する。
+2. 同じSymbol・Directionで建値の異なる複数ポジションを用意し、Break EvenをONにしてTrigger/Lockを設定する。加重平均建値からTrigger以上になった瞬間に、対象Ticket全件へ加重平均建値基準の共通SLが1回だけ設定されることを確認する（Expertsログの`[INFO] Position modified...`がTicketごとに出力されること）。
+3. TrailingをONにしてTriggerとDistanceを別々に設定し、バスケットの加重平均建値からの含み益がTrigger未満の間は全TicketのSLが動かず、Trigger以上になってから全Ticketへ現在価格からDistance分の共通SLが設定されることを確認する。価格が反落してもSLが後退しないことを確認する。
+4. Break Even・Trailing両方ONの状態で、バスケットごとに有利な候補が採用され、対象Ticket全件へ同じ候補価格が適用されることを確認する。
+5. Break EvenのTrigger/Lock、TrailingのTrigger/Distance欄に非数値・負数・空欄を入力し、それぞれの機能が実質的に無効になる（SLを一切動かさない）ことを確認する。Trailing Triggerを0または空欄にした場合は、Distanceが開始条件にも使われることを確認する。
+6. バスケット内の1Ticketに未解決の変更・決済要求がある状態では、同じバスケットの他Ticketにもその周期は変更要求が送信されないことを確認する。
+7. Break EvenとTrailingがOFFのときボタンが赤、ONのとき緑になることを確認する。
+8. 対象外のSymbol・Directionのポジションが影響を受けないことを確認する。
