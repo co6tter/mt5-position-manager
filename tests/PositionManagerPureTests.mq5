@@ -40,7 +40,8 @@ void TestBatchResultHelpers()
    PMResetBatchResult(result, 3);
    PMAddFailure(result, 12345, 10016, "Invalid stops", 1);
    AssertTrue(result.requested == 3 && result.successful == 0 &&
-              result.queued == 0, "Batch result reset");
+              result.queued == 0 && result.unchanged == 0,
+              "Batch result reset");
    AssertTrue(ArraySize(result.failures) == 1 &&
               result.failures[0].ticket == 12345 &&
               result.failures[0].retcode == 10016,
@@ -413,6 +414,8 @@ void TestEntryHelpers()
               "Non-zero failed results are errors");
    AssertTrue(PMResolveStatusSeverity("Close: 0 succeeded, 0 queued, 10 failed / 10") == PM_STATUS_ERROR,
               "Double-digit failed results are not mistaken for zero");
+   AssertTrue(PMResolveStatusSeverity("SL update: 1 succeeded, 3 unchanged, 0 queued, 0 failed / 4") == PM_STATUS_SUCCESS,
+              "Unchanged stop updates are not errors");
    AssertTrue(PMResolveStatusSeverity("SL clear stopped: trading unavailable") == PM_STATUS_ERROR,
               "Stopped unavailable results are errors");
   }

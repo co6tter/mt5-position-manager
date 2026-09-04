@@ -383,7 +383,8 @@ PMStatusSeverity PMResolveStatusSeverity(const string text)
       StringFind(text, "Updated") >= 0 ||
       StringFind(text, "set") >= 0 ||
       StringFind(text, "closed") >= 0 ||
-      StringFind(text, "succeeded") >= 0)
+      StringFind(text, "succeeded") >= 0 ||
+      StringFind(text, "unchanged") >= 0)
       return PM_STATUS_SUCCESS;
 
    return PM_STATUS_NORMAL;
@@ -426,6 +427,7 @@ void PMResetBatchResult(PMBatchResult &result, const int requested = 0)
   {
    result.requested = requested;
    result.successful = 0;
+   result.unchanged = 0;
    result.queued = 0;
    ArrayResize(result.failures, 0);
   }

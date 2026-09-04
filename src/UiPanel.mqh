@@ -651,7 +651,9 @@ private:
      {
       if(ArraySize(result.failures) > 0 && PMIsTradingUnavailableRetcode(result.failures[0].retcode))
          return StringFormat("%s stopped: trading unavailable (%s)", operation, result.failures[0].description);
-      string text = StringFormat("%s: %d succeeded, %d queued, %d failed / %d", operation, result.successful, result.queued, ArraySize(result.failures), result.requested);
+      string text = StringFormat("%s: %d succeeded, %d unchanged, %d queued, %d failed / %d",
+                                 operation, result.successful, result.unchanged,
+                                 result.queued, ArraySize(result.failures), result.requested);
       if(ArraySize(result.failures) > 0)
          text += StringFormat("; ticket=%I64u (%s, retcode=%u)", result.failures[0].ticket, result.failures[0].description, result.failures[0].retcode);
       return text;

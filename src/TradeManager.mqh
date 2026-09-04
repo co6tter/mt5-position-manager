@@ -96,6 +96,12 @@ public:
          return PM_TRADE_ATTEMPT_FAILED;
         }
       const int pending_modify = FindPending(PM_TRADE_OPERATION_MODIFY, ticket);
+      if(StopsMatch(ticket, sl, tp))
+        {
+         if(pending_modify >= 0)
+            ArrayRemove(m_pending, pending_modify, 1);
+         return PM_TRADE_ATTEMPT_UNCHANGED;
+        }
       if(pending_modify >= 0)
         {
          PrintFormat("[INFO] Superseding pending modification ticket=%I64u old_sl=%s old_tp=%s new_sl=%s new_tp=%s",
@@ -111,7 +117,8 @@ public:
                                                                wait_only, failure);
       if(status != PM_TRADE_ATTEMPT_QUEUED)
         {
-         if(status == PM_TRADE_ATTEMPT_SUCCESS)
+         if(status == PM_TRADE_ATTEMPT_SUCCESS ||
+            status == PM_TRADE_ATTEMPT_UNCHANGED)
             RemovePending(PM_TRADE_OPERATION_MODIFY, ticket);
          return status;
         }
@@ -187,6 +194,7 @@ public:
       CleanupClosedPending();
       int processed = 0;
       int successful = 0;
+      int unchanged = 0;
       int failed = 0;
       ulong first_failed_ticket = 0;
       string first_failure_description = "";
@@ -216,6 +224,12 @@ public:
          if(attempt_status == PM_TRADE_ATTEMPT_SUCCESS)
            {
             successful++;
+            ArrayRemove(m_pending, index, 1);
+            continue;
+           }
+         if(attempt_status == PM_TRADE_ATTEMPT_UNCHANGED)
+           {
+            unchanged++;
             ArrayRemove(m_pending, index, 1);
             continue;
            }
@@ -260,8 +274,8 @@ public:
 
       if(processed > 0)
         {
-         status_text = StringFormat("Retries: %d succeeded, %d failed, %d pending",
-                                    successful, failed, ArraySize(m_pending));
+         status_text = StringFormat("Retries: %d succeeded, %d unchanged, %d failed, %d pending",
+                                    successful, unchanged, failed, ArraySize(m_pending));
          if(first_failed_ticket != 0)
             status_text += StringFormat("; ticket=%I64u (%s)",
                                         first_failed_ticket,
@@ -368,6 +382,8 @@ private:
          SetFailure(failure, ticket, 0, "Position no longer exists.", attempt);
          return PM_TRADE_ATTEMPT_FAILED;
         }
+      if(StopsMatch(ticket, sl, tp))
+         return PM_TRADE_ATTEMPT_UNCHANGED;
 
       const string symbol = PositionGetString(POSITION_SYMBOL);
       if(!m_trade.SetTypeFillingBySymbol(symbol))
@@ -386,8 +402,7 @@ private:
       const string description = m_trade.ResultRetcodeDescription();
       LogResult("modify", ticket, request_ok, retcode, description);
 
-      if(request_ok && (retcode == TRADE_RETCODE_DONE ||
-                        retcode == TRADE_RETCODE_NO_CHANGES) &&
+      if(request_ok && retcode == TRADE_RETCODE_DONE &&
          StopsMatch(ticket, sl, tp))
         {
          PrintFormat("[INFO] Position modified ticket=%I64u sl=%s tp=%s deal=%I64u order=%I64u",
@@ -396,8 +411,15 @@ private:
          return PM_TRADE_ATTEMPT_SUCCESS;
         }
 
+      if(retcode == TRADE_RETCODE_NO_CHANGES &&
+         StopsMatch(ticket, sl, tp))
+        {
+         PrintFormat("[INFO] Position unchanged ticket=%I64u sl=%s tp=%s",
+                     ticket, DoubleToString(sl, 8), DoubleToString(tp, 8));
+         return PM_TRADE_ATTEMPT_UNCHANGED;
+        }
+
       if(request_ok && (retcode == TRADE_RETCODE_DONE ||
-                        retcode == TRADE_RETCODE_NO_CHANGES ||
                         retcode == TRADE_RETCODE_PLACED))
         {
          wait_only = true;
@@ -584,10 +606,13 @@ private:
                   const uint retcode,
                   const string description)
      {
-      if(!request_ok || (retcode != TRADE_RETCODE_DONE &&
-                         retcode != TRADE_RETCODE_DONE_PARTIAL &&
-                         retcode != TRADE_RETCODE_NO_CHANGES &&
-                         retcode != TRADE_RETCODE_PLACED))
+      const bool modify_without_changes = operation == "modify" &&
+                                           retcode == TRADE_RETCODE_NO_CHANGES;
+      if((!request_ok && !modify_without_changes) ||
+         (retcode != TRADE_RETCODE_DONE &&
+          retcode != TRADE_RETCODE_DONE_PARTIAL &&
+          retcode != TRADE_RETCODE_NO_CHANGES &&
+          retcode != TRADE_RETCODE_PLACED))
          PrintFormat("[ERROR] %s request ticket=%I64u bool=%s retcode=%u description=%s last_error=%d",
                      operation, ticket, request_ok ? "true" : "false",
                      retcode, description, GetLastError());

@@ -102,6 +102,8 @@ private:
      {
       if(status == PM_TRADE_ATTEMPT_SUCCESS)
          result.successful++;
+      else if(status == PM_TRADE_ATTEMPT_UNCHANGED)
+         result.unchanged++;
       else if(status == PM_TRADE_ATTEMPT_QUEUED)
          result.queued++;
       else

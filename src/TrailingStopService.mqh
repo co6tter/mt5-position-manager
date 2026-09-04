@@ -162,6 +162,7 @@ public:
         }
 
       int modified = 0;
+      int unchanged = 0;
       int queued = 0;
       int failed = 0;
       ulong first_failed_ticket = 0;
@@ -264,6 +265,8 @@ public:
                trades.ModifyTicket(position.ticket, targets[ticket_index], position.tp, failure);
             if(attempt_status == PM_TRADE_ATTEMPT_SUCCESS)
                modified++;
+            else if(attempt_status == PM_TRADE_ATTEMPT_UNCHANGED)
+               unchanged++;
             else if(attempt_status == PM_TRADE_ATTEMPT_QUEUED)
                queued++;
             else
@@ -280,11 +283,11 @@ public:
            }
         }
 
-      if(modified == 0 && queued == 0 && failed == 0)
+      if(modified == 0 && unchanged == 0 && queued == 0 && failed == 0)
          return false;
 
-      status = StringFormat("Trailing/Break Even: %d updated, %d queued, %d failed",
-                            modified, queued, failed);
+      status = StringFormat("Trailing/Break Even: %d updated, %d unchanged, %d queued, %d failed",
+                            modified, unchanged, queued, failed);
       if(first_failed_ticket != 0)
          status += StringFormat("; ticket=%I64u (%s)",
                                 first_failed_ticket, first_failure_description);

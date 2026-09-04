@@ -52,7 +52,8 @@ enum PMTradeAttemptStatus
   {
    PM_TRADE_ATTEMPT_SUCCESS = 0,
    PM_TRADE_ATTEMPT_QUEUED = 1,
-   PM_TRADE_ATTEMPT_FAILED = 2
+   PM_TRADE_ATTEMPT_FAILED = 2,
+   PM_TRADE_ATTEMPT_UNCHANGED = 3
   };
 
 enum PMStatusSeverity
@@ -102,6 +103,7 @@ struct PMBatchResult
   {
    int requested;
    int successful;
+   int unchanged;
    int queued;
    PMTradeFailure failures[];
   };

@@ -28,7 +28,7 @@ Price入力またはPips入力を受け付ける。Pipsの基準価格はLongが
 
 ## UI
 
-標準チャートオブジェクトだけでパネルを構成する。パネル内には余白を設ける。Entry、Positions、SL/TP、Auto Close、Equity Guard、Trailの6タブを持ち、選択中タブは明るい青色・強調境界線・白文字、非選択タブは暗い青灰色・控えめな境界線・銀文字で表示し、非選択タブの本文は表示しない。タイトルバーの折り畳みボタンで本文を隠せ、折り畳み中もタイトルバーをドラッグできる。右下のグリップでは幅と高さを変更でき、必要な本文より小さくはしない。Symbol・Directionは候補を順番に切り替えるボタンとし、SL/TPとAuto Closeの数値は編集欄から入力する。処理結果は本文より少し大きい、折り返し可能な複数行StatusとExpertsログへ出力する。Statusは通常を明るい色、成功を緑、待機を黄色、失敗を赤で表示する。Positionsの価格は銘柄のDigitsで表示する。
+標準チャートオブジェクトだけでパネルを構成する。パネル内には余白を設ける。Entry、Positions、SL/TP、Auto Close、Equity Guard、Trailの6タブを持ち、選択中タブは明るい青色・強調境界線・白文字、非選択タブは暗い青灰色・控えめな境界線・銀文字で表示し、非選択タブの本文は表示しない。タイトルバーの折り畳みボタンで本文を隠せ、折り畳み中もタイトルバーをドラッグできる。右下のグリップでは幅と高さを変更でき、必要な本文より小さくはしない。Symbol・Directionは候補を順番に切り替えるボタンとし、SL/TPとAuto Closeの数値は編集欄から入力する。処理結果は本文より少し大きい、折り返し可能な複数行StatusとExpertsログへ出力する。Statusは通常を明るい色、成功・変更なしを緑、待機を黄色、失敗を赤で表示する。SL/TPの一括変更で既存値と同じTicketは`unchanged`として集計し、失敗には含めない。Positionsの価格は銘柄のDigitsで表示する。
 
 EntryタブはLot、SL/TP points、最新Bid/Ask、Buy/Sell別の計算価格を表示する。LotはVolume Min/Max/Stepへ正規化し、SL/TPは注文直前のTickから計算してStops Level、Freeze Level、Tick Sizeを検証する。確認ダイアログは表示しない。
 

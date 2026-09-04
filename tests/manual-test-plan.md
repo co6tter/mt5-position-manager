@@ -59,6 +59,7 @@
 4. Stops Level、Freeze Level、Tick Sizeに違反する値で取引要求が送信されないことを確認する。
 5. Clear SL / Clear TPで反対側の値が維持されることを確認する。
 6. SL/TPタブの通常幅では各行が入力欄、`Set / Change`、`Clear`の順に一行で収まり、狭幅では`Set / Change`と`Clear`が同じ折り返し行に移動することを確認する。
+7. 既に同じSLが設定された3件と未設定の1件を選択して同じSLを設定し、Statusが`1 succeeded, 3 unchanged, 0 queued, 0 failed / 4`（または同内容の折り返し表示）となり、既存3件が`failed`にならないことを確認する。
 
 ## Position価格とStatus表示
 
