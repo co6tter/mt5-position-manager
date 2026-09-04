@@ -82,9 +82,9 @@ public:
       ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_STYLE,
                        STYLE_DOT);
       ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_WIDTH, 1);
-      // Keep the line above broker entry/trade levels while the panel's
-      // foreground rectangle and controls remain visually on top of it.
-      ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_BACK, false);
+      // Draw the line in the chart background so the panel foreground
+      // rectangle and controls always remain visually on top of it.
+      ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_BACK, true);
       ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_ZORDER, 0);
       ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME,
                        OBJPROP_SELECTABLE, false);
