@@ -14,7 +14,7 @@
 2. EURUSDだけを外部から決済する。
 3. 1秒以上待ち、FilterとAuto CloseがXAUUSDのままであることを確認する。
 4. XAUUSDの全ポジションを外部から決済しても、対象が別Symbolへ変化しないことを確認する。
-5. USDJPYとXAUUSDの両方へEAを表示し、片方にだけポジションがある状態でも、両チャートのPositions / Auto Close / TrailingのSymbolボタンが相互に切り替わることを確認する。
+5. USDJPYとXAUUSDの両方へEAを表示し、最大5秒待つ。片方にだけポジションがある状態でも、両チャートのPositions / Auto Close / TrailingのSymbolボタンが相互に切り替わることを確認する。
 
 ## Tab、折り畳み、成り行きエントリー
 
@@ -98,3 +98,13 @@
 6. バスケット内の1Ticketに未解決の変更・決済要求がある状態では、同じバスケットの他Ticketにもその周期は変更要求が送信されないことを確認する。
 7. Break EvenとTrailingがOFFのときボタンが赤、ONのとき緑になることを確認する。
 8. 対象外のSymbol・Directionのポジションが影響を受けないことを確認する。
+
+## パフォーマンス回帰
+
+1. Positionsタブへ10件以上のポジションを表示し、60秒以上待っても行が点滅せず、選択状態とページが維持されることを確認する。
+2. `InpMaxPositionRows=50`で50件を表示し、Entry / Positions / SL/TP / Auto Close / Equity Guard / Trailを切り替えて、クリックと入力が継続して応答することを確認する。
+3. 各タブで60秒待ち、表示値が変化しないタブでは不要な画面点滅がなく、Entry価格とPositions損益は従来どおり1秒周期で更新されることを確認する。
+4. チャートへEA以外のオブジェクトを多数配置してパネルをドラッグし、外部オブジェクトの個数に応じて操作が極端に遅くならず、外部オブジェクトの位置が変化しないことを確認する。
+5. パネルを連続してリサイズし、Position行の幅、Statusの折り返し、最小・最大幅、チャート境界の制約が維持されることを確認する。
+6. Auto Close、Equity Guard、Break Even、Trailingをすべて有効にして60秒以上動かし、各監視が1秒Timerで継続し、同じ周期に自動決済とSL変更が重複送信されないことをExpertsログで確認する。
+7. MetaEditor Profilerまたは`GetMicrosecondCount()`を使い、ポジション0件・10件・50件で`OnTimer`の変更前後を同じ端末条件で比較する。

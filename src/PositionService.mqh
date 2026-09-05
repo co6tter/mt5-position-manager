@@ -6,19 +6,29 @@
 
 class CPositionService
   {
+private:
+   string m_panel_symbols[];
+   datetime m_panel_symbols_refreshed_at;
+
 public:
+   CPositionService()
+     {
+      m_panel_symbols_refreshed_at = 0;
+     }
+
    int Collect(PMPosition &positions[])
      {
-      ArrayResize(positions, 0);
       const int total = PositionsTotal();
+      ArrayResize(positions, total);
+      int count = 0;
       for(int index = 0; index < total; index++)
         {
          const ulong ticket = PositionGetTicket(index);
-         if(ticket == 0 || !PositionSelectByTicket(ticket))
+         // PositionGetTicket selects the position for the following property
+         // reads, so selecting the same ticket again only duplicates work.
+         if(ticket == 0)
             continue;
 
-         const int count = ArraySize(positions);
-         ArrayResize(positions, count + 1);
          positions[count].ticket = ticket;
          positions[count].symbol = PositionGetString(POSITION_SYMBOL);
          positions[count].type = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
@@ -28,8 +38,10 @@ public:
          positions[count].sl = PositionGetDouble(POSITION_SL);
          positions[count].tp = PositionGetDouble(POSITION_TP);
          positions[count].profit = PositionGetDouble(POSITION_PROFIT);
+         count++;
         }
-      return ArraySize(positions);
+      ArrayResize(positions, count);
+      return count;
      }
 
    int CollectTickets(const string symbol,
@@ -39,17 +51,27 @@ public:
       ArrayResize(tickets, 0);
       PMPosition positions[];
       Collect(positions);
+      return CollectTickets(positions, symbol, direction, tickets);
+     }
+
+   int CollectTickets(const PMPosition &positions[],
+                      const string symbol,
+                      const PMDirection direction,
+                      ulong &tickets[])
+     {
+      ArrayResize(tickets, ArraySize(positions));
+      int count = 0;
       for(int i = 0; i < ArraySize(positions); i++)
         {
          if(symbol != "" && positions[i].symbol != symbol)
             continue;
          if(!PMDirectionMatches(direction, positions[i].type))
             continue;
-         const int count = ArraySize(tickets);
-         ArrayResize(tickets, count + 1);
          tickets[count] = positions[i].ticket;
+         count++;
         }
-      return ArraySize(tickets);
+      ArrayResize(tickets, count);
+      return count;
      }
 
    bool Get(const ulong ticket, PMPosition &position)
@@ -73,25 +95,41 @@ public:
       ArrayResize(symbols, 0);
       PMPosition positions[];
       Collect(positions);
+      return CollectSymbols(positions, symbols);
+     }
+
+   int CollectSymbols(const PMPosition &positions[], string &symbols[])
+     {
+      ArrayResize(symbols, 0);
       for(int i = 0; i < ArraySize(positions); i++)
          AddUniqueSymbol(symbols, positions[i].symbol);
       AddUniqueSymbol(symbols, _Symbol);
-      CollectPanelChartSymbols(symbols);
+      RefreshPanelChartSymbols();
+      for(int i = 0; i < ArraySize(m_panel_symbols); i++)
+         AddUniqueSymbol(symbols, m_panel_symbols[i]);
       return ArraySize(symbols);
      }
 
 private:
-   void CollectPanelChartSymbols(string &symbols[])
+   void RefreshPanelChartSymbols()
      {
+      const datetime now = TimeLocal();
+      if(m_panel_symbols_refreshed_at > 0 && now > 0 &&
+         now >= m_panel_symbols_refreshed_at &&
+         now - m_panel_symbols_refreshed_at < PM_PANEL_SYMBOL_REFRESH_SECONDS)
+         return;
+
+      ArrayResize(m_panel_symbols, 0, 8);
       long chart_id = ChartFirst();
       int chart_count = 0;
       while(chart_id >= 0 && chart_count < 100)
         {
          if(ObjectFind(chart_id, PM_OBJECT_PREFIX + "BACKGROUND") >= 0)
-            AddUniqueSymbol(symbols, ChartSymbol(chart_id));
+            AddUniqueSymbol(m_panel_symbols, ChartSymbol(chart_id));
          chart_id = ChartNext(chart_id);
          chart_count++;
         }
+      m_panel_symbols_refreshed_at = now;
      }
 
    void AddUniqueSymbol(string &symbols[], const string symbol)
@@ -102,7 +140,7 @@ private:
          if(symbols[i] == symbol)
             return;
       const int count = ArraySize(symbols);
-      ArrayResize(symbols, count + 1);
+      ArrayResize(symbols, count + 1, 8);
       symbols[count] = symbol;
      }
   };

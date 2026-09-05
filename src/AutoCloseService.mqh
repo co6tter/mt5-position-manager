@@ -18,6 +18,7 @@ private:
    string m_config_key;
    datetime m_session_close;
    datetime m_auto_close_at;
+   datetime m_schedule_refreshed_at;
 
 public:
    CAutoCloseService()
@@ -30,11 +31,13 @@ public:
       m_config_key = "";
       m_session_close = 0;
       m_auto_close_at = 0;
+      m_schedule_refreshed_at = 0;
      }
 
    bool Evaluate(const AutoCloseConfig &config,
                  const datetime now,
                  CSessionService &sessions,
+                 const PMPosition &all_positions[],
                  CPositionService &positions,
                  CTradeManager &trades,
                  string &status)
@@ -50,6 +53,7 @@ public:
          m_watched_date = 0;
          m_session_close = 0;
          m_auto_close_at = 0;
+         m_schedule_refreshed_at = 0;
         }
       if(!config.enabled || config.symbol == "")
          return false;
@@ -61,14 +65,29 @@ public:
          m_watched_before_close = false;
          m_schedule_reported = false;
          m_started = false;
+         m_session_close = 0;
+         m_auto_close_at = 0;
+         m_schedule_refreshed_at = 0;
         }
 
-      if(!sessions.GetTodayClose(config.symbol, now, m_session_close))
+      if(m_schedule_refreshed_at <= 0 || now < m_schedule_refreshed_at ||
+         now - m_schedule_refreshed_at >= PM_SESSION_REFRESH_SECONDS)
         {
-         status = "Auto Close: session close unavailable for " + config.symbol;
-         return false;
+         if(!sessions.GetTodayClose(config.symbol, now, m_session_close))
+           {
+            m_session_close = 0;
+            m_auto_close_at = 0;
+            m_schedule_refreshed_at = now - PM_SESSION_REFRESH_SECONDS +
+                                      PM_SESSION_RETRY_SECONDS;
+            status = "Auto Close: session close unavailable for " + config.symbol;
+            return false;
+           }
+         m_schedule_refreshed_at = now;
+         m_auto_close_at = m_session_close -
+                           MathMax(0, config.minutes_before_close) * 60;
         }
-      m_auto_close_at = m_session_close - MathMax(0, config.minutes_before_close) * 60;
+      if(m_session_close <= 0 || m_auto_close_at <= 0)
+         return false;
       if(now < m_auto_close_at)
         {
          m_watched_before_close = true;
@@ -97,7 +116,8 @@ public:
         }
 
       ulong tickets[];
-      positions.CollectTickets(config.symbol, config.direction, tickets);
+      positions.CollectTickets(all_positions, config.symbol,
+                               config.direction, tickets);
       if(ArraySize(tickets) == 0)
         {
          status = "Auto Close: no matching positions.";

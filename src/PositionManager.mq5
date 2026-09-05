@@ -34,14 +34,16 @@ CUiPanel g_ui;
 int OnInit()
   {
    g_trades.Configure(InpDeviationPoints, InpRetryCount, InpRetryIntervalSeconds);
+   PMPosition positions[];
+   g_positions.Collect(positions);
    // Create the chart line before the foreground panel so the panel remains on top.
-   g_equity_line.Render(_Symbol, g_positions);
+   g_equity_line.Render(_Symbol, positions);
    if(!g_ui.Create(InpMaxPositionRows))
      {
       g_equity_line.Destroy();
       return INIT_FAILED;
      }
-   g_ui.Refresh(g_positions);
+   g_ui.Refresh(positions, g_positions);
    g_ui.Render();
    ResetLastError();
    if(!EventSetTimer(PM_TIMER_SECONDS))
@@ -74,21 +76,36 @@ void OnTimer()
       now = TimeCurrent();
    string retry_status = "";
    g_trades.ProcessRetries(now, retry_status);
-   g_ui.Refresh(g_positions);
-   g_equity_line.Render(_Symbol, g_positions);
+   PMPosition positions[];
+   g_positions.Collect(positions);
+   g_ui.Refresh(positions, g_positions);
+   if(g_equity_line.Render(_Symbol, positions))
+      g_ui.RequestRedraw();
    AutoCloseConfig config = {};
    g_ui.GetAutoCloseConfig(config);
    string auto_status = "";
-   g_auto_close.Evaluate(config, now, g_sessions, g_positions, g_trades, auto_status);
+   const bool auto_close_handled =
+      g_auto_close.Evaluate(config, now, g_sessions, positions,
+                            g_positions, g_trades, auto_status);
+   // Read-only timer cycles use one shared snapshot. Refresh only after a
+   // service may have changed positions so downstream state and actions stay
+   // consistent with the original evaluation order.
+   if(auto_close_handled)
+      g_positions.Collect(positions);
    g_ui.SetAutoSchedule(g_auto_close.SessionClose(), g_auto_close.AutoCloseAt());
    EquityGuardConfig equity_guard_config = {};
    g_ui.GetEquityGuardConfig(equity_guard_config);
    string equity_guard_status = "";
-   g_equity_guard.Evaluate(equity_guard_config, g_positions, g_trades, equity_guard_status);
+   const bool equity_guard_handled =
+      g_equity_guard.Evaluate(equity_guard_config, positions,
+                              g_trades, equity_guard_status);
+   if(equity_guard_handled)
+      g_positions.Collect(positions);
    TrailingStopConfig trailing_stop_config = {};
    g_ui.GetTrailingStopConfig(trailing_stop_config);
    string trailing_stop_status = "";
-   g_trailing_stop.Evaluate(trailing_stop_config, g_positions, g_trades, g_validation, trailing_stop_status);
+   g_trailing_stop.Evaluate(trailing_stop_config, positions, g_positions,
+                            g_trades, g_validation, trailing_stop_status);
    if(equity_guard_status != "")
       g_ui.SetStatus(equity_guard_status);
    else if(auto_status != "")

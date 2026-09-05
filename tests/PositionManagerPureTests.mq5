@@ -267,6 +267,11 @@ void TestPositionBasket()
                                     open_price, current_price, tickets) &&
               ArraySize(tickets) == 1 && tickets[0] == 103,
               "Buy and Sell positions are kept in separate baskets");
+
+   AssertTrue(!PMBuildPositionBasket(positions, "", POSITION_TYPE_BUY,
+                                     open_price, current_price, tickets) &&
+              ArraySize(tickets) == 0,
+              "An empty basket symbol clears stale output tickets");
   }
 
 void TestProfitPoints()

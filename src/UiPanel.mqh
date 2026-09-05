@@ -21,6 +21,7 @@ private:
    PMPriceMode m_sl_mode;
    PMPriceMode m_tp_mode;
    PMPassedCloseBehavior m_passed_behavior;
+   int m_auto_minutes;
    bool m_auto_enabled;
    bool m_equity_guard_enabled;
    PMEquityThresholdMode m_equity_guard_mode;
@@ -42,11 +43,23 @@ private:
    datetime m_auto_close_at;
    int m_page;
    int m_rendered_rows;
+   int m_visible_rows;
    bool m_row_render_error_reported;
+   bool m_controls_dirty;
+   bool m_visibility_dirty;
+   bool m_status_layout_dirty;
+   bool m_schedule_dirty;
+   bool m_positions_dirty;
+   bool m_force_redraw;
+   string m_object_names[];
+   int m_object_x[];
+   int m_object_y[];
    int m_origin_x;
    int m_origin_y;
    int m_panel_width;
    int m_panel_height;
+   long m_chart_width;
+   long m_chart_height;
    int m_expanded_height;
    int m_user_panel_height;
    bool m_dragging;
@@ -71,6 +84,7 @@ public:
       m_sl_mode = PM_PRICE_ABSOLUTE;
       m_tp_mode = PM_PRICE_ABSOLUTE;
       m_passed_behavior = PM_PASSED_CLOSE_DO_NOTHING;
+      m_auto_minutes = 10;
       m_auto_enabled = false;
       m_equity_guard_enabled = false;
       m_equity_guard_mode = PM_EQUITY_THRESHOLD_AMOUNT;
@@ -92,11 +106,20 @@ public:
       m_auto_close_at = 0;
       m_page = 0;
       m_rendered_rows = 0;
+      m_visible_rows = 0;
       m_row_render_error_reported = false;
+      m_controls_dirty = true;
+      m_visibility_dirty = true;
+      m_status_layout_dirty = true;
+      m_schedule_dirty = true;
+      m_positions_dirty = true;
+      m_force_redraw = true;
       m_origin_x = 0;
       m_origin_y = 0;
       m_panel_width = PM_DEFAULT_PANEL_WIDTH;
       m_panel_height = 0;
+      m_chart_width = 0;
+      m_chart_height = 0;
       m_expanded_height = 0;
       m_user_panel_height = 0;
       m_dragging = false;
@@ -114,11 +137,23 @@ public:
 
    bool Create(const int max_rows)
      {
+      ArrayResize(m_object_names, 0, 128);
+      ArrayResize(m_object_x, 0, 128);
+      ArrayResize(m_object_y, 0, 128);
+      m_rendered_rows = 0;
+      m_visible_rows = 0;
+      m_controls_dirty = true;
+      m_visibility_dirty = true;
+      m_status_layout_dirty = true;
+      m_schedule_dirty = true;
+      m_positions_dirty = true;
+      m_force_redraw = true;
       m_max_rows = MathMax(PM_MIN_POSITION_ROWS, MathMin(max_rows, PM_MAX_POSITION_ROWS));
       m_panel_width = PM_DEFAULT_PANEL_WIDTH;
       m_user_panel_height = 0;
       m_origin_x = 0;
       m_origin_y = 0;
+      RefreshChartSize();
       LoadPanelPosition();
       m_panel_height = ExpandedPanelHeight();
       m_expanded_height = m_panel_height;
@@ -265,13 +300,19 @@ public:
       EndInteraction();
       ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, 0, m_chart_mouse_move_before_create);
       ObjectsDeleteAll(0, PM_OBJECT_PREFIX);
+      ArrayResize(m_object_names, 0);
+      ArrayResize(m_object_x, 0);
+      ArrayResize(m_object_y, 0);
+      m_rendered_rows = 0;
+      m_visible_rows = 0;
       m_created = false;
      }
 
-   void Refresh(CPositionService &positions)
+   void Refresh(const PMPosition &position_snapshot[],
+                CPositionService &positions)
      {
-      positions.Collect(m_positions);
-      positions.CollectSymbols(m_symbols);
+      ArrayCopy(m_positions, position_snapshot);
+      positions.CollectSymbols(position_snapshot, m_symbols);
       if(m_filter_symbol == "")
          m_filter_symbol = _Symbol;
       if(m_auto_symbol == "")
@@ -285,60 +326,76 @@ public:
       for(int i = ArraySize(m_selected) - 1; i >= 0; i--)
          if(!ContainsPosition(m_selected[i]))
             ArrayRemove(m_selected, i, 1);
+      m_positions_dirty = true;
      }
 
    void Render()
      {
-      ObjectSetString(0, Name("FILTER_SYMBOL"), OBJPROP_TEXT, FilterSymbol());
-      ObjectSetString(0, Name("FILTER_DIRECTION"), OBJPROP_TEXT, PMDirectionToString(m_filter_direction));
-      ObjectSetString(0, Name("SL_MODE"), OBJPROP_TEXT, PriceModeToString(m_sl_mode));
-      ObjectSetString(0, Name("TP_MODE"), OBJPROP_TEXT, PriceModeToString(m_tp_mode));
-      UpdateToggleButtonVisual("AUTO_ENABLED", m_auto_enabled);
-      ObjectSetString(0, Name("AUTO_SYMBOL"), OBJPROP_TEXT, AutoSymbol());
-      ObjectSetString(0, Name("AUTO_DIRECTION"), OBJPROP_TEXT, PMDirectionToString(m_auto_direction));
-      ObjectSetString(0, Name("PASSED_BEHAVIOR"), OBJPROP_TEXT,
-                      m_passed_behavior == PM_PASSED_CLOSE_IMMEDIATELY ? "Passed: Close Now" : "Passed: Do Nothing");
-      ObjectSetString(0, Name("EQ_MODE"), OBJPROP_TEXT, EquityThresholdModeToString(m_equity_guard_mode));
-      UpdateEquityGuardVisuals();
-      ObjectSetString(0, Name("TS_SYMBOL"), OBJPROP_TEXT, TrailingSymbol());
-      ObjectSetString(0, Name("TS_DIRECTION"), OBJPROP_TEXT, PMDirectionToString(m_trailing_direction));
-      UpdateToggleButtonVisual("BE_ENABLED", m_break_even_enabled);
-      UpdateToggleButtonVisual("TRAIL_ENABLED", m_trailing_enabled);
-      ObjectSetString(0, Name("SESSION_LABEL"), OBJPROP_TEXT,
-                      "Session close: " + PMFormatDateTime(m_session_close) +
-                      " | Auto close: " + PMFormatDateTime(m_auto_close_at));
-      MqlTick tick = {};
-      SymbolInfoTick(_Symbol, tick);
-      ObjectSetString(0, Name("ENTRY_PRICE"), OBJPROP_TEXT,
-                      _Symbol + "  Bid " + PMFormatPrice(_Symbol, tick.bid) +
-                      " / Ask " + PMFormatPrice(_Symbol, tick.ask));
-      UpdateEntryPreview(tick);
-      ObjectSetString(0, Name("PAGE_LABEL"), OBJPROP_TEXT,
-                      StringFormat("Page %d/%d", m_page + 1, PageCount()));
-      ObjectSetString(0, Name("SELECTED_LABEL"), OBJPROP_TEXT,
-                      StringFormat("Selected %d", ArraySize(m_selected)));
-      ObjectSetString(0, Name("TOTAL_LABEL"), OBJPROP_TEXT,
-                      StringFormat("Total %d", ArraySize(m_positions)));
-      if(!m_collapsed && m_active_tab == PM_PANEL_TAB_POSITIONS)
-         RenderPositionRows();
-      else
-         ClearPositionRows();
-      ApplyTabVisibility();
-      UpdateStatusLayout();
-      MovePanelTo(m_origin_x, m_origin_y);
-      ChartRedraw();
+      bool redraw = m_force_redraw;
+      if(m_controls_dirty)
+        {
+         RenderControlStates();
+         m_controls_dirty = false;
+         redraw = true;
+        }
+      if(m_schedule_dirty)
+        {
+         ObjectSetString(0, Name("SESSION_LABEL"), OBJPROP_TEXT,
+                         "Session close: " + PMFormatDateTime(m_session_close) +
+                         " | Auto close: " + PMFormatDateTime(m_auto_close_at));
+         m_schedule_dirty = false;
+         redraw = true;
+        }
+      if(!m_collapsed && m_active_tab == PM_PANEL_TAB_ENTRY)
+        {
+         RenderEntryState();
+         redraw = true;
+        }
+      if(!m_collapsed && m_active_tab == PM_PANEL_TAB_POSITIONS &&
+         m_positions_dirty)
+        {
+         RenderPositionSummary();
+         m_positions_dirty = !RenderPositionRows();
+         redraw = true;
+        }
+      if(m_visibility_dirty)
+        {
+         ApplyTabVisibility();
+         m_visibility_dirty = false;
+         redraw = true;
+        }
+      if(m_status_layout_dirty)
+        {
+         UpdateStatusLayout();
+         MovePanelTo(m_origin_x, m_origin_y);
+         m_status_layout_dirty = false;
+         redraw = true;
+        }
+      if(redraw)
+         ChartRedraw();
+      m_force_redraw = false;
+     }
+
+   void RequestRedraw()
+     {
+      m_force_redraw = true;
      }
 
    void SetStatus(const string status)
      {
-      if(status != "")
-         m_status = status;
+      if(status == "" || status == m_status)
+         return;
+      m_status = status;
+      m_status_layout_dirty = true;
      }
 
    void SetAutoSchedule(const datetime session_close, const datetime auto_close_at)
      {
+      if(m_session_close == session_close && m_auto_close_at == auto_close_at)
+         return;
       m_session_close = session_close;
       m_auto_close_at = auto_close_at;
+      m_schedule_dirty = true;
      }
 
    void GetAutoCloseConfig(AutoCloseConfig &config)
@@ -392,6 +449,15 @@ public:
          EndInteraction();
          return true;
         }
+      if(id == CHARTEVENT_CHART_CHANGE)
+        {
+         RefreshChartSize();
+         ApplyPanelFrameLayout();
+         m_positions_dirty = true;
+         m_status_layout_dirty = true;
+         Render();
+         return true;
+        }
       if(id != CHARTEVENT_OBJECT_CLICK && id != CHARTEVENT_OBJECT_ENDEDIT)
          return false;
       if(id == CHARTEVENT_OBJECT_ENDEDIT)
@@ -407,6 +473,8 @@ public:
             m_panel_height = PM_TITLEBAR_HEIGHT;
          else
             m_panel_height = m_expanded_height;
+         m_visibility_dirty = true;
+         m_status_layout_dirty = true;
         }
       else if(HandleTabClick(object_name))
          m_collapsed = false;
@@ -496,11 +564,56 @@ public:
          m_trailing_enabled = !m_trailing_enabled;
       else
          ToggleRowSelection(object_name);
+      m_controls_dirty = true;
+      m_positions_dirty = true;
       Render();
       return true;
      }
 
 private:
+   void RenderControlStates()
+     {
+      ObjectSetString(0, Name("FILTER_SYMBOL"), OBJPROP_TEXT, FilterSymbol());
+      ObjectSetString(0, Name("FILTER_DIRECTION"), OBJPROP_TEXT,
+                      PMDirectionToString(m_filter_direction));
+      ObjectSetString(0, Name("SL_MODE"), OBJPROP_TEXT,
+                      PriceModeToString(m_sl_mode));
+      ObjectSetString(0, Name("TP_MODE"), OBJPROP_TEXT,
+                      PriceModeToString(m_tp_mode));
+      UpdateToggleButtonVisual("AUTO_ENABLED", m_auto_enabled);
+      ObjectSetString(0, Name("AUTO_SYMBOL"), OBJPROP_TEXT, AutoSymbol());
+      ObjectSetString(0, Name("AUTO_DIRECTION"), OBJPROP_TEXT,
+                      PMDirectionToString(m_auto_direction));
+      ObjectSetString(0, Name("PASSED_BEHAVIOR"), OBJPROP_TEXT,
+                      m_passed_behavior == PM_PASSED_CLOSE_IMMEDIATELY ?
+                      "Passed: Close Now" : "Passed: Do Nothing");
+      ObjectSetString(0, Name("EQ_MODE"), OBJPROP_TEXT,
+                      EquityThresholdModeToString(m_equity_guard_mode));
+      UpdateEquityGuardVisuals();
+      ObjectSetString(0, Name("TS_SYMBOL"), OBJPROP_TEXT, TrailingSymbol());
+      ObjectSetString(0, Name("TS_DIRECTION"), OBJPROP_TEXT,
+                      PMDirectionToString(m_trailing_direction));
+      UpdateToggleButtonVisual("BE_ENABLED", m_break_even_enabled);
+      UpdateToggleButtonVisual("TRAIL_ENABLED", m_trailing_enabled);
+     }
+   void RenderEntryState()
+     {
+      MqlTick tick = {};
+      SymbolInfoTick(_Symbol, tick);
+      ObjectSetString(0, Name("ENTRY_PRICE"), OBJPROP_TEXT,
+                      _Symbol + "  Bid " + PMFormatPrice(_Symbol, tick.bid) +
+                      " / Ask " + PMFormatPrice(_Symbol, tick.ask));
+      UpdateEntryPreview(tick);
+     }
+   void RenderPositionSummary()
+     {
+      ObjectSetString(0, Name("PAGE_LABEL"), OBJPROP_TEXT,
+                      StringFormat("Page %d/%d", m_page + 1, PageCount()));
+      ObjectSetString(0, Name("SELECTED_LABEL"), OBJPROP_TEXT,
+                      StringFormat("Selected %d", ArraySize(m_selected)));
+      ObjectSetString(0, Name("TOTAL_LABEL"), OBJPROP_TEXT,
+                      StringFormat("Total %d", ArraySize(m_positions)));
+     }
    string Name(const string suffix) { return PM_OBJECT_PREFIX + suffix; }
    string PanelPositionKey(const string axis)
      {
@@ -528,10 +641,7 @@ private:
    int ContentTop() { return PM_TITLEBAR_HEIGHT + PM_TAB_BAR_HEIGHT + PM_PANEL_CONTENT_GAP; }
    int AutoCloseMinutes()
      {
-      long minutes = StringToInteger(ObjectGetString(0, Name("AUTO_MINUTES"), OBJPROP_TEXT));
-      if(minutes < 0) minutes = 0;
-      if(minutes > PM_MAX_AUTO_CLOSE_MINUTES) minutes = PM_MAX_AUTO_CLOSE_MINUTES;
-      return (int)minutes;
+      return m_auto_minutes;
      }
    int PageCount()
      {
@@ -590,13 +700,9 @@ private:
      }
    void SelectAll()
      {
-      ArrayResize(m_selected, 0);
+      ArrayResize(m_selected, ArraySize(m_positions));
       for(int i = 0; i < ArraySize(m_positions); i++)
-        {
-         const int count = ArraySize(m_selected);
-         ArrayResize(m_selected, count + 1);
-         m_selected[count] = m_positions[i].ticket;
-        }
+         m_selected[i] = m_positions[i].ticket;
       SetStatus(StringFormat("%d positions selected.", ArraySize(m_selected)));
      }
    void ToggleRowSelection(const string object_name)
@@ -694,7 +800,7 @@ private:
      }
    bool HandleEditEnd(const string object_name)
      {
-      if(object_name == Name("AUTO_MINUTES")) { const int value = AutoCloseMinutes(); ObjectSetString(0, Name("AUTO_MINUTES"), OBJPROP_TEXT, IntegerToString(value)); SetStatus(StringFormat("Auto Close minutes set to %d.", value)); }
+      if(object_name == Name("AUTO_MINUTES")) { CommitIntegerValue("AUTO_MINUTES", m_auto_minutes, PM_MAX_AUTO_CLOSE_MINUTES); SetStatus(StringFormat("Auto Close minutes set to %d.", m_auto_minutes)); }
       else if(object_name == Name("EQ_LOSS_VALUE")) { CommitDoubleValue("EQ_LOSS_VALUE", m_equity_guard_loss_threshold, PM_MAX_EQUITY_THRESHOLD, 2); UpdateEquityGuardVisuals(); SetStatus(StringFormat("Max Loss updated: %.2f (%s).", m_equity_guard_loss_threshold, m_equity_guard_enabled ? "Guard ON" : "Guard OFF")); }
       else if(object_name == Name("EQ_PROFIT_VALUE")) { CommitDoubleValue("EQ_PROFIT_VALUE", m_equity_guard_profit_threshold, PM_MAX_EQUITY_THRESHOLD, 2); UpdateEquityGuardVisuals(); SetStatus(StringFormat("Max Profit updated: %.2f (%s).", m_equity_guard_profit_threshold, m_equity_guard_enabled ? "Guard ON" : "Guard OFF")); }
       else if(object_name == Name("BE_TRIGGER_VALUE")) { CommitIntegerValue("BE_TRIGGER_VALUE", m_be_trigger_pips, PM_MAX_TRAILING_POINTS); SetStatus(StringFormat("Break Even Trigger updated: %d pips.", m_be_trigger_pips)); }
@@ -729,6 +835,8 @@ private:
       else if(object_name == Name("SL_VALUE")) { SetStatus("SL value updated."); }
       else if(object_name == Name("TP_VALUE")) { SetStatus("TP value updated."); }
       else return false;
+      m_controls_dirty = true;
+      m_positions_dirty = true;
       Render();
       return true;
      }
@@ -766,6 +874,9 @@ private:
       m_expanded_height = PMResolvePanelHeight(ExpandedPanelHeight(),
                                                m_user_panel_height);
       m_panel_height = m_expanded_height;
+      m_visibility_dirty = true;
+      m_status_layout_dirty = true;
+      m_positions_dirty = true;
       return true;
      }
    void ShiftEntryVolume(const double direction)
@@ -988,53 +1099,126 @@ private:
                              PMFormatPrice(_Symbol, result.price), result.deal,
                              result.order, result.retcode));
      }
-   void RenderPositionRows()
+   bool RenderPositionRows()
      {
       const int start = m_page * m_max_rows;
       const int visible_rows = VisiblePositionRows();
-      const int previous_rows = m_rendered_rows;
+      const int previous_visible_rows = m_visible_rows;
       bool rows_created = true;
+      int row_creation_error = 0;
       for(int row = 0; row < visible_rows; row++)
         {
          PMPosition position = m_positions[start + row];
-         const string selected = IsSelected(position.ticket) ? "[x] " : "[ ] ";
          const int row_y = ContentTop() + PM_PANEL_POSITIONS_HEADER_HEIGHT + row * PM_PANEL_POSITION_ROW_HEIGHT;
          const bool is_selected = IsSelected(position.ticket);
+         const string selected = is_selected ? "[x] " : "[ ] ";
          const string row_text = selected + position.symbol + "  Lot=" + DoubleToString(position.volume, 2) +
                                  "  Entry=" + PMFormatPrice(position.symbol, position.open_price) +
                                  "  SL=" + PMFormatPrice(position.symbol, position.sl) +
                                  "  TP=" + PMFormatPrice(position.symbol, position.tp) +
                                  "  P=" + DoubleToString(position.profit, 2) +
                                  "  #" + StringFormat("%I64u", position.ticket);
-         ObjectDelete(0, RowName(row));
-         ObjectDelete(0, RowDetailName(row));
-         ObjectDelete(0, RowDirectionName(row));
-         rows_created = CreateButton("ROW_" + IntegerToString(row), "", 12, row_y, m_panel_width - 24, 22, is_selected ? clrDarkGreen : clrDarkSlateGray) && rows_created;
-         rows_created = CreateLabel("ROW_DETAIL_" + IntegerToString(row), row_text, 75, row_y + 4, clrWhite, 8) && rows_created;
-         rows_created = CreateLabel("ROW_DIRECTION_" + IntegerToString(row),
-                                   PMPositionTypeToString(position.type), 40, row_y + 4,
-                                   position.type == POSITION_TYPE_BUY ? clrLimeGreen : clrTomato, 8) && rows_created;
+         if(row >= m_rendered_rows)
+           {
+            if(!CreatePositionRow(row, row_y, row_text, position.type,
+                                  is_selected, row_creation_error))
+              {
+               rows_created = false;
+               break;
+              }
+            m_rendered_rows++;
+           }
+         else
+           {
+            if(!UpdatePositionRow(row, row_text, position.type,
+                                  is_selected) &&
+               !CreatePositionRow(row, row_y, row_text, position.type,
+                                  is_selected, row_creation_error))
+              {
+               rows_created = false;
+               break;
+              }
+           }
         }
-      for(int row = visible_rows; row < previous_rows; row++)
+      m_visible_rows = MathMin(visible_rows, m_rendered_rows);
+      if(previous_visible_rows != m_visible_rows)
         {
-         ObjectDelete(0, RowName(row));
-         ObjectDelete(0, RowDetailName(row));
-         ObjectDelete(0, RowDirectionName(row));
+         m_visibility_dirty = true;
+         m_status_layout_dirty = true;
         }
-      m_rendered_rows = visible_rows;
       if(!rows_created && !m_row_render_error_reported)
-         PrintFormat("[ERROR] UI position row creation failed. last_error=%d", GetLastError());
+         PrintFormat("[ERROR] UI position row creation failed. last_error=%d",
+                     row_creation_error);
       m_row_render_error_reported = !rows_created;
+      return rows_created;
      }
-   void ClearPositionRows()
+   bool UpdatePositionRow(const int row,
+                          const string row_text,
+                          const ENUM_POSITION_TYPE type,
+                          const bool selected)
      {
-      for(int row = 0; row < m_rendered_rows; row++)
+      bool updated = true;
+      if(!ObjectSetInteger(0, RowName(row), OBJPROP_XSIZE,
+                           m_panel_width - 24))
+         updated = false;
+      if(!ObjectSetInteger(0, RowName(row), OBJPROP_BGCOLOR,
+                           selected ? clrDarkGreen : clrDarkSlateGray))
+         updated = false;
+      if(!ObjectSetString(0, RowDetailName(row), OBJPROP_TEXT, row_text))
+         updated = false;
+      if(!ObjectSetString(0, RowDirectionName(row), OBJPROP_TEXT,
+                          PMPositionTypeToString(type)))
+         updated = false;
+      if(!ObjectSetInteger(0, RowDirectionName(row), OBJPROP_COLOR,
+                           type == POSITION_TYPE_BUY ?
+                           clrLimeGreen : clrTomato))
+         updated = false;
+      return updated;
+     }
+   bool CreatePositionRow(const int row,
+                          const int row_y,
+                          const string row_text,
+                          const ENUM_POSITION_TYPE type,
+                          const bool selected,
+                          int &error_code)
+     {
+      error_code = 0;
+      const string row_suffix = "ROW_" + IntegerToString(row);
+      const string detail_suffix = "ROW_DETAIL_" + IntegerToString(row);
+      const string direction_suffix = "ROW_DIRECTION_" + IntegerToString(row);
+      ResetLastError();
+      if(!DeleteRegisteredObject(Name(row_suffix)) ||
+         !DeleteRegisteredObject(Name(detail_suffix)) ||
+         !DeleteRegisteredObject(Name(direction_suffix)))
         {
-         ObjectDelete(0, RowName(row));
-         ObjectDelete(0, RowDetailName(row));
-         ObjectDelete(0, RowDirectionName(row));
+         error_code = GetLastError();
+         return false;
         }
-      m_rendered_rows = 0;
+      ResetLastError();
+      if(!CreateButton(row_suffix, "", 12, row_y, m_panel_width - 24, 22,
+                       selected ? clrDarkGreen : clrDarkSlateGray))
+        {
+         error_code = GetLastError();
+         return false;
+        }
+      ResetLastError();
+      if(!CreateLabel(detail_suffix, row_text, 75, row_y + 4, clrWhite, 8))
+        {
+         error_code = GetLastError();
+         DeleteRegisteredObject(Name(row_suffix));
+         return false;
+        }
+      ResetLastError();
+      if(!CreateLabel(direction_suffix, PMPositionTypeToString(type),
+                      40, row_y + 4,
+                      type == POSITION_TYPE_BUY ? clrLimeGreen : clrTomato, 8))
+        {
+         error_code = GetLastError();
+         DeleteRegisteredObject(Name(row_suffix));
+         DeleteRegisteredObject(Name(detail_suffix));
+         return false;
+        }
+      return true;
      }
    void ApplyTabVisibility()
      {
@@ -1132,17 +1316,19 @@ private:
       SetVisible("SESSION_LABEL", expanded);
       for(int row = 0; row < m_rendered_rows; row++)
         {
-         SetVisible("ROW_" + IntegerToString(row), positions);
-         SetVisible("ROW_DETAIL_" + IntegerToString(row), positions);
-         SetVisible("ROW_DIRECTION_" + IntegerToString(row), positions);
+         const bool row_visible = positions && row < m_visible_rows;
+         SetVisible("ROW_" + IntegerToString(row), row_visible);
+         SetVisible("ROW_DETAIL_" + IntegerToString(row), row_visible);
+         SetVisible("ROW_DIRECTION_" + IntegerToString(row), row_visible);
         }
       for(int line = 0; line < PM_MAX_STATUS_LINES; line++)
          SetVisible("STATUS_LINE_" + IntegerToString(line), expanded);
       SetVisible("RESIZE_GRIP", expanded);
       ObjectSetString(0, Name("COLLAPSE"), OBJPROP_TEXT, m_collapsed ? "+" : "-");
       ObjectSetInteger(0, Name("BACKGROUND"), OBJPROP_YSIZE, PanelHeight());
-      ObjectSetInteger(0, Name("RESIZE_GRIP"), OBJPROP_XDISTANCE, m_origin_x + m_panel_width - 24);
-      ObjectSetInteger(0, Name("RESIZE_GRIP"), OBJPROP_YDISTANCE, m_origin_y + PanelHeight() - 18);
+      SetObjectPosition(Name("RESIZE_GRIP"),
+                        m_origin_x + m_panel_width - 24,
+                        m_origin_y + PanelHeight() - 18);
      }
    void UpdateTabColors()
      {
@@ -1227,18 +1413,20 @@ private:
                                             m_user_panel_height);
       m_expanded_height = m_panel_height;
       const int base_y = content_bottom + m_panel_height - required_height;
-      ObjectSetInteger(0, Name("SESSION_LABEL"), OBJPROP_YDISTANCE, m_origin_y + base_y);
+      SetObjectY(Name("SESSION_LABEL"), m_origin_y + base_y);
       const color status_color = StatusTextColor();
       for(int line = 0; line < PM_MAX_STATUS_LINES; line++)
         {
          const bool visible = line < ArraySize(lines);
          ObjectSetString(0, Name("STATUS_LINE_" + IntegerToString(line)), OBJPROP_TEXT, visible ? lines[line] : "");
          ObjectSetInteger(0, Name("STATUS_LINE_" + IntegerToString(line)), OBJPROP_COLOR, status_color);
-         ObjectSetInteger(0, Name("STATUS_LINE_" + IntegerToString(line)), OBJPROP_YDISTANCE, m_origin_y + base_y + PM_PANEL_STATUS_LINE_HEIGHT + line * PM_PANEL_STATUS_LINE_HEIGHT);
+         SetObjectY(Name("STATUS_LINE_" + IntegerToString(line)),
+                    m_origin_y + base_y + PM_PANEL_STATUS_LINE_HEIGHT +
+                    line * PM_PANEL_STATUS_LINE_HEIGHT);
          SetVisible("STATUS_LINE_" + IntegerToString(line), visible);
         }
       ObjectSetInteger(0, Name("BACKGROUND"), OBJPROP_YSIZE, PanelHeight());
-      ObjectSetInteger(0, Name("RESIZE_GRIP"), OBJPROP_YDISTANCE, m_origin_y + PanelHeight() - 18);
+      SetObjectY(Name("RESIZE_GRIP"), m_origin_y + PanelHeight() - 18);
      }
    int StatusTextWidth(const string text)
      {
@@ -1308,11 +1496,77 @@ private:
       ObjectSetInteger(0, Name(suffix), OBJPROP_TIMEFRAMES,
                        visible ? OBJ_ALL_PERIODS : OBJ_NO_PERIODS);
      }
+   int FindRegisteredObject(const string object_name)
+     {
+      for(int index = 0; index < ArraySize(m_object_names); index++)
+         if(m_object_names[index] == object_name)
+            return index;
+      return -1;
+     }
+   void RegisterObject(const string object_name, const int x, const int y)
+     {
+      int index = FindRegisteredObject(object_name);
+      if(index < 0)
+        {
+         index = ArraySize(m_object_names);
+         ArrayResize(m_object_names, index + 1, 128);
+         ArrayResize(m_object_x, index + 1, 128);
+         ArrayResize(m_object_y, index + 1, 128);
+         m_object_names[index] = object_name;
+        }
+      m_object_x[index] = x;
+      m_object_y[index] = y;
+     }
+   bool DeleteRegisteredObject(const string object_name)
+     {
+      const int index = FindRegisteredObject(object_name);
+      if(index < 0)
+         return true;
+      if(!ObjectDelete(0, object_name) && ObjectFind(0, object_name) >= 0)
+         return false;
+      ArrayRemove(m_object_names, index, 1);
+      ArrayRemove(m_object_x, index, 1);
+      ArrayRemove(m_object_y, index, 1);
+      return true;
+     }
+   void SetObjectPosition(const string object_name, const int x, const int y)
+     {
+      const int index = FindRegisteredObject(object_name);
+      if(index >= 0)
+        {
+         if(m_object_x[index] != x)
+            ObjectSetInteger(0, object_name, OBJPROP_XDISTANCE, x);
+         if(m_object_y[index] != y)
+            ObjectSetInteger(0, object_name, OBJPROP_YDISTANCE, y);
+         m_object_x[index] = x;
+         m_object_y[index] = y;
+         return;
+        }
+      ObjectSetInteger(0, object_name, OBJPROP_XDISTANCE, x);
+      ObjectSetInteger(0, object_name, OBJPROP_YDISTANCE, y);
+     }
+   void SetObjectX(const string object_name, const int x)
+     {
+      const int index = FindRegisteredObject(object_name);
+      if(index >= 0 && m_object_x[index] == x)
+         return;
+      ObjectSetInteger(0, object_name, OBJPROP_XDISTANCE, x);
+      if(index >= 0)
+         m_object_x[index] = x;
+     }
+   void SetObjectY(const string object_name, const int y)
+     {
+      const int index = FindRegisteredObject(object_name);
+      if(index >= 0 && m_object_y[index] == y)
+         return;
+      ObjectSetInteger(0, object_name, OBJPROP_YDISTANCE, y);
+      if(index >= 0)
+         m_object_y[index] = y;
+     }
    void AlignLabelToInput(const string suffix, const int right_x, const int y)
      {
       ObjectSetInteger(0, Name(suffix), OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
-      ObjectSetInteger(0, Name(suffix), OBJPROP_XDISTANCE, m_origin_x + right_x);
-      ObjectSetInteger(0, Name(suffix), OBJPROP_YDISTANCE, m_origin_y + y);
+      SetObjectPosition(Name(suffix), m_origin_x + right_x, m_origin_y + y);
      }
    bool CreateBackground(const int height)
      {
@@ -1330,6 +1584,7 @@ private:
       ObjectSetInteger(0, object_name, OBJPROP_SELECTABLE, false);
       ObjectSetInteger(0, object_name, OBJPROP_HIDDEN, true);
       ObjectSetInteger(0, object_name, OBJPROP_ZORDER, 0);
+      RegisterObject(object_name, m_origin_x, m_origin_y);
       return true;
      }
    void PrepareObject(const string object_name, const int x, const int y)
@@ -1340,6 +1595,7 @@ private:
       ObjectSetInteger(0, object_name, OBJPROP_SELECTABLE, false);
       ObjectSetInteger(0, object_name, OBJPROP_HIDDEN, true);
       ObjectSetInteger(0, object_name, OBJPROP_ZORDER, 1);
+      RegisterObject(object_name, m_origin_x + x, m_origin_y + y);
      }
    bool CreateLabel(const string suffix, const string text, const int x, const int y, const color text_color, const int font_size)
      {
@@ -1405,6 +1661,7 @@ private:
      }
    void BeginInteraction(const bool resize, const int x, const int y)
      {
+      RefreshChartSize();
       m_dragging = !resize;
       m_resizing = resize;
       m_interaction_start_x = x;
@@ -1453,12 +1710,10 @@ private:
      }
    void MovePanelTo(const int requested_x, const int requested_y)
      {
-      long chart_width = 0;
-      long chart_height = 0;
-      ChartGetInteger(0, CHART_WIDTH_IN_PIXELS, 0, chart_width);
-      ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0, chart_height);
-      int max_x = (int)chart_width - m_panel_width;
-      int max_y = (int)chart_height - PanelHeight();
+      if(m_chart_width <= 0 || m_chart_height <= 0)
+         RefreshChartSize();
+      int max_x = (int)m_chart_width - m_panel_width;
+      int max_y = (int)m_chart_height - PanelHeight();
       if(max_x < 0)
          max_x = 0;
       if(max_y < 0)
@@ -1474,52 +1729,60 @@ private:
    void ResizePanelTo(const int requested_width,
                       const int requested_height)
      {
-      long chart_width = 0;
-      long chart_height = 0;
-      ChartGetInteger(0, CHART_WIDTH_IN_PIXELS, 0, chart_width);
-      ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0, chart_height);
+      if(m_chart_width <= 0 || m_chart_height <= 0)
+         RefreshChartSize();
       const int available_width = MathMax(PM_MIN_PANEL_WIDTH,
-                                          (int)chart_width - m_origin_x);
+                                          (int)m_chart_width - m_origin_x);
       const int maximum = MathMin(PM_MAX_PANEL_WIDTH, available_width);
       m_panel_width = MathMax(PM_MIN_PANEL_WIDTH,
                               MathMin(requested_width, maximum));
       const int available_height = MathMax(PM_TITLEBAR_HEIGHT,
-                                           (int)chart_height - m_origin_y);
+                                           (int)m_chart_height - m_origin_y);
       m_user_panel_height = MathMax(PM_TITLEBAR_HEIGHT,
                                     MathMin(requested_height,
                                             available_height));
       ApplyPanelFrameLayout();
+      m_positions_dirty = true;
+      m_status_layout_dirty = true;
+      m_force_redraw = true;
       Render();
+     }
+   void RefreshChartSize()
+     {
+      long chart_width = 0;
+      long chart_height = 0;
+      if(ChartGetInteger(0, CHART_WIDTH_IN_PIXELS, 0, chart_width) &&
+         chart_width > 0)
+         m_chart_width = chart_width;
+      if(ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0, chart_height) &&
+         chart_height > 0)
+         m_chart_height = chart_height;
      }
    void ShiftPanelObjects(const int delta_x, const int delta_y, const string exclude_name)
      {
       if(delta_x == 0 && delta_y == 0)
          return;
-      const int total = ObjectsTotal(0, -1, -1);
-      for(int index = total - 1; index >= 0; index--)
+      for(int index = 0; index < ArraySize(m_object_names); index++)
         {
-         const string object_name = ObjectName(0, index, -1, -1);
-         if(StringFind(object_name, PM_OBJECT_PREFIX) != 0 ||
-            object_name == exclude_name)
+         const string object_name = m_object_names[index];
+         if(object_name == exclude_name)
             continue;
-         const int x = (int)ObjectGetInteger(0, object_name,
-                                             OBJPROP_XDISTANCE);
-         const int y = (int)ObjectGetInteger(0, object_name,
-                                             OBJPROP_YDISTANCE);
-         ObjectSetInteger(0, object_name, OBJPROP_XDISTANCE, x + delta_x);
-         ObjectSetInteger(0, object_name, OBJPROP_YDISTANCE, y + delta_y);
+         m_object_x[index] += delta_x;
+         m_object_y[index] += delta_y;
+         ObjectSetInteger(0, object_name, OBJPROP_XDISTANCE,
+                          m_object_x[index]);
+         ObjectSetInteger(0, object_name, OBJPROP_YDISTANCE,
+                          m_object_y[index]);
         }
      }
    void ApplyPanelFrameLayout()
      {
       ObjectSetInteger(0, Name("BACKGROUND"), OBJPROP_XSIZE, m_panel_width);
       ObjectSetInteger(0, Name("BACKGROUND"), OBJPROP_YSIZE, PanelHeight());
-      ObjectSetInteger(0, Name("COLLAPSE"), OBJPROP_XDISTANCE,
-                       m_origin_x + m_panel_width - 30);
-      ObjectSetInteger(0, Name("RESIZE_GRIP"), OBJPROP_XDISTANCE,
-                       m_origin_x + m_panel_width - 24);
-      ObjectSetInteger(0, Name("RESIZE_GRIP"), OBJPROP_YDISTANCE,
-                       m_origin_y + PanelHeight() - 18);
+      SetObjectX(Name("COLLAPSE"), m_origin_x + m_panel_width - 30);
+      SetObjectPosition(Name("RESIZE_GRIP"),
+                        m_origin_x + m_panel_width - 24,
+                        m_origin_y + PanelHeight() - 18);
       ApplyStopsLayout();
      }
    int StopsClearX()
@@ -1528,8 +1791,7 @@ private:
      }
    void SetStopsObjectPosition(const string suffix, const int x, const int y)
      {
-      ObjectSetInteger(0, Name(suffix), OBJPROP_XDISTANCE, m_origin_x + x);
-      ObjectSetInteger(0, Name(suffix), OBJPROP_YDISTANCE, m_origin_y + y);
+      SetObjectPosition(Name(suffix), m_origin_x + x, m_origin_y + y);
      }
    void ApplyStopsLayout()
      {

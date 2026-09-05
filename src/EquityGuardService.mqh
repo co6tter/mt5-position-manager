@@ -3,7 +3,6 @@
 
 #include "Models.mqh"
 #include "Constants.mqh"
-#include "PositionService.mqh"
 #include "TradeManager.mqh"
 
 bool PMEvaluateEquityGuard(const double total_profit,
@@ -76,7 +75,7 @@ public:
      }
 
    bool Evaluate(const EquityGuardConfig &config,
-                 CPositionService &positions,
+                 const PMPosition &all_positions[],
                  CTradeManager &trades,
                  string &status)
      {
@@ -90,8 +89,6 @@ public:
       if(!config.enabled)
          return false;
 
-      PMPosition all_positions[];
-      positions.Collect(all_positions);
       double total_profit = 0.0;
       for(int i = 0; i < ArraySize(all_positions); i++)
          total_profit += all_positions[i].profit;

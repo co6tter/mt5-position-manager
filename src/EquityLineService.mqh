@@ -3,7 +3,6 @@
 
 #include "Models.mqh"
 #include "Constants.mqh"
-#include "PositionService.mqh"
 
 #define PM_EQUITY_LINE_OBJECT_NAME "MT5PMEquityBreakEvenLine"
 
@@ -43,25 +42,36 @@ class CEquityLineService
   {
 private:
    bool m_error_reported;
+   bool m_created;
+   bool m_visibility_known;
+   bool m_visible;
+   bool m_price_known;
+   double m_price;
 
 public:
    CEquityLineService()
      {
       m_error_reported = false;
+      m_created = false;
+      m_visibility_known = false;
+      m_visible = false;
+      m_price_known = false;
+      m_price = 0.0;
      }
 
-   bool Render(const string symbol, CPositionService &position_service)
+   // Returns true only when a chart redraw is needed.
+   bool Render(const string symbol, const PMPosition &positions[])
      {
-      PMPosition positions[];
-      position_service.Collect(positions);
       double price = 0.0;
       if(!PMCalculateEquityLinePrice(positions, symbol, price))
         {
          if(!EnsureCreated(PlaceholderPrice(symbol)))
             return false;
-         SetLineVisibility(false);
+         bool changed = false;
+         if(!SetLineVisibility(false, changed))
+            return false;
          m_error_reported = false;
-         return false;
+         return changed;
         }
 
       const double tick_size = SymbolInfoDouble(symbol,
@@ -70,13 +80,65 @@ public:
       price = PMNormalizePrice(price, tick_size, digits);
       if(price <= 0.0)
         {
-         SetLineVisibility(false);
-         return false;
+         if(!EnsureCreated(PlaceholderPrice(symbol)))
+            return false;
+         bool changed = false;
+         if(!SetLineVisibility(false, changed))
+            return false;
+         m_error_reported = false;
+         return changed;
         }
 
       if(!EnsureCreated(price))
          return false;
 
+      bool changed = false;
+      if(!SetLineVisibility(true, changed))
+         return false;
+      if(!m_price_known || price != m_price)
+        {
+         ResetLastError();
+         if(!ObjectSetDouble(0, PM_EQUITY_LINE_OBJECT_NAME,
+                             OBJPROP_PRICE, price))
+           {
+            const int error_code = GetLastError();
+            Delete();
+            ReportError("update", error_code);
+            return false;
+           }
+         m_price = price;
+         m_price_known = true;
+         changed = true;
+        }
+      m_error_reported = false;
+      return changed;
+     }
+
+   void Destroy()
+     {
+      Delete();
+     }
+
+private:
+   bool EnsureCreated(const double price)
+     {
+      if(m_created)
+         return true;
+      const bool exists = ObjectFind(0, PM_EQUITY_LINE_OBJECT_NAME) >= 0;
+      if(!exists)
+        {
+         ResetLastError();
+         if(!ObjectCreate(0, PM_EQUITY_LINE_OBJECT_NAME, OBJ_HLINE,
+                          0, 0, price))
+           {
+            ReportError("create", GetLastError());
+            return false;
+           }
+        }
+      m_created = true;
+      m_visibility_known = false;
+      m_price_known = !exists;
+      m_price = price;
       ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_COLOR,
                        PM_EQUITY_LINE_COLOR);
       ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_STYLE,
@@ -89,36 +151,8 @@ public:
       ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME,
                        OBJPROP_SELECTABLE, false);
       ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_HIDDEN, true);
-      SetLineVisibility(true);
       ObjectSetString(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_TEXT,
                       "Equity / Break-even");
-      ResetLastError();
-      if(!ObjectSetDouble(0, PM_EQUITY_LINE_OBJECT_NAME, OBJPROP_PRICE, price))
-        {
-         ReportError("update");
-         return false;
-        }
-      m_error_reported = false;
-      return true;
-     }
-
-   void Destroy()
-     {
-      Delete();
-     }
-
-private:
-   bool EnsureCreated(const double price)
-     {
-      if(ObjectFind(0, PM_EQUITY_LINE_OBJECT_NAME) >= 0)
-         return true;
-      ResetLastError();
-      if(!ObjectCreate(0, PM_EQUITY_LINE_OBJECT_NAME, OBJ_HLINE,
-                       0, 0, price))
-        {
-         ReportError("create");
-         return false;
-        }
       return true;
      }
    double PlaceholderPrice(const string symbol)
@@ -128,24 +162,40 @@ private:
          return bid;
       return 1.0;
      }
-   void SetLineVisibility(const bool visible)
+   bool SetLineVisibility(const bool visible, bool &changed)
      {
-      ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME,
-                       OBJPROP_TIMEFRAMES,
-                       visible ? OBJ_ALL_PERIODS : OBJ_NO_PERIODS);
+      changed = false;
+      if(m_visibility_known && visible == m_visible)
+         return true;
+      ResetLastError();
+      if(!ObjectSetInteger(0, PM_EQUITY_LINE_OBJECT_NAME,
+                           OBJPROP_TIMEFRAMES,
+                           visible ? OBJ_ALL_PERIODS : OBJ_NO_PERIODS))
+        {
+         const int error_code = GetLastError();
+         Delete();
+         ReportError("change visibility of", error_code);
+         return false;
+        }
+      m_visible = visible;
+      m_visibility_known = true;
+      changed = true;
+      return true;
      }
    void Delete()
      {
-      if(ObjectFind(0, PM_EQUITY_LINE_OBJECT_NAME) >= 0)
-         ObjectDelete(0, PM_EQUITY_LINE_OBJECT_NAME);
+      ObjectDelete(0, PM_EQUITY_LINE_OBJECT_NAME);
+      m_created = false;
+      m_visibility_known = false;
+      m_price_known = false;
      }
 
-   void ReportError(const string operation)
+   void ReportError(const string operation, const int error_code)
      {
       if(m_error_reported)
          return;
       PrintFormat("[ERROR] Unable to %s Equity / Break-even line. error=%d",
-                  operation, GetLastError());
+                  operation, error_code);
       m_error_reported = true;
      }
   };

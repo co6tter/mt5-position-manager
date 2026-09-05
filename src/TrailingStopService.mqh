@@ -62,13 +62,17 @@ bool PMBuildPositionBasket(const PMPosition &positions[],
   {
    open_price = 0.0;
    current_price = 0.0;
-   ArrayResize(tickets, 0);
    if(symbol == "")
+     {
+      ArrayResize(tickets, 0);
       return false;
+     }
+   ArrayResize(tickets, ArraySize(positions));
 
    double total_volume = 0.0;
    double open_price_volume = 0.0;
    double current_price_volume = 0.0;
+   int ticket_count = 0;
    for(int index = 0; index < ArraySize(positions); index++)
      {
       if(positions[index].symbol != symbol ||
@@ -85,12 +89,12 @@ bool PMBuildPositionBasket(const PMPosition &positions[],
       total_volume += positions[index].volume;
       open_price_volume += positions[index].open_price * positions[index].volume;
       current_price_volume += positions[index].current_price * positions[index].volume;
-      const int count = ArraySize(tickets);
-      ArrayResize(tickets, count + 1);
-      tickets[count] = positions[index].ticket;
+      tickets[ticket_count] = positions[index].ticket;
+      ticket_count++;
      }
 
-   if(total_volume <= 0.0 || ArraySize(tickets) == 0)
+   ArrayResize(tickets, ticket_count);
+   if(total_volume <= 0.0 || ticket_count == 0)
       return false;
    open_price = open_price_volume / total_volume;
    current_price = current_price_volume / total_volume;
@@ -138,6 +142,7 @@ class CTrailingStopService
   {
 public:
    bool Evaluate(const TrailingStopConfig &config,
+                 const PMPosition &all_positions[],
                  CPositionService &positions,
                  CTradeManager &trades,
                  CValidationService &validator,
@@ -147,8 +152,6 @@ public:
       if(!config.enabled_break_even && !config.enabled_trailing)
          return false;
 
-      PMPosition all_positions[];
-      positions.Collect(all_positions);
       if(ArraySize(all_positions) == 0)
          return false;
 
@@ -224,15 +227,15 @@ public:
                                  has_trailing, trailing_candidate, best))
             continue;
 
-         double targets[];
+         double target = 0.0;
          string reason = "";
-         bool accepted = CalculateBasketTargets(basket_tickets, best, positions,
-                                                validator, targets, reason);
+         bool accepted = CalculateBasketTarget(best, all_positions[i],
+                                               validator, target, reason);
          if(!accepted && has_break_even && has_trailing)
            {
             const double fallback = best == trailing_candidate ? break_even_candidate : trailing_candidate;
-            accepted = CalculateBasketTargets(basket_tickets, fallback, positions,
-                                              validator, targets, reason);
+            accepted = CalculateBasketTarget(fallback, all_positions[i],
+                                             validator, target, reason);
            }
          if(!accepted)
            {
@@ -257,12 +260,12 @@ public:
                continue;
              }
 
-            if(!PMIsMoreFavorableStop(position.type, targets[ticket_index], position.sl))
+            if(!PMIsMoreFavorableStop(position.type, target, position.sl))
                continue;
 
             PMTradeFailure failure = {};
             const PMTradeAttemptStatus attempt_status =
-               trades.ModifyTicket(position.ticket, targets[ticket_index], position.tp, failure);
+               trades.ModifyTicket(position.ticket, target, position.tp, failure);
             if(attempt_status == PM_TRADE_ATTEMPT_SUCCESS)
                modified++;
             else if(attempt_status == PM_TRADE_ATTEMPT_UNCHANGED)
@@ -303,27 +306,18 @@ private:
       return false;
      }
 
-   bool CalculateBasketTargets(const ulong &tickets[],
-                              const double candidate,
-                              CPositionService &positions,
+   bool CalculateBasketTarget(const double candidate,
+                              const PMPosition &basket_position,
                               CValidationService &validator,
-                              double &targets[],
+                              double &target,
                               string &reason)
      {
       reason = "";
-      ArrayResize(targets, ArraySize(tickets));
-      for(int index = 0; index < ArraySize(tickets); index++)
-        {
-         PMPosition position = {};
-         if(!positions.Get(tickets[index], position))
-           {
-            reason = "Position no longer exists.";
-            return false;
-           }
-         if(!validator.CalculateTarget(position, true, PM_PRICE_ABSOLUTE,
-                                       candidate, targets[index], reason))
-            return false;
-        }
+      target = 0.0;
+      if(!validator.CalculateTarget(basket_position, true,
+                                    PM_PRICE_ABSOLUTE, candidate,
+                                    target, reason))
+         return false;
       return true;
      }
   };
