@@ -251,19 +251,15 @@ public:
       created = CreateLabel("BE_LABEL", "Break Even", 12, ContentTop() + 37, clrSilver, 9) && created;
       created = CreateButton("BE_ENABLED", "OFF", 95, ContentTop() + 32, 60, 22) && created;
       created = CreateLabel("BE_TRIGGER_LABEL", "Trigger", 165, ContentTop() + 37, clrSilver, 9) && created;
-      created = CreateEdit("BE_TRIGGER_VALUE", "", 250, ContentTop() + 32, 60, 22) && created;
-      created = CreateLabel("BE_LOCK_LABEL", "Lock", 305, ContentTop() + 37, clrSilver, 9) && created;
-      created = CreateEdit("BE_LOCK_VALUE", "", 390, ContentTop() + 32, 60, 22) && created;
+      created = CreateEdit("BE_TRIGGER_VALUE", "", 220, ContentTop() + 32, 60, 22) && created;
+      created = CreateLabel("BE_LOCK_LABEL", "Lock", 295, ContentTop() + 37, clrSilver, 9) && created;
+      created = CreateEdit("BE_LOCK_VALUE", "", 365, ContentTop() + 32, 60, 22) && created;
       created = CreateLabel("TRAIL_LABEL", "Trailing", 12, ContentTop() + 70, clrSilver, 9) && created;
       created = CreateButton("TRAIL_ENABLED", "OFF", 95, ContentTop() + 65, 60, 22) && created;
       created = CreateLabel("TRAIL_TRIGGER_LABEL", "Trigger", 165, ContentTop() + 70, clrSilver, 9) && created;
-      created = CreateEdit("TRAIL_TRIGGER_VALUE", "", 250, ContentTop() + 65, 60, 22) && created;
-      created = CreateLabel("TRAIL_DIST_LABEL", "Distance", 310, ContentTop() + 70, clrSilver, 9) && created;
-      created = CreateEdit("TRAIL_DIST_VALUE", "", 390, ContentTop() + 65, 60, 22) && created;
-      AlignLabelToInput("BE_TRIGGER_LABEL", 238, ContentTop() + 37);
-      AlignLabelToInput("BE_LOCK_LABEL", 378, ContentTop() + 37);
-      AlignLabelToInput("TRAIL_TRIGGER_LABEL", 238, ContentTop() + 70);
-      AlignLabelToInput("TRAIL_DIST_LABEL", 378, ContentTop() + 70);
+      created = CreateEdit("TRAIL_TRIGGER_VALUE", "", 220, ContentTop() + 65, 60, 22) && created;
+      created = CreateLabel("TRAIL_DIST_LABEL", "Distance", 295, ContentTop() + 70, clrSilver, 9) && created;
+      created = CreateEdit("TRAIL_DIST_VALUE", "", 365, ContentTop() + 65, 60, 22) && created;
       created = CreateLabel("TRAIL_HINT", "Break-even and trailing rules use pips. Trigger 0 uses Distance.", 12, ContentTop() + 103, clrSilver, 8) && created;
 
       created = CreateLabel("SESSION_LABEL", "Session close: - | Auto close: -", 14, 0, clrSilver, 9) && created;
@@ -1565,11 +1561,6 @@ private:
       ObjectSetInteger(0, object_name, OBJPROP_YDISTANCE, y);
       if(index >= 0)
          m_object_y[index] = y;
-     }
-   void AlignLabelToInput(const string suffix, const int right_x, const int y)
-     {
-      ObjectSetInteger(0, Name(suffix), OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
-      SetObjectPosition(Name(suffix), m_origin_x + right_x, m_origin_y + y);
      }
    bool CreateBackground(const int height)
      {
