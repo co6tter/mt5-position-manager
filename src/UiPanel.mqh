@@ -311,7 +311,10 @@ public:
    void Refresh(const PMPosition &position_snapshot[],
                 CPositionService &positions)
      {
-      ArrayCopy(m_positions, position_snapshot);
+      const int position_count = ArraySize(position_snapshot);
+      ArrayResize(m_positions, position_count);
+      for(int i = 0; i < position_count; i++)
+         m_positions[i] = position_snapshot[i];
       positions.CollectSymbols(position_snapshot, m_symbols);
       if(m_filter_symbol == "")
          m_filter_symbol = _Symbol;
