@@ -633,13 +633,13 @@ public:
       else if(object_name == Name("EQ_MODE"))
          m_equity_guard_mode = m_equity_guard_mode == PM_EQUITY_THRESHOLD_AMOUNT ? PM_EQUITY_THRESHOLD_PERCENT : PM_EQUITY_THRESHOLD_AMOUNT;
       else if(object_name == Name("EQ_LOSS_DEC"))
-         StepThresholdInput("EQ_LOSS_VALUE", m_equity_guard_loss_threshold, -ThresholdStep(), PM_MAX_EQUITY_THRESHOLD);
+         AdjustEquityThreshold("EQ_LOSS_VALUE", m_equity_guard_loss_threshold, -ThresholdStep(), PM_MAX_EQUITY_THRESHOLD);
       else if(object_name == Name("EQ_LOSS_INC"))
-         StepThresholdInput("EQ_LOSS_VALUE", m_equity_guard_loss_threshold, ThresholdStep(), PM_MAX_EQUITY_THRESHOLD);
+         AdjustEquityThreshold("EQ_LOSS_VALUE", m_equity_guard_loss_threshold, ThresholdStep(), PM_MAX_EQUITY_THRESHOLD);
       else if(object_name == Name("EQ_PROFIT_DEC"))
-         StepThresholdInput("EQ_PROFIT_VALUE", m_equity_guard_profit_threshold, -ThresholdStep(), PM_MAX_EQUITY_THRESHOLD);
+         AdjustEquityThreshold("EQ_PROFIT_VALUE", m_equity_guard_profit_threshold, -ThresholdStep(), PM_MAX_EQUITY_THRESHOLD);
       else if(object_name == Name("EQ_PROFIT_INC"))
-         StepThresholdInput("EQ_PROFIT_VALUE", m_equity_guard_profit_threshold, ThresholdStep(), PM_MAX_EQUITY_THRESHOLD);
+         AdjustEquityThreshold("EQ_PROFIT_VALUE", m_equity_guard_profit_threshold, ThresholdStep(), PM_MAX_EQUITY_THRESHOLD);
       else if(object_name == Name("TS_SYMBOL"))
          CycleSymbol(m_trailing_symbol);
       else if(object_name == Name("TS_DIRECTION"))
@@ -1331,10 +1331,7 @@ private:
       ObjectSetString(0, Name(suffix), OBJPROP_TEXT, IntegerToString(target));
       SetStatus(StringFormat("%s set to %d.", description, target));
      }
-   void StepThresholdInput(const string suffix,
-                           double &target,
-                           const double delta,
-                           const double maximum)
+   void AdjustEquityThreshold(const string suffix, double &target, const double delta, const double maximum)
      {
       CommitDoubleValue(suffix, target, maximum, 2);
       target = PMStepDecimal(target, delta, 0.0, maximum, 2);
