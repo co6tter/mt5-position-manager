@@ -281,21 +281,21 @@ public:
       created = CreateLabel("EQ_HINT", "Guard OFF | Loss: not set | Profit: not set", 12, ContentTop() + 101, clrOrange, 8) && created;
 
       created = CreateLabel("TS_LABEL", "Trailing Scope", 12, ContentTop() + 4, clrSilver, 9) && created;
-      created = CreateButton("TS_SYMBOL", "Symbol", 170, ContentTop(), 105, 22) && created;
-      created = CreateButton("TS_DIRECTION", "Both", 285, ContentTop(), 85, 22) && created;
-      created = CreateLabel("BE_LABEL", "Break Even", 12, ContentTop() + 37, clrSilver, 9) && created;
-      created = CreateButton("BE_ENABLED", "OFF", 115, ContentTop() + 32, 60, 22) && created;
-      created = CreateLabel("BE_TRIGGER_LABEL", "Trigger (pips)", 12, ContentTop() + 69, clrSilver, 9) && created;
-      created = CreateNumericInput("BE_TRIGGER", "BE_TRIGGER_VALUE", "", 170, ContentTop() + 64, 90) && created;
-      created = CreateLabel("BE_LOCK_LABEL", "Lock (pips)", 12, ContentTop() + 101, clrSilver, 9) && created;
-      created = CreateNumericInput("BE_LOCK", "BE_LOCK_VALUE", "", 170, ContentTop() + 96, 90) && created;
-      created = CreateLabel("TRAIL_LABEL", "Trailing", 12, ContentTop() + 133, clrSilver, 9) && created;
-      created = CreateButton("TRAIL_ENABLED", "OFF", 115, ContentTop() + 128, 60, 22) && created;
-      created = CreateLabel("TRAIL_TRIGGER_LABEL", "Trigger (pips)", 12, ContentTop() + 165, clrSilver, 9) && created;
-      created = CreateNumericInput("TRAIL_TRIGGER", "TRAIL_TRIGGER_VALUE", "", 170, ContentTop() + 160, 90) && created;
-      created = CreateLabel("TRAIL_DIST_LABEL", "Distance (pips)", 12, ContentTop() + 197, clrSilver, 9) && created;
-      created = CreateNumericInput("TRAIL_DIST", "TRAIL_DIST_VALUE", "", 170, ContentTop() + 192, 90) && created;
-      created = CreateLabel("TRAIL_HINT", "Trailing Trigger 0 uses Distance. All distances are pips.", 12, ContentTop() + 229, clrSilver, 8) && created;
+      created = CreateButton("TS_SYMBOL", "Symbol", PM_TRAIL_CONTROL_X, ContentTop(), 105, 22) && created;
+      created = CreateButton("TS_DIRECTION", "Both", PM_TRAIL_CONTROL_X + 110, ContentTop(), 85, 22) && created;
+      created = CreateLabel("BE_LABEL", "Break Even", 12, ContentTop() + 33, clrSilver, 9) && created;
+      created = CreateButton("BE_ENABLED", "OFF", PM_TRAIL_CONTROL_X, ContentTop() + 28, 60, 22) && created;
+      created = CreateLabel("BE_TRIGGER_LABEL", "Trigger (pips)", 12, ContentTop() + 61, clrSilver, 9) && created;
+      created = CreateNumericInput("BE_TRIGGER", "BE_TRIGGER_VALUE", "", PM_TRAIL_CONTROL_X, ContentTop() + 56, PM_TRAIL_INPUT_WIDTH) && created;
+      created = CreateLabel("BE_LOCK_LABEL", "Lock (pips)", PM_TRAIL_LABEL2_X, ContentTop() + 61, clrSilver, 9) && created;
+      created = CreateNumericInput("BE_LOCK", "BE_LOCK_VALUE", "", PM_TRAIL_CONTROL2_X, ContentTop() + 56, PM_TRAIL_INPUT_WIDTH) && created;
+      created = CreateLabel("TRAIL_LABEL", "Trailing", 12, ContentTop() + 89, clrSilver, 9) && created;
+      created = CreateButton("TRAIL_ENABLED", "OFF", PM_TRAIL_CONTROL_X, ContentTop() + 84, 60, 22) && created;
+      created = CreateLabel("TRAIL_TRIGGER_LABEL", "Trigger (pips)", 12, ContentTop() + 117, clrSilver, 9) && created;
+      created = CreateNumericInput("TRAIL_TRIGGER", "TRAIL_TRIGGER_VALUE", "", PM_TRAIL_CONTROL_X, ContentTop() + 112, PM_TRAIL_INPUT_WIDTH) && created;
+      created = CreateLabel("TRAIL_DIST_LABEL", "Distance (pips)", PM_TRAIL_LABEL2_X, ContentTop() + 117, clrSilver, 9) && created;
+      created = CreateNumericInput("TRAIL_DIST", "TRAIL_DIST_VALUE", "", PM_TRAIL_CONTROL2_X, ContentTop() + 112, PM_TRAIL_INPUT_WIDTH) && created;
+      created = CreateLabel("TRAIL_HINT", "Trailing Trigger 0 uses Distance. All distances are pips.", 12, ContentTop() + 144, clrSilver, 8) && created;
 
       created = CreateLabel("SESSION_LABEL", "Session close: - | Auto close: -", 14, 0, clrSilver, 9) && created;
       for(int line = 0; line < PM_MAX_STATUS_LINES; line++)
@@ -880,8 +880,9 @@ private:
       lines[1] = "Est. " + (money_ok && estimate.MoneyKnown() ?
                  SignedValue(estimate.Money(), (int)AccountInfoInteger(ACCOUNT_CURRENCY_DIGITS)) : "N/A") +
                  " " + AccountInfoString(ACCOUNT_CURRENCY) + StringFormat(" | %d pos", ArraySize(m_selected));
-      lines[2] = estimate.HasBuy() ? "Buy avg " + SignedValue(estimate.BuyPoints(), 1) + " points" : "";
-      lines[3] = estimate.HasSell() ? "Sell avg " + SignedValue(estimate.SellPoints(), 1) + " points" : "";
+      const double points_per_pip = PMPointsPerPip(digits);
+      lines[2] = estimate.HasBuy() ? "Buy avg " + SignedValue(estimate.BuyPoints() / points_per_pip, 1) + " pips" : "";
+      lines[3] = estimate.HasSell() ? "Sell avg " + SignedValue(estimate.SellPoints() / points_per_pip, 1) + " pips" : "";
      }
    bool EnsurePriceObjects(const int index, const double price)
      {
