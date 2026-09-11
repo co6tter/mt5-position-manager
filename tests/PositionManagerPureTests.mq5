@@ -3,6 +3,7 @@
 
 #include "..\src\Models.mqh"
 #include "..\src\Constants.mqh"
+#include "..\src\PriceEditor.mqh"
 #include "..\src\SessionService.mqh"
 #include "..\src\EquityGuardService.mqh"
 #include "..\src\EquityLineService.mqh"
@@ -439,6 +440,25 @@ void TestPanelLayoutHelpers()
               "Panel height never shrinks below required content");
   }
 
+void TestInputStepperHelpers()
+  {
+   AssertTrue(PMStepInteger(0, -1, 0, 1440) == 0,
+              "Integer stepper clamps at its minimum");
+   AssertTrue(PMStepInteger(1439, 1, 0, 1440) == 1440,
+              "Integer stepper reaches its maximum");
+   AssertTrue(PMStepInteger(2147483647, 1, 0, 2147483647) == 2147483647,
+              "Integer stepper does not overflow before clamping");
+   AssertTrue(MathAbs(PMStepDecimal(0.0, 0.1, 0.0, 100.0, 2) - 0.1) < 0.000001,
+              "Decimal stepper supports percent-sized increments");
+   AssertTrue(MathAbs(PMStepDecimal(100.0, 1.0, 0.0, 100.0, 2) - 100.0) < 0.000001,
+              "Decimal stepper clamps at its maximum");
+   double value = 0.0;
+   for(int i = 0; i < 1000; i++) value = PMStepDecimal(value, 0.1, 0.0, 100.0, 2);
+   AssertTrue(value == 100.0, "Repeated decimal steps reach the exact limit");
+   AssertTrue(PMStepDecimal(0.05, -0.1, 0.0, 100.0, 2) == 0.0,
+              "Decimal subtraction cannot make a threshold negative");
+  }
+
 void TestPriceEditorHelpers()
   {
    AssertTrue(MathAbs(PMPriceEditorStep(0.001, 0.01, 3) - 0.01) < 0.0000001,
@@ -449,6 +469,93 @@ void TestPriceEditorHelpers()
               "Price editor increases USDJPY by one pip");
    AssertTrue(MathAbs(PMShiftPriceEditorValue(159.900, 0.001, 0.01, -1, 3) - 159.890) < 0.0000001,
               "Price editor decreases USDJPY by one pip");
+   AssertTrue(PMShiftPriceEditorValue(10.0, 0.01, 0.25, 1, 2) == 10.25,
+              "Increase advances one tick when a tick exceeds a pip");
+   AssertTrue(PMShiftPriceEditorValue(10.0, 0.01, 0.25, -1, 2) == 9.75,
+              "Decrease advances one tick when a tick exceeds a pip");
+   AssertTrue(PMShiftPriceEditorValue(10.12, 0.01, 0.25, 1, 2) == 10.25,
+              "Off-grid increase rounds in the requested direction");
+   AssertTrue(PMShiftPriceEditorValue(10.12, 0.01, 0.25, -1, 2) == 10.0,
+              "Off-grid decrease rounds in the requested direction");
+   AssertTrue(PMShiftPriceEditorValue(0.25, 0.01, 0.25, -1, 2) == 0.25,
+              "Price cannot step below the smallest positive tick");
+  }
+
+void TestPriceDragLifecycle()
+  {
+   CPriceEditDrag drag;
+   int index = 7;
+   double price = 7.0;
+   AssertTrue(!drag.Finish("ticket:1", index, price) && index == -1 && price == 0.0,
+              "An unsolicited drag completion cannot write an editor");
+   drag.Begin(0, "ticket:1", 100.0);
+   drag.Move(101.25);
+   drag.Move(-1.0);
+   AssertTrue(drag.Matches("ticket:1") && drag.Price() == 101.25,
+              "An invalid mouse price preserves the last valid draft");
+   AssertTrue(drag.Finish("ticket:1", index, price) && index == 0 && price == 101.25,
+              "Matching completion returns the exact SL draft");
+   AssertTrue(!drag.Finish("ticket:1", index, price),
+              "Duplicate completion cannot apply a draft twice");
+   drag.Begin(1, "ticket:1:volume:1", 100.0);
+   drag.Move(102.0);
+   AssertTrue(!drag.Finish("ticket:1:volume:2", index, price) && index == -1 && price == 0.0,
+              "Netting volume changes invalidate the old drag even on the same ticket");
+   drag.Begin(1, "ticket:1", 100.0);
+   drag.Cancel();
+   AssertTrue(!drag.Finish("ticket:1", index, price),
+              "A cancelled drag cannot update a hidden or changed form");
+   drag.Begin(2, "ticket:1", 100.0);
+   AssertTrue(drag.Index() == -1, "Unknown price editors cannot acquire a drag");
+   drag.Begin(0, "ticket:1", 0.0);
+   AssertTrue(drag.Index() == -1, "A nonpositive price cannot acquire a drag");
+  }
+
+void TestPriceEstimateAggregation()
+  {
+   CPriceEditEstimate estimate;
+   AssertTrue(!estimate.HasBuy() && !estimate.HasSell(),
+              "Empty selections do not display a direction average");
+   estimate.Add(true, 1.0, 100.0, true, 10.0);
+   estimate.Add(true, 3.0, 200.0, true, 60.0);
+   estimate.Add(false, 2.0, -300.0, true, -60.0);
+   AssertTrue(estimate.BuyPoints() == 175.0 && estimate.SellPoints() == -300.0,
+              "Mixed-side points use separate volume-weighted averages");
+   AssertTrue(estimate.MoneyKnown() && estimate.Money() == 10.0,
+              "Monetary estimates sum all selected tickets including losses");
+   estimate.Add(false, 2.0, -100.0, false, 0.0);
+   AssertTrue(!estimate.MoneyKnown() && estimate.SellPoints() == -200.0,
+              "One failed monetary calculation keeps points but invalidates the total");
+   estimate.Add(true, 1.0, 175.0, true, 20.0);
+   AssertTrue(!estimate.MoneyKnown(),
+              "A later successful calculation cannot restore an incomplete monetary total");
+  }
+
+void TestPriceLabelPlacement()
+  {
+   int sl_x = 0, sl_y = 0, tp_x = 0, tp_y = 0;
+   AssertTrue(PMPlacePriceLabel(1000, 700, 300, 240, 72, 0, 0, 560, 500,
+                              0, 0, 0, 0, sl_x, sl_y) &&
+              !PMRectOverlaps(sl_x, sl_y, 240, 72, 0, 0, 560, 500),
+              "Price labels leave the minimum-width panel unobscured");
+   AssertTrue(PMPlacePriceLabel(1000, 700, 300, 240, 72, 0, 0, 560, 500,
+                              sl_x, sl_y, 240, 76, tp_x, tp_y) &&
+              !PMRectOverlaps(sl_x, sl_y, 240, 72, tp_x, tp_y, 240, 72),
+              "SL and TP labels at the same price remain individually accessible");
+   AssertTrue(tp_x >= 8 && tp_y >= 8 && tp_x + 240 <= 992 && tp_y + 72 <= 692,
+              "Repositioned labels stay within chart margins");
+   AssertTrue(PMPlacePriceLabel(1000, 700, 0, 240, 72, 0, 0, 0, 0,
+                              0, 0, 0, 0, sl_x, sl_y) && sl_y == 8,
+              "Top-edge prices retain readable labels");
+   AssertTrue(PMPlacePriceLabel(1000, 700, 700, 240, 72, 0, 0, 0, 0,
+                              0, 0, 0, 0, sl_x, sl_y) && sl_y + 72 <= 692,
+              "Bottom-edge prices retain readable labels");
+   AssertTrue(!PMPlacePriceLabel(200, 700, 300, 240, 72, 0, 0, 0, 0,
+                               0, 0, 0, 0, sl_x, sl_y),
+              "Oversized labels are reported unavailable instead of clipped");
+   AssertTrue(!PMPlacePriceLabel(600, 400, 300, 240, 72, 0, 0, 600, 400,
+                               0, 0, 0, 0, sl_x, sl_y),
+              "A panel covering the chart cannot be covered by a label");
   }
 
 void TestEquityLineCalculation()
@@ -507,7 +614,11 @@ void OnStart()
    TestBestStopCandidate();
    TestEntryHelpers();
    TestPanelLayoutHelpers();
+   TestInputStepperHelpers();
    TestPriceEditorHelpers();
+   TestPriceDragLifecycle();
+   TestPriceEstimateAggregation();
+   TestPriceLabelPlacement();
    TestEquityLineCalculation();
    if(g_failures == 0)
       Print("[PASS] All Position Manager pure tests passed.");

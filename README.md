@@ -88,6 +88,8 @@ Pure Testsをコンパイルする場合は、次のように`-SourcePath`を指
 
 `scripts/compile.ps1`は、MetaEditorの終了コードが0以外の場合、またはログに単語境界付きの`0 errors`が含まれない場合に失敗として扱います。
 
+MT5がない環境では、Python 3とC++17コンパイラで`python3 tests/run-price-editor-tests.py`を実行できます。実際のヘルパーと共通テストを使い、増減・ドラッグ状態・損益集計・ラベル配置の純粋ロジックを確認します。MQL5のコンパイル、チャートイベント、実際の表示・取引APIの検証は含みません。
+
 ## Usage
 
 EAをチャートへ適用し、AutoTradingを有効にします。SymbolやDirectionのボタンはクリックするたびに候補が切り替わります。Symbol候補には保有ポジションの銘柄と、同じEAパネルを表示しているチャートの銘柄が含まれます。
@@ -103,7 +105,9 @@ EAをチャートへ適用し、AutoTradingを有効にします。SymbolやDire
 - ポジション行: クリックして選択・選択解除します。
 - `<` / `>`: ポジション一覧のページを移動します。Page、Selected、Totalを確認してください。
 - `Close Selected`: 選択行だけを確認後に決済します。
-- `SL` / `TP`: 選択行を先に選び、`Price`または`Pips`のModeとValueを指定します。Pipsは銘柄の桁数に応じて内部でpointsへ変換されます。
+- `SL` / `TP`: 選択行を先に選び、`Price`または`Pips`のModeとValueを指定します。すべての数値欄に`-` / `+`があり、Minutesは1分、Amountは1.00、Percentは0.1ポイント、pips欄は1 pipずつ変更できます。Pipsは銘柄の桁数に応じて内部でpointsへ変換されます。
+- `Price`モードでは、選択したチャート銘柄のSL/TP候補が色分けされた水平ラインとして表示されます。ラインまたはラベルを左ドラッグし、離すとValueへTick Size単位で反映されます。空欄の初期候補やクリックだけではValueは変わりません。価格の`-` / `+`は通常1 pip、Tick Sizeがそれより大きい場合は最低1 tickずつ変更します。実際の変更は`Set / Change`を押したときだけ行われます。
+- ラベルには価格、選択Ticket合計の口座通貨による概算損益（Swap・Commission除外）、Buy/Sell別のVolume加重平均points、件数を表示します。金額計算が1件でも失敗した場合は`N/A`、Broker制約違反は`Invalid`と表示します。別銘柄の選択、Pipsモード、タブ非表示では該当ラインを隠します。価格やラベルが画面に収まらない場合はヒントに従って価格スケールやチャート幅を調整してください。
 - `Clear SL` / `Clear TP`: 選択ポジションの該当保護注文を削除します。
 - タイトルバー部分を左ドラッグするとパネルを移動できます。右下の`///`付近を左ドラッグすると幅と高さを変更できます。高さを広げた場合、Statusはパネル下端側へ移動します。時間足を変更してEAが再初期化されても、パネル位置はチャート単位で維持されます。Statusは通常を明るい色、成功・変更なしを緑、待機を黄色、失敗を赤で表示します。SL/TPの一括結果では、既存値と同じTicketは`unchanged`として表示され、`failed`には含めません。
 
@@ -111,7 +115,7 @@ Pips指定では、LongはBidを基準にSLを下側、TPを上側へ、Shortは
 
 ### Equity / Break-evenライン
 
-EAを配置したチャートのSymbolに保有ポジションがある場合、全Ticketの方向とLotを合算した理論上の損益分岐価格を、チャート上へ細い薄ピンクの破線として表示します。ラインはエントリーラインより前面、操作パネルより背面へ描画します。Buyだけ、またはSellだけの場合はLot加重平均の建値です。Buy/Sellが混在する場合はネットポジションの損益分岐価格を表示します。
+EAを配置したチャートのSymbolに保有ポジションがある場合、全Ticketの方向とLotを合算した理論上の損益分岐価格を、チャート上へ細い薄ピンクの破線として表示します。ラインはチャートの背景へ描画し、操作パネルが前面に残ります。Buyだけ、またはSellだけの場合はLot加重平均の建値です。Buy/Sellが混在する場合はネットポジションの損益分岐価格を表示します。
 
 対象ポジションがない場合、またはBuyとSellのLotが一致してネットLotが0の場合は、一意な損益分岐価格を計算できないためラインを表示しません。SwapとCommissionは計算に含みません。ラインは1秒Timer周期で更新され、パネルの選択タブや折り畳み状態には依存しません。
 
@@ -173,6 +177,7 @@ TriggerやDistanceがブローカーのStops Levelより小さい場合、候補
 │   ├── EquityLineService.mqh     # チャートSymbolの損益分岐ライン
 │   ├── TrailingStopService.mqh   # Break Even・Trailing StopのSL更新
 │   ├── UiPanel.mqh               # チャートオブジェクトによる操作パネル
+│   ├── PriceEditor.mqh           # 価格ドラッグの状態・概算集計・ラベル配置
 │   └── Models.mqh / Constants.mqh # 共通モデルと補助関数
 ├── scripts/compile.ps1           # MetaEditorコンパイル検証
 ├── tests/                        # Pure Testsと手動テスト計画

@@ -29,8 +29,8 @@
 #define PM_PANEL_POSITION_ROW_HEIGHT 24
 #define PM_PANEL_STOPS_HEIGHT 92
 #define PM_PANEL_AUTO_HEIGHT 108
-#define PM_PANEL_GUARD_HEIGHT 92
-#define PM_PANEL_TRAIL_HEIGHT 138
+#define PM_PANEL_GUARD_HEIGHT 126
+#define PM_PANEL_TRAIL_HEIGHT 254
 #define PM_STOPS_MODE_X 42
 #define PM_STOPS_DEC_X 123
 #define PM_STOPS_VALUE_X 153
@@ -44,6 +44,12 @@
 #define PM_TAB_BAR_HEIGHT 26
 #define PM_RESIZE_HANDLE_HIT_SIZE 28
 #define PM_EQUITY_LINE_COLOR C'255,182,193'
+#define PM_SL_EDIT_LINE_NAME "MT5PM_SL_EDIT_LINE"
+#define PM_TP_EDIT_LINE_NAME "MT5PM_TP_EDIT_LINE"
+#define PM_SL_EDIT_LABEL_NAME "MT5PM_SL_EDIT_LABEL"
+#define PM_TP_EDIT_LABEL_NAME "MT5PM_TP_EDIT_LABEL"
+#define PM_SL_EDIT_LINE_COLOR C'255,120,120'
+#define PM_TP_EDIT_LINE_COLOR C'120,190,255'
 #define PM_ACTIVE_TAB_COLOR C'65,105,145'
 #define PM_INACTIVE_TAB_COLOR C'38,48,62'
 #define PM_ACTIVE_TAB_BORDER_COLOR C'130,190,230'
@@ -187,6 +193,30 @@ bool PMIsUnsignedDecimalText(const string text)
    return digit_count > 0;
   }
 
+int PMStepInteger(const int value,
+                 const int delta,
+                 const int minimum,
+                 const int maximum)
+  {
+   if(maximum < minimum)
+      return minimum;
+   return (int)MathMax(minimum, MathMin(maximum, (long)value + delta));
+  }
+
+double PMStepDecimal(const double value,
+                     const double delta,
+                     const double minimum,
+                     const double maximum,
+                     const int digits)
+  {
+   if(maximum < minimum)
+      return minimum;
+   if(!MathIsValidNumber(value) || !MathIsValidNumber(delta))
+      return minimum;
+   const double stepped = MathMax(minimum, MathMin(maximum, value + delta));
+   return NormalizeDouble(stepped, digits);
+  }
+
 double PMNormalizeVolume(const double value,
                          const double minimum,
                          const double maximum,
@@ -241,7 +271,14 @@ double PMShiftPriceEditorValue(const double value,
    const double step = PMPriceEditorStep(point, tick_size, digits);
    if(step <= 0.0)
       return value;
-   return NormalizeDouble(value + direction * step, digits);
+   if(!MathIsValidNumber(tick_size) || tick_size <= 0.0)
+      return NormalizeDouble(MathMax(step, value + direction * step), digits);
+   // At least one tick in the requested direction, including off-grid input.
+   const double steps = MathMax(1.0, MathCeil(step / tick_size - 0.00000001));
+   const double ticks = direction > 0 ?
+                        MathFloor(value / tick_size + 0.00000001) + steps :
+                        MathCeil(value / tick_size - 0.00000001) - steps;
+   return NormalizeDouble(MathMax(1.0, ticks) * tick_size, digits);
   }
 
 bool PMCalculateEntryStops(const PMEntrySide side,

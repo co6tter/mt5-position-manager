@@ -7,6 +7,7 @@
 #include "TradeManager.mqh"
 #include "ValidationService.mqh"
 #include "PositionActionService.mqh"
+#include "PriceEditor.mqh"
 
 class CUiPanel
   {
@@ -64,6 +65,22 @@ private:
    int m_user_panel_height;
    bool m_dragging;
    bool m_resizing;
+   CPriceEditDrag m_price_drag;
+   string m_price_line_selection_key;
+   string m_stop_committed[2];
+   double m_price_seed[2];
+   bool m_price_line_visible[2];
+   int m_price_line_y[2];
+   double m_price_line_price[2];
+   int m_price_label_x[2];
+   int m_price_label_y[2];
+   int m_price_label_width[2];
+   int m_price_label_height[2];
+   bool m_price_scroll_before;
+   bool m_mouse_left_pressed;
+   bool m_price_drag_moved;
+   int m_price_mouse_start_y;
+   double m_price_mouse_start_price;
    int m_interaction_start_x;
    int m_interaction_start_y;
    int m_interaction_origin_x;
@@ -124,6 +141,24 @@ public:
       m_user_panel_height = 0;
       m_dragging = false;
       m_resizing = false;
+      m_price_line_selection_key = "";
+      m_price_scroll_before = true;
+      m_mouse_left_pressed = false;
+      m_price_drag_moved = false;
+      m_price_mouse_start_y = 0;
+      m_price_mouse_start_price = 0.0;
+      for(int i = 0; i < 2; i++)
+        {
+         m_stop_committed[i] = "";
+         m_price_seed[i] = 0.0;
+         m_price_line_visible[i] = false;
+         m_price_line_y[i] = 0;
+         m_price_line_price[i] = 0.0;
+         m_price_label_x[i] = 0;
+         m_price_label_y[i] = 0;
+         m_price_label_width[i] = 0;
+         m_price_label_height[i] = 0;
+        }
       m_interaction_start_x = 0;
       m_interaction_start_y = 0;
       m_interaction_origin_x = 0;
@@ -228,39 +263,39 @@ public:
       ApplyStopsLayout();
 
       created = CreateLabel("AUTO_LABEL", "Auto Close", 12, ContentTop() + 4, clrSilver, 9) && created;
-      created = CreateButton("AUTO_ENABLED", "OFF", 95, ContentTop(), 60, 22) && created;
-      created = CreateButton("AUTO_SYMBOL", "Symbol", 165, ContentTop(), 105, 22) && created;
-      created = CreateButton("AUTO_DIRECTION", "Both", 280, ContentTop(), 85, 22) && created;
-      created = CreateLabel("MINUTES_LABEL", "Mins", 370, ContentTop() + 5, clrSilver, 9) && created;
-      created = CreateEdit("AUTO_MINUTES", "10", 405, ContentTop(), 50, 22) && created;
-      created = CreateButton("PASSED_BEHAVIOR", "Passed: Do Nothing", 12, ContentTop() + 32, 170, 22) && created;
-      created = CreateLabel("AUTO_HINT", "Timer-driven schedule.", 195, ContentTop() + 37, clrSilver, 8) && created;
+      created = CreateButton("AUTO_ENABLED", "OFF", 160, ContentTop(), 60, 22) && created;
+      created = CreateButton("AUTO_SYMBOL", "Symbol", 230, ContentTop(), 105, 22) && created;
+      created = CreateButton("AUTO_DIRECTION", "Both", 345, ContentTop(), 85, 22) && created;
+      created = CreateLabel("MINUTES_LABEL", "Minutes before close", 12, ContentTop() + 37, clrSilver, 9) && created;
+      created = CreateNumericInput("AUTO_MINUTES", "AUTO_MINUTES", "10", 210, ContentTop() + 32, 90) && created;
+      created = CreateButton("PASSED_BEHAVIOR", "Passed: Do Nothing", 12, ContentTop() + 64, 170, 22) && created;
+      created = CreateLabel("AUTO_HINT", "Timer-driven schedule.", 195, ContentTop() + 69, clrSilver, 8) && created;
 
       created = CreateLabel("EQ_LABEL", "Equity Guard", 12, ContentTop() + 4, clrSilver, 9) && created;
-      created = CreateButton("EQ_ENABLED", "OFF", 95, ContentTop(), 60, 22) && created;
-      created = CreateButton("EQ_MODE", "Amount", 165, ContentTop(), 85, 22) && created;
-      created = CreateLabel("EQ_LOSS_LABEL", "Loss", 12, ContentTop() + 37, clrSilver, 9) && created;
-      created = CreateEdit("EQ_LOSS_VALUE", "", 52, ContentTop() + 32, 120, 22) && created;
-      created = CreateLabel("EQ_PROFIT_LABEL", "Profit", 184, ContentTop() + 37, clrSilver, 9) && created;
-      created = CreateEdit("EQ_PROFIT_VALUE", "", 229, ContentTop() + 32, 120, 22) && created;
-      created = CreateLabel("EQ_HINT", "Guard OFF | Loss: not set | Profit: not set", 12, ContentTop() + 69, clrOrange, 8) && created;
+      created = CreateButton("EQ_ENABLED", "OFF", 160, ContentTop(), 60, 22) && created;
+      created = CreateButton("EQ_MODE", "Amount", 230, ContentTop(), 85, 22) && created;
+      created = CreateLabel("EQ_LOSS_LABEL", "Max Loss", 12, ContentTop() + 37, clrSilver, 9) && created;
+      created = CreateNumericInput("EQ_LOSS", "EQ_LOSS_VALUE", "", 120, ContentTop() + 32, 160) && created;
+      created = CreateLabel("EQ_PROFIT_LABEL", "Max Profit", 12, ContentTop() + 69, clrSilver, 9) && created;
+      created = CreateNumericInput("EQ_PROFIT", "EQ_PROFIT_VALUE", "", 120, ContentTop() + 64, 160) && created;
+      created = CreateLabel("EQ_HINT", "Guard OFF | Loss: not set | Profit: not set", 12, ContentTop() + 101, clrOrange, 8) && created;
 
       created = CreateLabel("TS_LABEL", "Trailing Scope", 12, ContentTop() + 4, clrSilver, 9) && created;
-      created = CreateButton("TS_SYMBOL", "Symbol", 105, ContentTop(), 105, 22) && created;
-      created = CreateButton("TS_DIRECTION", "Both", 220, ContentTop(), 85, 22) && created;
+      created = CreateButton("TS_SYMBOL", "Symbol", 170, ContentTop(), 105, 22) && created;
+      created = CreateButton("TS_DIRECTION", "Both", 285, ContentTop(), 85, 22) && created;
       created = CreateLabel("BE_LABEL", "Break Even", 12, ContentTop() + 37, clrSilver, 9) && created;
-      created = CreateButton("BE_ENABLED", "OFF", 95, ContentTop() + 32, 60, 22) && created;
-      created = CreateLabel("BE_TRIGGER_LABEL", "Trigger", 165, ContentTop() + 37, clrSilver, 9) && created;
-      created = CreateEdit("BE_TRIGGER_VALUE", "", 220, ContentTop() + 32, 60, 22) && created;
-      created = CreateLabel("BE_LOCK_LABEL", "Lock", 295, ContentTop() + 37, clrSilver, 9) && created;
-      created = CreateEdit("BE_LOCK_VALUE", "", 365, ContentTop() + 32, 60, 22) && created;
-      created = CreateLabel("TRAIL_LABEL", "Trailing", 12, ContentTop() + 70, clrSilver, 9) && created;
-      created = CreateButton("TRAIL_ENABLED", "OFF", 95, ContentTop() + 65, 60, 22) && created;
-      created = CreateLabel("TRAIL_TRIGGER_LABEL", "Trigger", 165, ContentTop() + 70, clrSilver, 9) && created;
-      created = CreateEdit("TRAIL_TRIGGER_VALUE", "", 220, ContentTop() + 65, 60, 22) && created;
-      created = CreateLabel("TRAIL_DIST_LABEL", "Distance", 295, ContentTop() + 70, clrSilver, 9) && created;
-      created = CreateEdit("TRAIL_DIST_VALUE", "", 365, ContentTop() + 65, 60, 22) && created;
-      created = CreateLabel("TRAIL_HINT", "Break-even and trailing rules use pips. Trigger 0 uses Distance.", 12, ContentTop() + 103, clrSilver, 8) && created;
+      created = CreateButton("BE_ENABLED", "OFF", 115, ContentTop() + 32, 60, 22) && created;
+      created = CreateLabel("BE_TRIGGER_LABEL", "Trigger (pips)", 12, ContentTop() + 69, clrSilver, 9) && created;
+      created = CreateNumericInput("BE_TRIGGER", "BE_TRIGGER_VALUE", "", 170, ContentTop() + 64, 90) && created;
+      created = CreateLabel("BE_LOCK_LABEL", "Lock (pips)", 12, ContentTop() + 101, clrSilver, 9) && created;
+      created = CreateNumericInput("BE_LOCK", "BE_LOCK_VALUE", "", 170, ContentTop() + 96, 90) && created;
+      created = CreateLabel("TRAIL_LABEL", "Trailing", 12, ContentTop() + 133, clrSilver, 9) && created;
+      created = CreateButton("TRAIL_ENABLED", "OFF", 115, ContentTop() + 128, 60, 22) && created;
+      created = CreateLabel("TRAIL_TRIGGER_LABEL", "Trigger (pips)", 12, ContentTop() + 165, clrSilver, 9) && created;
+      created = CreateNumericInput("TRAIL_TRIGGER", "TRAIL_TRIGGER_VALUE", "", 170, ContentTop() + 160, 90) && created;
+      created = CreateLabel("TRAIL_DIST_LABEL", "Distance (pips)", 12, ContentTop() + 197, clrSilver, 9) && created;
+      created = CreateNumericInput("TRAIL_DIST", "TRAIL_DIST_VALUE", "", 170, ContentTop() + 192, 90) && created;
+      created = CreateLabel("TRAIL_HINT", "Trailing Trigger 0 uses Distance. All distances are pips.", 12, ContentTop() + 229, clrSilver, 8) && created;
 
       created = CreateLabel("SESSION_LABEL", "Session close: - | Auto close: -", 14, 0, clrSilver, 9) && created;
       for(int line = 0; line < PM_MAX_STATUS_LINES; line++)
@@ -294,8 +329,11 @@ public:
    void Destroy()
      {
       EndInteraction();
+      CancelPriceDrag();
+      m_price_line_selection_key = "";
       ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, 0, m_chart_mouse_move_before_create);
       ObjectsDeleteAll(0, PM_OBJECT_PREFIX);
+      DeletePriceLineObjects();
       ArrayResize(m_object_names, 0);
       ArrayResize(m_object_x, 0);
       ArrayResize(m_object_y, 0);
@@ -325,6 +363,7 @@ public:
       for(int i = ArraySize(m_selected) - 1; i >= 0; i--)
          if(!ContainsPosition(m_selected[i]))
             ArrayRemove(m_selected, i, 1);
+      SyncPriceContext();
       m_positions_dirty = true;
      }
 
@@ -370,7 +409,11 @@ public:
          m_status_layout_dirty = false;
          redraw = true;
         }
-      if(redraw)
+      if(!m_collapsed && m_active_tab == PM_PANEL_TAB_STOPS)
+         UpdatePriceLines();
+      else
+         HidePriceLines();
+      if(redraw || m_force_redraw)
          ChartRedraw();
       m_force_redraw = false;
      }
@@ -440,16 +483,37 @@ public:
      {
       if(id == CHARTEVENT_MOUSE_MOVE)
         {
-         HandleMouseMove((int)lparam, (int)dparam, object_name);
+         const bool pressed = ((uint)StringToInteger(object_name) & 1) != 0;
+         const bool started = pressed && !m_mouse_left_pressed;
+         m_mouse_left_pressed = pressed;
+         if(m_price_drag.Index() >= 0 && !pressed)
+           {
+            PMPosition snapshot[];
+            positions.Collect(snapshot);
+            Refresh(snapshot, positions);
+           }
+         if(HandlePriceMouse((int)lparam, (int)dparam, pressed, started))
+            return true;
+         if(started || m_dragging || m_resizing || !pressed)
+            HandleMouseMove((int)lparam, (int)dparam, object_name);
          return true;
         }
       if(id == CHARTEVENT_CLICK)
         {
+         if(m_price_drag.Index() >= 0)
+           {
+            PMPosition snapshot[];
+            positions.Collect(snapshot);
+            Refresh(snapshot, positions);
+            HandlePriceMouse((int)lparam, (int)dparam, false, false);
+           }
+         m_mouse_left_pressed = false;
          EndInteraction();
          return true;
         }
       if(id == CHARTEVENT_CHART_CHANGE)
         {
+         CancelPriceDrag();
          RefreshChartSize();
          ApplyPanelFrameLayout();
          m_positions_dirty = true;
@@ -457,13 +521,18 @@ public:
          Render();
          return true;
         }
+      // These objects use mouse capture, never native object dragging.
+      if(IsPriceLineObject(object_name)) return true;
       if(id != CHARTEVENT_OBJECT_CLICK && id != CHARTEVENT_OBJECT_ENDEDIT)
+         return false;
+      if(StringFind(object_name, PM_OBJECT_PREFIX) != 0 ||
+         ObjectFind(0, object_name) < 0 ||
+         ObjectGetInteger(0, object_name, OBJPROP_TIMEFRAMES) == OBJ_NO_PERIODS)
          return false;
       if(id == CHARTEVENT_OBJECT_ENDEDIT)
          return HandleEditEnd(object_name);
+      CancelPriceDrag();
       EndInteraction();
-      if(StringFind(object_name, PM_OBJECT_PREFIX) != 0)
-         return false;
       ObjectSetInteger(0, object_name, OBJPROP_STATE, false);
       if(object_name == Name("COLLAPSE"))
         {
@@ -489,6 +558,10 @@ public:
          ShiftEntryPoints("ENTRY_TP_POINTS", -1);
       else if(object_name == Name("ENTRY_TP_INC"))
          ShiftEntryPoints("ENTRY_TP_POINTS", 1);
+      else if(object_name == Name("AUTO_MINUTES_DEC"))
+         StepIntegerInput("AUTO_MINUTES", m_auto_minutes, -1, PM_MAX_AUTO_CLOSE_MINUTES, "Auto Close minutes");
+      else if(object_name == Name("AUTO_MINUTES_INC"))
+         StepIntegerInput("AUTO_MINUTES", m_auto_minutes, 1, PM_MAX_AUTO_CLOSE_MINUTES, "Auto Close minutes");
       else if(object_name == Name("ENTRY_BUY"))
          OpenMarket(PM_ENTRY_BUY, trades, validator);
       else if(object_name == Name("ENTRY_SELL"))
@@ -519,7 +592,10 @@ public:
       else if(object_name == Name("CLOSE_SELECTED"))
          CloseSelected(trades);
       else if(object_name == Name("SL_MODE"))
+        {
          m_sl_mode = m_sl_mode == PM_PRICE_ABSOLUTE ? PM_PRICE_PIPS : PM_PRICE_ABSOLUTE;
+         m_stop_committed[0] = ObjectGetString(0, Name("SL_VALUE"), OBJPROP_TEXT);
+        }
       else if(object_name == Name("SL_DEC"))
          ShiftStopEditor(true, -1);
       else if(object_name == Name("SL_INC"))
@@ -529,7 +605,10 @@ public:
       else if(object_name == Name("CLEAR_SL"))
          ClearStopTarget(true, positions, trades, actions);
       else if(object_name == Name("TP_MODE"))
+        {
          m_tp_mode = m_tp_mode == PM_PRICE_ABSOLUTE ? PM_PRICE_PIPS : PM_PRICE_ABSOLUTE;
+         m_stop_committed[1] = ObjectGetString(0, Name("TP_VALUE"), OBJPROP_TEXT);
+        }
       else if(object_name == Name("TP_DEC"))
          ShiftStopEditor(false, -1);
       else if(object_name == Name("TP_INC"))
@@ -553,14 +632,38 @@ public:
         }
       else if(object_name == Name("EQ_MODE"))
          m_equity_guard_mode = m_equity_guard_mode == PM_EQUITY_THRESHOLD_AMOUNT ? PM_EQUITY_THRESHOLD_PERCENT : PM_EQUITY_THRESHOLD_AMOUNT;
+      else if(object_name == Name("EQ_LOSS_DEC"))
+         StepThresholdInput("EQ_LOSS_VALUE", m_equity_guard_loss_threshold, -ThresholdStep(), PM_MAX_EQUITY_THRESHOLD);
+      else if(object_name == Name("EQ_LOSS_INC"))
+         StepThresholdInput("EQ_LOSS_VALUE", m_equity_guard_loss_threshold, ThresholdStep(), PM_MAX_EQUITY_THRESHOLD);
+      else if(object_name == Name("EQ_PROFIT_DEC"))
+         StepThresholdInput("EQ_PROFIT_VALUE", m_equity_guard_profit_threshold, -ThresholdStep(), PM_MAX_EQUITY_THRESHOLD);
+      else if(object_name == Name("EQ_PROFIT_INC"))
+         StepThresholdInput("EQ_PROFIT_VALUE", m_equity_guard_profit_threshold, ThresholdStep(), PM_MAX_EQUITY_THRESHOLD);
       else if(object_name == Name("TS_SYMBOL"))
          CycleSymbol(m_trailing_symbol);
       else if(object_name == Name("TS_DIRECTION"))
          m_trailing_direction = NextDirection(m_trailing_direction);
       else if(object_name == Name("BE_ENABLED"))
          m_break_even_enabled = !m_break_even_enabled;
+      else if(object_name == Name("BE_TRIGGER_DEC"))
+         StepIntegerInput("BE_TRIGGER_VALUE", m_be_trigger_pips, -1, PM_MAX_TRAILING_POINTS, "Break Even Trigger");
+      else if(object_name == Name("BE_TRIGGER_INC"))
+         StepIntegerInput("BE_TRIGGER_VALUE", m_be_trigger_pips, 1, PM_MAX_TRAILING_POINTS, "Break Even Trigger");
+      else if(object_name == Name("BE_LOCK_DEC"))
+         StepIntegerInput("BE_LOCK_VALUE", m_be_lock_pips, -1, PM_MAX_TRAILING_POINTS, "Break Even Lock");
+      else if(object_name == Name("BE_LOCK_INC"))
+         StepIntegerInput("BE_LOCK_VALUE", m_be_lock_pips, 1, PM_MAX_TRAILING_POINTS, "Break Even Lock");
       else if(object_name == Name("TRAIL_ENABLED"))
          m_trailing_enabled = !m_trailing_enabled;
+      else if(object_name == Name("TRAIL_TRIGGER_DEC"))
+         StepIntegerInput("TRAIL_TRIGGER_VALUE", m_trail_trigger_pips, -1, PM_MAX_TRAILING_POINTS, "Trailing Trigger");
+      else if(object_name == Name("TRAIL_TRIGGER_INC"))
+         StepIntegerInput("TRAIL_TRIGGER_VALUE", m_trail_trigger_pips, 1, PM_MAX_TRAILING_POINTS, "Trailing Trigger");
+      else if(object_name == Name("TRAIL_DIST_DEC"))
+         StepIntegerInput("TRAIL_DIST_VALUE", m_trail_pips, -1, PM_MAX_TRAILING_POINTS, "Trailing Distance");
+      else if(object_name == Name("TRAIL_DIST_INC"))
+         StepIntegerInput("TRAIL_DIST_VALUE", m_trail_pips, 1, PM_MAX_TRAILING_POINTS, "Trailing Distance");
       else
          ToggleRowSelection(object_name);
       m_controls_dirty = true;
@@ -570,6 +673,417 @@ public:
      }
 
 private:
+   bool IsPriceLineObject(const string object_name)
+     {
+      return object_name == PM_SL_EDIT_LINE_NAME || object_name == PM_TP_EDIT_LINE_NAME ||
+             StringFind(object_name, PM_SL_EDIT_LABEL_NAME) == 0 ||
+             StringFind(object_name, PM_TP_EDIT_LABEL_NAME) == 0;
+     }
+   string PriceLineName(const int index)
+     {
+      return index == 0 ? PM_SL_EDIT_LINE_NAME : PM_TP_EDIT_LINE_NAME;
+     }
+   string PriceLabelName(const int index, const int row)
+     {
+      return (index == 0 ? PM_SL_EDIT_LABEL_NAME : PM_TP_EDIT_LABEL_NAME) +
+             IntegerToString(row);
+     }
+   string StopSuffix(const int index) { return index == 0 ? "SL_VALUE" : "TP_VALUE"; }
+   void CancelPriceDrag()
+     {
+      if(m_price_drag.Index() >= 0)
+         ChartSetInteger(0, CHART_MOUSE_SCROLL, m_price_scroll_before);
+      m_price_drag.Cancel();
+      m_price_drag_moved = false;
+     }
+   void DeletePriceLineObjects()
+     {
+      CancelPriceDrag();
+      for(int i = 0; i < 2; i++)
+        {
+         ObjectDelete(0, PriceLineName(i));
+         for(int row = 0; row < 4; row++)
+            ObjectDelete(0, PriceLabelName(i, row));
+         m_price_line_visible[i] = false;
+        }
+     }
+   bool PriceInteger(const string name, const ENUM_OBJECT_PROPERTY_INTEGER property,
+                      const long value)
+     {
+      if(ObjectGetInteger(0, name, property) == value) return true;
+      const bool ok = ObjectSetInteger(0, name, property, value);
+      if(ok) m_force_redraw = true;
+      return ok;
+     }
+   bool PriceText(const string name, const string text)
+     {
+      if(ObjectGetString(0, name, OBJPROP_TEXT) == text) return true;
+      const bool ok = ObjectSetString(0, name, OBJPROP_TEXT, text);
+      if(ok) m_force_redraw = true;
+      return ok;
+     }
+   void HidePriceLine(const int index)
+     {
+      m_price_line_visible[index] = false;
+      m_price_label_width[index] = 0;
+      m_price_label_height[index] = 0;
+      if(ObjectFind(0, PriceLineName(index)) >= 0)
+         PriceInteger(PriceLineName(index), OBJPROP_TIMEFRAMES, OBJ_NO_PERIODS);
+      for(int row = 0; row < 4; row++)
+         if(ObjectFind(0, PriceLabelName(index, row)) >= 0)
+            PriceInteger(PriceLabelName(index, row), OBJPROP_TIMEFRAMES, OBJ_NO_PERIODS);
+     }
+   void HidePriceLines()
+     {
+      CancelPriceDrag();
+      HidePriceLine(0);
+      HidePriceLine(1);
+     }
+   bool SelectedPriceSymbol()
+     {
+      if(ArraySize(m_selected) == 0) return false;
+      for(int i = 0; i < ArraySize(m_selected); i++)
+        {
+         PMPosition position = {};
+         if(!FindCachedPosition(m_selected[i], position) || position.symbol != _Symbol)
+            return false;
+        }
+      return true;
+     }
+   string PriceSelectionKey()
+     {
+      string key = StringFormat("%s:%d:%d:%d:%d", _Symbol, (int)m_active_tab,
+                                 (int)m_collapsed, (int)m_sl_mode, (int)m_tp_mode);
+      for(int i = 0; i < ArraySize(m_selected); i++)
+        {
+         PMPosition position = {};
+         if(!FindCachedPosition(m_selected[i], position)) return key + ":missing";
+         // Netting trades can change the position without changing its ticket.
+         key += StringFormat(":%I64u:%s:%d:%.8f:%.8f", position.ticket,
+                              position.symbol, (int)position.type,
+                              position.volume, position.open_price);
+        }
+      return key;
+     }
+   void SyncPriceContext()
+     {
+      const string context = PriceSelectionKey();
+      if(context == m_price_line_selection_key) return;
+      CancelPriceDrag();
+      m_price_line_selection_key = context;
+      for(int i = 0; i < 2; i++) m_price_seed[i] = 0.0;
+      // Selection changes invalidate a drag, not the user's Price/Pips text.
+     }
+   bool ReadOrSeedStopPrice(const int index, const MqlTick &tick, double &price)
+     {
+      price = 0.0;
+      const string input = m_stop_committed[index];
+      if(input != "")
+        {
+         if(!PMIsUnsignedDecimalText(input)) return false;
+         price = StringToDouble(input);
+         return MathIsValidNumber(price) && price > 0.0;
+        }
+      if(m_price_seed[index] > 0.0) { price = m_price_seed[index]; return true; }
+      PMPosition first = {};
+      if(!FirstSelectedPosition(first)) return false;
+      const bool is_sl = index == 0;
+      double existing = is_sl ? first.sl : first.tp;
+      for(int i = 0; i < ArraySize(m_selected); i++)
+        {
+         PMPosition position = {};
+         if(!FindCachedPosition(m_selected[i], position)) return false;
+         if((is_sl ? position.sl : position.tp) != existing) existing = 0.0;
+        }
+      if(existing > 0.0 && MathIsValidNumber(existing))
+         price = existing;
+      else
+        {
+         const double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+         const double tick_size = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
+         const long level = MathMax(SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL),
+                                     SymbolInfoInteger(_Symbol, SYMBOL_TRADE_FREEZE_LEVEL));
+         const double distance = level * point + MathMax(point, tick_size) * 2.0;
+         const double reference = first.type == POSITION_TYPE_BUY ? tick.bid : tick.ask;
+         const bool upward = first.type == POSITION_TYPE_BUY ? !is_sl : is_sl;
+         price = reference + (upward ? distance : -distance);
+        }
+      price = PMNormalizePrice(price, SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE),
+                                (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS));
+      m_price_seed[index] = price;
+      return price > 0.0;
+     }
+   string SignedValue(const double value, const int digits)
+     {
+      const double rounded = NormalizeDouble(value, digits);
+      return (rounded >= 0.0 ? "+" : "") + DoubleToString(rounded, digits);
+     }
+   void BuildPriceLineText(const int index, const double price, string &lines[])
+     {
+      ArrayResize(lines, 4);
+      CPriceEditEstimate estimate;
+      bool money_ok = true, valid = true;
+      CValidationService validator;
+      const double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+      for(int i = 0; i < ArraySize(m_selected); i++)
+        {
+         PMPosition position = {};
+         if(!FindCachedPosition(m_selected[i], position)) { valid = false; money_ok = false; continue; }
+         double target = 0.0;
+         string reason = "";
+         if(!validator.CalculateTarget(position, index == 0, PM_PRICE_ABSOLUTE,
+                                        price, target, reason)) valid = false;
+         const double points = PMProfitPoints(position.open_price, position.type, price, point);
+         ENUM_ORDER_TYPE side = ORDER_TYPE_BUY;
+         if(position.type == POSITION_TYPE_SELL) side = ORDER_TYPE_SELL;
+         double profit = 0.0;
+         const bool calculated = OrderCalcProfit(side, _Symbol, position.volume,
+                                                 position.open_price, price, profit);
+         estimate.Add(position.type == POSITION_TYPE_BUY, position.volume, points,
+                       calculated, profit);
+        }
+      const int digits = (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS);
+      lines[0] = (index == 0 ? "SL" : "TP") + " draft " + DoubleToString(price, digits) +
+                 (valid ? "" : " | Invalid");
+      lines[1] = "Est. " + (money_ok && estimate.MoneyKnown() ?
+                 SignedValue(estimate.Money(), (int)AccountInfoInteger(ACCOUNT_CURRENCY_DIGITS)) : "N/A") +
+                 " " + AccountInfoString(ACCOUNT_CURRENCY) + StringFormat(" | %d pos", ArraySize(m_selected));
+      lines[2] = estimate.HasBuy() ? "Buy avg " + SignedValue(estimate.BuyPoints(), 1) + " points" : "";
+      lines[3] = estimate.HasSell() ? "Sell avg " + SignedValue(estimate.SellPoints(), 1) + " points" : "";
+     }
+   bool EnsurePriceObjects(const int index, const double price)
+     {
+      const string name = PriceLineName(index);
+      const color line_color = index == 0 ? PM_SL_EDIT_LINE_COLOR : PM_TP_EDIT_LINE_COLOR;
+      if(ObjectFind(0, name) < 0)
+        {
+         if(!ObjectCreate(0, name, OBJ_HLINE, 0, 0, price)) return false;
+         m_force_redraw = true;
+        }
+      // Mouse capture is handled below. Native dragging would race timer rendering.
+      bool ok = PriceInteger(name, OBJPROP_SELECTABLE, false);
+      ok = PriceInteger(name, OBJPROP_SELECTED, false) && ok;
+      ok = PriceInteger(name, OBJPROP_HIDDEN, true) && ok;
+      ok = PriceInteger(name, OBJPROP_BACK, true) && ok;
+      ok = PriceInteger(name, OBJPROP_COLOR, line_color) && ok;
+      ok = PriceInteger(name, OBJPROP_STYLE, STYLE_DASH) && ok;
+      ok = PriceInteger(name, OBJPROP_WIDTH, 1) && ok;
+      if(ObjectGetDouble(0, name, OBJPROP_PRICE) != price)
+        {
+         ok = ObjectSetDouble(0, name, OBJPROP_PRICE, price) && ok;
+         m_force_redraw = true;
+        }
+      for(int row = 0; row < 4; row++)
+        {
+         const string label = PriceLabelName(index, row);
+         if(ObjectFind(0, label) < 0)
+           {
+            if(!ObjectCreate(0, label, OBJ_LABEL, 0, 0, 0)) return false;
+            ObjectSetString(0, label, OBJPROP_FONT, "Arial");
+            m_force_redraw = true;
+           }
+         ok = PriceInteger(label, OBJPROP_SELECTABLE, false) && ok;
+         ok = PriceInteger(label, OBJPROP_HIDDEN, true) && ok;
+         ok = PriceInteger(label, OBJPROP_CORNER, CORNER_LEFT_UPPER) && ok;
+         ok = PriceInteger(label, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER) && ok;
+         ok = PriceInteger(label, OBJPROP_FONTSIZE, 9) && ok;
+         ok = PriceInteger(label, OBJPROP_COLOR, line_color) && ok;
+        }
+      return ok;
+     }
+   bool UpdatePriceLine(const int index, const MqlTick &tick, bool &outside)
+     {
+      outside = false;
+      if((index == 0 ? m_sl_mode : m_tp_mode) != PM_PRICE_ABSOLUTE)
+        { HidePriceLine(index); return true; }
+      double price = 0.0;
+      if(m_price_drag.Index() == index) price = m_price_drag.Price();
+      else if(!ReadOrSeedStopPrice(index, tick, price))
+        { HidePriceLine(index); return true; }
+      price = PMNormalizePrice(price, SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE),
+                                (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS));
+      if(price <= 0.0) { HidePriceLine(index); return true; }
+      int ignored_x = 0, price_y = 0;
+      if(!ChartTimePriceToXY(0, 0, tick.time, price, ignored_x, price_y))
+        { HidePriceLine(index); outside = true; return true; }
+      if(price_y < 0 || price_y >= m_chart_height)
+        { HidePriceLine(index); outside = true; return true; }
+      string lines[];
+      BuildPriceLineText(index, price, lines);
+      int width = 0, row_height = 18;
+      TextSetFont("Arial", -90, FW_NORMAL);
+      for(int row = 0; row < 4; row++)
+        {
+         uint w = 0, h = 0;
+         if(!TextGetSize(lines[row], w, h)) w = StringLen(lines[row]) * 8;
+         width = MathMax(width, (int)w);
+         row_height = MathMax(row_height, (int)h + 3);
+        }
+      const int height = 4 * row_height;
+      const int other = 1 - index;
+      int label_x = 0, label_y = 0;
+      const bool placed = PMPlacePriceLabel((int)m_chart_width, (int)m_chart_height,
+                                            price_y, width, height,
+                                            m_origin_x - 4, m_origin_y - 4,
+                                            m_panel_width + 8, PanelHeight() + 8,
+                                            m_price_label_x[other], m_price_label_y[other],
+                                            m_price_label_width[other], m_price_label_height[other] + 4,
+                                            label_x, label_y);
+      if(!EnsurePriceObjects(index, price)) { HidePriceLine(index); return false; }
+      bool ok = PriceInteger(PriceLineName(index), OBJPROP_TIMEFRAMES, OBJ_ALL_PERIODS);
+      m_price_line_visible[index] = true;
+      m_price_line_y[index] = price_y;
+      m_price_line_price[index] = price;
+      m_price_label_x[index] = label_x;
+      m_price_label_y[index] = label_y;
+      m_price_label_width[index] = placed ? width : 0;
+      m_price_label_height[index] = placed ? height : 0;
+      for(int row = 0; row < 4; row++)
+        {
+         const string label = PriceLabelName(index, row);
+         ok = PriceInteger(label, OBJPROP_XDISTANCE, label_x) && ok;
+         ok = PriceInteger(label, OBJPROP_YDISTANCE, label_y + row * row_height) && ok;
+         ok = PriceText(label, lines[row]) && ok;
+         ok = PriceInteger(label, OBJPROP_TIMEFRAMES,
+                            placed && lines[row] != "" ? OBJ_ALL_PERIODS : OBJ_NO_PERIODS) && ok;
+        }
+      if(!placed) outside = true;
+      if(!ok) HidePriceLine(index);
+      return ok;
+     }
+   void UpdatePriceLines()
+     {
+      SyncPriceContext();
+      if(m_sl_mode != PM_PRICE_ABSOLUTE && m_tp_mode != PM_PRICE_ABSOLUTE)
+        {
+         HidePriceLines();
+         PriceText(Name("STOPS_HINT"), "Lines are available in Price mode.");
+         return;
+        }
+      if(!SelectedPriceSymbol())
+        {
+         HidePriceLines();
+         PriceText(Name("STOPS_HINT"), "Lines: select positions of the chart symbol.");
+         return;
+        }
+      MqlTick tick = {};
+      const double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+      const double tick_size = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
+      if(!SymbolInfoTick(_Symbol, tick) || tick.bid <= 0.0 || tick.ask <= 0.0 ||
+         point <= 0.0 || tick_size <= 0.0)
+        {
+         HidePriceLines();
+         PriceText(Name("STOPS_HINT"), "Lines unavailable: no price or symbol settings.");
+         return;
+        }
+      // Place SL first, then TP around it, so equal-price labels remain accessible.
+      m_price_label_width[0] = 0;
+      m_price_label_width[1] = 0;
+      bool sl_outside = false, tp_outside = false;
+      const bool sl_ok = UpdatePriceLine(0, tick, sl_outside);
+      const bool tp_ok = UpdatePriceLine(1, tick, tp_outside);
+      bool invalid_input = false;
+      for(int i = 0; i < 2; i++)
+         if((i == 0 ? m_sl_mode : m_tp_mode) == PM_PRICE_ABSOLUTE && m_stop_committed[i] != "")
+           {
+            const double value = StringToDouble(m_stop_committed[i]);
+            if(!PMIsUnsignedDecimalText(m_stop_committed[i]) || !MathIsValidNumber(value) ||
+               PMNormalizePrice(value, tick_size, (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS)) <= 0.0)
+               invalid_input = true;
+           }
+      const string hint = !sl_ok || !tp_ok ? "Lines unavailable: chart object update failed." :
+                          invalid_input ? "Lines unavailable: enter a positive Price value." :
+                          sl_outside || tp_outside ? "Lines/labels outside view: resize chart or price scale." :
+                          "Drag a line or its label; Set / Change applies the draft.";
+      PriceText(Name("STOPS_HINT"), hint);
+     }
+   void CommitStopEditor(const int index)
+     {
+      const string suffix = StopSuffix(index);
+      string input = ObjectGetString(0, Name(suffix), OBJPROP_TEXT);
+      if((index == 0 ? m_sl_mode : m_tp_mode) == PM_PRICE_ABSOLUTE &&
+         PMIsUnsignedDecimalText(input) &&
+         (ArraySize(m_selected) == 0 || SelectedPriceSymbol()))
+        {
+         // Mixed-symbol forms keep their input precision for per-ticket validation.
+         const string symbol = _Symbol;
+         const double price = PMNormalizePrice(StringToDouble(input),
+                                                SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE),
+                                                (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS));
+         if(price > 0.0)
+           {
+            input = PMFormatPrice(symbol, price);
+            ObjectSetString(0, Name(suffix), OBJPROP_TEXT, input);
+           }
+        }
+      m_stop_committed[index] = input;
+      CancelPriceDrag();
+     }
+   bool HandlePriceMouse(const int x, const int y, const bool pressed, const bool started)
+     {
+      SyncPriceContext();
+      if(m_price_drag.Index() < 0)
+        {
+         if(!started || m_collapsed || m_active_tab != PM_PANEL_TAB_STOPS ||
+            !SelectedPriceSymbol() ||
+            PMRectOverlaps(x, y, 1, 1, m_origin_x, m_origin_y, m_panel_width, PanelHeight()))
+            return false;
+         int chosen = -1, distance = 6;
+         // Labels disambiguate SL/TP at the same price.
+         for(int i = 0; i < 2; i++)
+            if(m_price_line_visible[i] &&
+               PMRectOverlaps(x, y, 1, 1, m_price_label_x[i], m_price_label_y[i],
+                               m_price_label_width[i], m_price_label_height[i])) chosen = i;
+         if(chosen < 0)
+            for(int i = 0; i < 2; i++)
+               if(m_price_line_visible[i] && MathAbs(y - m_price_line_y[i]) < distance)
+                 { distance = (int)MathAbs(y - m_price_line_y[i]); chosen = i; }
+         if(chosen < 0) return false;
+         long scroll = 1;
+         ChartGetInteger(0, CHART_MOUSE_SCROLL, 0, scroll);
+         m_price_scroll_before = scroll != 0;
+         if(!ChartSetInteger(0, CHART_MOUSE_SCROLL, false)) return false;
+         m_price_drag.Begin(chosen, m_price_line_selection_key, m_price_line_price[chosen]);
+         m_price_mouse_start_y = y;
+         m_price_mouse_start_price = m_price_line_price[chosen];
+         m_price_drag_moved = false;
+         return true;
+        }
+      // Use the price delta from mouse-down: grabbing a displaced label does not jump the line.
+      int window = 0, start_window = 0;
+      datetime time = 0, start_time = 0;
+      double price = 0.0, start_price = 0.0;
+      if(ChartXYToTimePrice(0, x, y, window, time, price) && window == 0 &&
+         ChartXYToTimePrice(0, x, m_price_mouse_start_y, start_window, start_time, start_price) &&
+         start_window == 0)
+        {
+         const double candidate = PMNormalizePrice(m_price_mouse_start_price + price - start_price,
+                                                   SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE),
+                                                   (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS));
+         if(candidate > 0.0)
+           {
+            m_price_drag.Move(candidate);
+            if(y != m_price_mouse_start_y) m_price_drag_moved = true;
+           }
+        }
+      if(!pressed)
+        {
+         int index = -1;
+         double final_price = 0.0;
+         const bool moved = m_price_drag_moved;
+         const bool accepted = m_price_drag.Finish(m_price_line_selection_key, index, final_price);
+         ChartSetInteger(0, CHART_MOUSE_SCROLL, m_price_scroll_before);
+         m_price_drag_moved = false;
+         if(accepted && moved)
+           {
+            m_stop_committed[index] = PMFormatPrice(_Symbol, final_price);
+            ObjectSetString(0, Name(StopSuffix(index)), OBJPROP_TEXT, m_stop_committed[index]);
+            SetStatus((index == 0 ? "SL" : "TP") + " draft updated. Set / Change applies it.");
+           }
+        }
+      Render();
+      return true;
+     }
    void RenderControlStates()
      {
       ObjectSetString(0, Name("FILTER_SYMBOL"), OBJPROP_TEXT, FilterSymbol());
@@ -767,7 +1281,11 @@ private:
      {
       if(ArraySize(m_selected) == 0) { SetStatus("No positions selected."); return; }
       const string suffix = is_sl ? "SL_VALUE" : "TP_VALUE";
-      const double value = StringToDouble(ObjectGetString(0, Name(suffix), OBJPROP_TEXT));
+      CommitStopEditor(is_sl ? 0 : 1);
+      const string input = ObjectGetString(0, Name(suffix), OBJPROP_TEXT);
+      if(!PMIsUnsignedDecimalText(input))
+        { SetStatus("SL/TP value must be a positive number."); return; }
+      const double value = StringToDouble(input);
       PMBatchResult result;
       string validation_error = "";
       if(!actions.ApplyStopTarget(m_selected, is_sl, is_sl ? m_sl_mode : m_tp_mode, value, positions, trades, validator, result, validation_error))
@@ -786,6 +1304,7 @@ private:
       double value = StringToDouble(ObjectGetString(0, Name(suffix), OBJPROP_TEXT));
       if(!MathIsValidNumber(value) || value < 0.0) value = 0.0;
       if(value > maximum) value = maximum;
+      value = NormalizeDouble(value, digits);
       target = value;
       ObjectSetString(0, Name(suffix), OBJPROP_TEXT, DoubleToString(value, digits));
      }
@@ -796,6 +1315,35 @@ private:
       if(value > maximum) value = maximum;
       target = (int)value;
       ObjectSetString(0, Name(suffix), OBJPROP_TEXT, IntegerToString(target));
+     }
+   double ThresholdStep()
+     {
+      return m_equity_guard_mode == PM_EQUITY_THRESHOLD_PERCENT ? 0.1 : 1.0;
+     }
+   void StepIntegerInput(const string suffix,
+                         int &target,
+                         const int delta,
+                         const int maximum,
+                         const string description)
+     {
+      CommitIntegerValue(suffix, target, maximum);
+      target = PMStepInteger(target, delta, 0, maximum);
+      ObjectSetString(0, Name(suffix), OBJPROP_TEXT, IntegerToString(target));
+      SetStatus(StringFormat("%s set to %d.", description, target));
+     }
+   void StepThresholdInput(const string suffix,
+                           double &target,
+                           const double delta,
+                           const double maximum)
+     {
+      CommitDoubleValue(suffix, target, maximum, 2);
+      target = PMStepDecimal(target, delta, 0.0, maximum, 2);
+      ObjectSetString(0, Name(suffix), OBJPROP_TEXT, DoubleToString(target, 2));
+      SetStatus(StringFormat("%s set to %.2f (%s).",
+                             suffix == "EQ_LOSS_VALUE" ? "Max Loss" : "Max Profit",
+                             target,
+                             m_equity_guard_mode == PM_EQUITY_THRESHOLD_PERCENT ? "Percent" : "Amount"));
+      UpdateEquityGuardVisuals();
      }
    bool HandleEditEnd(const string object_name)
      {
@@ -831,8 +1379,8 @@ private:
          else
             SetStatus(reason);
         }
-      else if(object_name == Name("SL_VALUE")) { SetStatus("SL value updated."); }
-      else if(object_name == Name("TP_VALUE")) { SetStatus("TP value updated."); }
+      else if(object_name == Name("SL_VALUE")) { CommitStopEditor(0); SetStatus("SL draft updated."); }
+      else if(object_name == Name("TP_VALUE")) { CommitStopEditor(1); SetStatus("TP draft updated."); }
       else return false;
       m_controls_dirty = true;
       m_positions_dirty = true;
@@ -1017,9 +1565,11 @@ private:
            }
          value = PMShiftPriceEditorValue(value, point, tick_size, direction, digits);
          ObjectSetString(0, Name(suffix), OBJPROP_TEXT, DoubleToString(value, digits));
+         CommitStopEditor(is_sl ? 0 : 1);
          return;
         }
       ObjectSetString(0, Name(suffix), OBJPROP_TEXT, DoubleToString(value, 0));
+      CommitStopEditor(is_sl ? 0 : 1);
      }
    bool FirstSelectedPosition(PMPosition &position)
      {
@@ -1283,7 +1833,9 @@ private:
       SetVisible("AUTO_SYMBOL", auto_tab);
       SetVisible("AUTO_DIRECTION", auto_tab);
       SetVisible("MINUTES_LABEL", auto_tab);
+      SetVisible("AUTO_MINUTES_DEC", auto_tab);
       SetVisible("AUTO_MINUTES", auto_tab);
+      SetVisible("AUTO_MINUTES_INC", auto_tab);
       SetVisible("PASSED_BEHAVIOR", auto_tab);
       SetVisible("AUTO_HINT", auto_tab);
       const bool guard = expanded && m_active_tab == PM_PANEL_TAB_GUARD;
@@ -1291,9 +1843,13 @@ private:
       SetVisible("EQ_ENABLED", guard);
       SetVisible("EQ_MODE", guard);
       SetVisible("EQ_LOSS_LABEL", guard);
+      SetVisible("EQ_LOSS_DEC", guard);
       SetVisible("EQ_LOSS_VALUE", guard);
+      SetVisible("EQ_LOSS_INC", guard);
       SetVisible("EQ_PROFIT_LABEL", guard);
+      SetVisible("EQ_PROFIT_DEC", guard);
       SetVisible("EQ_PROFIT_VALUE", guard);
+      SetVisible("EQ_PROFIT_INC", guard);
       SetVisible("EQ_HINT", guard);
       const bool trail = expanded && m_active_tab == PM_PANEL_TAB_TRAIL;
       SetVisible("TS_LABEL", trail);
@@ -1302,15 +1858,23 @@ private:
       SetVisible("BE_LABEL", trail);
       SetVisible("BE_ENABLED", trail);
       SetVisible("BE_TRIGGER_LABEL", trail);
+      SetVisible("BE_TRIGGER_DEC", trail);
       SetVisible("BE_TRIGGER_VALUE", trail);
+      SetVisible("BE_TRIGGER_INC", trail);
       SetVisible("BE_LOCK_LABEL", trail);
+      SetVisible("BE_LOCK_DEC", trail);
       SetVisible("BE_LOCK_VALUE", trail);
+      SetVisible("BE_LOCK_INC", trail);
       SetVisible("TRAIL_LABEL", trail);
       SetVisible("TRAIL_ENABLED", trail);
       SetVisible("TRAIL_TRIGGER_LABEL", trail);
+      SetVisible("TRAIL_TRIGGER_DEC", trail);
       SetVisible("TRAIL_TRIGGER_VALUE", trail);
+      SetVisible("TRAIL_TRIGGER_INC", trail);
       SetVisible("TRAIL_DIST_LABEL", trail);
+      SetVisible("TRAIL_DIST_DEC", trail);
       SetVisible("TRAIL_DIST_VALUE", trail);
+      SetVisible("TRAIL_DIST_INC", trail);
       SetVisible("TRAIL_HINT", trail);
       SetVisible("SESSION_LABEL", expanded);
       for(int row = 0; row < m_rendered_rows; row++)
@@ -1351,7 +1915,8 @@ private:
      }
    string EquityGuardThresholdText(const double value)
      {
-      return value > 0.0 ? DoubleToString(value, 2) : "not set";
+      // Amounts remain in the full-width editors; keep this status readable at high DPI.
+      return value > 0.0 ? "set" : "not set";
      }
    void UpdateEquityThresholdVisual(const string suffix, const double value)
      {
@@ -1619,6 +2184,13 @@ private:
       ObjectSetInteger(0, object_name, OBJPROP_BORDER_COLOR, clrGray);
       return true;
      }
+   bool CreateNumericInput(const string buttons, const string suffix, const string text,
+                            const int x, const int y, const int width)
+     {
+      bool ok = CreateButton(buttons + "_DEC", "-", x, y, 26, 22);
+      ok = CreateEdit(suffix, text, x + 30, y, width, 22) && ok;
+      return CreateButton(buttons + "_INC", "+", x + width + 34, y, 26, 22) && ok;
+     }
    bool CreateEdit(const string suffix, const string text, const int x, const int y, const int width, const int height)
      {
       const string object_name = Name(suffix);
@@ -1696,8 +2268,12 @@ private:
             BeginInteraction(false, x, y);
         }
       if(m_dragging)
+        {
          MovePanelTo(m_interaction_origin_x + x - m_interaction_start_x,
                      m_interaction_origin_y + y - m_interaction_start_y);
+         m_force_redraw = true;
+         Render();
+        }
       else if(m_resizing)
          ResizePanelTo(m_interaction_width + x - m_interaction_start_x,
                        m_interaction_height + y - m_interaction_start_y);
