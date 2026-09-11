@@ -281,21 +281,21 @@ public:
       created = CreateLabel("EQ_HINT", "Guard OFF | Loss: not set | Profit: not set", 12, ContentTop() + 101, clrOrange, 8) && created;
 
       created = CreateLabel("TS_LABEL", "Trailing Scope", 12, ContentTop() + 4, clrSilver, 9) && created;
-      created = CreateButton("TS_SYMBOL", "Symbol", PM_TRAIL_CONTROL_X, ContentTop(), 105, 22) && created;
-      created = CreateButton("TS_DIRECTION", "Both", PM_TRAIL_CONTROL_X + 110, ContentTop(), 85, 22) && created;
+      created = CreateButton("TS_SYMBOL", "Symbol", PM_TRAIL_TOGGLE_X, ContentTop(), 105, 22) && created;
+      created = CreateButton("TS_DIRECTION", "Both", PM_TRAIL_TOGGLE_X + 110, ContentTop(), 85, 22) && created;
       created = CreateLabel("BE_LABEL", "Break Even", 12, ContentTop() + 33, clrSilver, 9) && created;
-      created = CreateButton("BE_ENABLED", "OFF", PM_TRAIL_CONTROL_X, ContentTop() + 28, 60, 22) && created;
-      created = CreateLabel("BE_TRIGGER_LABEL", "Trigger (pips)", 12, ContentTop() + 61, clrSilver, 9) && created;
-      created = CreateNumericInput("BE_TRIGGER", "BE_TRIGGER_VALUE", "", PM_TRAIL_CONTROL_X, ContentTop() + 56, PM_TRAIL_INPUT_WIDTH) && created;
-      created = CreateLabel("BE_LOCK_LABEL", "Lock (pips)", PM_TRAIL_LABEL2_X, ContentTop() + 61, clrSilver, 9) && created;
-      created = CreateNumericInput("BE_LOCK", "BE_LOCK_VALUE", "", PM_TRAIL_CONTROL2_X, ContentTop() + 56, PM_TRAIL_INPUT_WIDTH) && created;
-      created = CreateLabel("TRAIL_LABEL", "Trailing", 12, ContentTop() + 89, clrSilver, 9) && created;
-      created = CreateButton("TRAIL_ENABLED", "OFF", PM_TRAIL_CONTROL_X, ContentTop() + 84, 60, 22) && created;
-      created = CreateLabel("TRAIL_TRIGGER_LABEL", "Trigger (pips)", 12, ContentTop() + 117, clrSilver, 9) && created;
-      created = CreateNumericInput("TRAIL_TRIGGER", "TRAIL_TRIGGER_VALUE", "", PM_TRAIL_CONTROL_X, ContentTop() + 112, PM_TRAIL_INPUT_WIDTH) && created;
-      created = CreateLabel("TRAIL_DIST_LABEL", "Distance (pips)", PM_TRAIL_LABEL2_X, ContentTop() + 117, clrSilver, 9) && created;
-      created = CreateNumericInput("TRAIL_DIST", "TRAIL_DIST_VALUE", "", PM_TRAIL_CONTROL2_X, ContentTop() + 112, PM_TRAIL_INPUT_WIDTH) && created;
-      created = CreateLabel("TRAIL_HINT", "Trailing Trigger 0 uses Distance. All distances are pips.", 12, ContentTop() + 144, clrSilver, 8) && created;
+      created = CreateButton("BE_ENABLED", "OFF", PM_TRAIL_TOGGLE_X, ContentTop() + 28, 60, 22) && created;
+      created = CreateLabel("BE_TRIGGER_LABEL", "Trigger", PM_TRAIL_LABEL1_X, ContentTop() + 33, clrSilver, 9) && created;
+      created = CreateNumericInput("BE_TRIGGER", "BE_TRIGGER_VALUE", "", PM_TRAIL_INPUT1_X, ContentTop() + 28, PM_TRAIL_INPUT_WIDTH) && created;
+      created = CreateLabel("BE_LOCK_LABEL", "Lock", PM_TRAIL_LABEL2_X, ContentTop() + 33, clrSilver, 9) && created;
+      created = CreateNumericInput("BE_LOCK", "BE_LOCK_VALUE", "", PM_TRAIL_INPUT2_X, ContentTop() + 28, PM_TRAIL_INPUT_WIDTH) && created;
+      created = CreateLabel("TRAIL_LABEL", "Trailing", 12, ContentTop() + 61, clrSilver, 9) && created;
+      created = CreateButton("TRAIL_ENABLED", "OFF", PM_TRAIL_TOGGLE_X, ContentTop() + 56, 60, 22) && created;
+      created = CreateLabel("TRAIL_TRIGGER_LABEL", "Trigger", PM_TRAIL_LABEL1_X, ContentTop() + 61, clrSilver, 9) && created;
+      created = CreateNumericInput("TRAIL_TRIGGER", "TRAIL_TRIGGER_VALUE", "", PM_TRAIL_INPUT1_X, ContentTop() + 56, PM_TRAIL_INPUT_WIDTH) && created;
+      created = CreateLabel("TRAIL_DIST_LABEL", "Distance", PM_TRAIL_LABEL2_X, ContentTop() + 61, clrSilver, 9) && created;
+      created = CreateNumericInput("TRAIL_DIST", "TRAIL_DIST_VALUE", "", PM_TRAIL_INPUT2_X, ContentTop() + 56, PM_TRAIL_INPUT_WIDTH) && created;
+      created = CreateLabel("TRAIL_HINT", "Trailing Trigger 0 uses Distance. All distances are pips.", 12, ContentTop() + 88, clrSilver, 8) && created;
 
       created = CreateLabel("SESSION_LABEL", "Session close: - | Auto close: -", 14, 0, clrSilver, 9) && created;
       for(int line = 0; line < PM_MAX_STATUS_LINES; line++)
