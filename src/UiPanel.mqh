@@ -633,13 +633,45 @@ public:
       else if(object_name == Name("EQ_MODE"))
          m_equity_guard_mode = m_equity_guard_mode == PM_EQUITY_THRESHOLD_AMOUNT ? PM_EQUITY_THRESHOLD_PERCENT : PM_EQUITY_THRESHOLD_AMOUNT;
       else if(object_name == Name("EQ_LOSS_DEC"))
-         AdjustEquityThreshold("EQ_LOSS_VALUE", m_equity_guard_loss_threshold, -ThresholdStep(), PM_MAX_EQUITY_THRESHOLD);
+        {
+         CommitDoubleValue("EQ_LOSS_VALUE", m_equity_guard_loss_threshold, PM_MAX_EQUITY_THRESHOLD, 2);
+         m_equity_guard_loss_threshold = PMStepDecimal(m_equity_guard_loss_threshold,
+                                                       -(m_equity_guard_mode == PM_EQUITY_THRESHOLD_PERCENT ? 0.1 : 1.0),
+                                                       0.0, PM_MAX_EQUITY_THRESHOLD, 2);
+         ObjectSetString(0, Name("EQ_LOSS_VALUE"), OBJPROP_TEXT,
+                         DoubleToString(m_equity_guard_loss_threshold, 2));
+         UpdateEquityGuardVisuals();
+        }
       else if(object_name == Name("EQ_LOSS_INC"))
-         AdjustEquityThreshold("EQ_LOSS_VALUE", m_equity_guard_loss_threshold, ThresholdStep(), PM_MAX_EQUITY_THRESHOLD);
+        {
+         CommitDoubleValue("EQ_LOSS_VALUE", m_equity_guard_loss_threshold, PM_MAX_EQUITY_THRESHOLD, 2);
+         m_equity_guard_loss_threshold = PMStepDecimal(m_equity_guard_loss_threshold,
+                                                       m_equity_guard_mode == PM_EQUITY_THRESHOLD_PERCENT ? 0.1 : 1.0,
+                                                       0.0, PM_MAX_EQUITY_THRESHOLD, 2);
+         ObjectSetString(0, Name("EQ_LOSS_VALUE"), OBJPROP_TEXT,
+                         DoubleToString(m_equity_guard_loss_threshold, 2));
+         UpdateEquityGuardVisuals();
+        }
       else if(object_name == Name("EQ_PROFIT_DEC"))
-         AdjustEquityThreshold("EQ_PROFIT_VALUE", m_equity_guard_profit_threshold, -ThresholdStep(), PM_MAX_EQUITY_THRESHOLD);
+        {
+         CommitDoubleValue("EQ_PROFIT_VALUE", m_equity_guard_profit_threshold, PM_MAX_EQUITY_THRESHOLD, 2);
+         m_equity_guard_profit_threshold = PMStepDecimal(m_equity_guard_profit_threshold,
+                                                          -(m_equity_guard_mode == PM_EQUITY_THRESHOLD_PERCENT ? 0.1 : 1.0),
+                                                          0.0, PM_MAX_EQUITY_THRESHOLD, 2);
+         ObjectSetString(0, Name("EQ_PROFIT_VALUE"), OBJPROP_TEXT,
+                         DoubleToString(m_equity_guard_profit_threshold, 2));
+         UpdateEquityGuardVisuals();
+        }
       else if(object_name == Name("EQ_PROFIT_INC"))
-         AdjustEquityThreshold("EQ_PROFIT_VALUE", m_equity_guard_profit_threshold, ThresholdStep(), PM_MAX_EQUITY_THRESHOLD);
+        {
+         CommitDoubleValue("EQ_PROFIT_VALUE", m_equity_guard_profit_threshold, PM_MAX_EQUITY_THRESHOLD, 2);
+         m_equity_guard_profit_threshold = PMStepDecimal(m_equity_guard_profit_threshold,
+                                                          m_equity_guard_mode == PM_EQUITY_THRESHOLD_PERCENT ? 0.1 : 1.0,
+                                                          0.0, PM_MAX_EQUITY_THRESHOLD, 2);
+         ObjectSetString(0, Name("EQ_PROFIT_VALUE"), OBJPROP_TEXT,
+                         DoubleToString(m_equity_guard_profit_threshold, 2));
+         UpdateEquityGuardVisuals();
+        }
       else if(object_name == Name("TS_SYMBOL"))
          CycleSymbol(m_trailing_symbol);
       else if(object_name == Name("TS_DIRECTION"))
@@ -1281,11 +1313,7 @@ private:
      {
       if(ArraySize(m_selected) == 0) { SetStatus("No positions selected."); return; }
       const string suffix = is_sl ? "SL_VALUE" : "TP_VALUE";
-      CommitStopEditor(is_sl ? 0 : 1);
-      const string input = ObjectGetString(0, Name(suffix), OBJPROP_TEXT);
-      if(!PMIsUnsignedDecimalText(input))
-        { SetStatus("SL/TP value must be a positive number."); return; }
-      const double value = StringToDouble(input);
+      const double value = StringToDouble(ObjectGetString(0, Name(suffix), OBJPROP_TEXT));
       PMBatchResult result;
       string validation_error = "";
       if(!actions.ApplyStopTarget(m_selected, is_sl, is_sl ? m_sl_mode : m_tp_mode, value, positions, trades, validator, result, validation_error))
@@ -1316,10 +1344,6 @@ private:
       target = (int)value;
       ObjectSetString(0, Name(suffix), OBJPROP_TEXT, IntegerToString(target));
      }
-   double ThresholdStep()
-     {
-      return m_equity_guard_mode == PM_EQUITY_THRESHOLD_PERCENT ? 0.1 : 1.0;
-     }
    void StepIntegerInput(const string suffix,
                          int &target,
                          const int delta,
@@ -1330,17 +1354,6 @@ private:
       target = PMStepInteger(target, delta, 0, maximum);
       ObjectSetString(0, Name(suffix), OBJPROP_TEXT, IntegerToString(target));
       SetStatus(StringFormat("%s set to %d.", description, target));
-     }
-   void AdjustEquityThreshold(const string suffix, double &target, const double delta, const double maximum)
-     {
-      CommitDoubleValue(suffix, target, maximum, 2);
-      target = PMStepDecimal(target, delta, 0.0, maximum, 2);
-      ObjectSetString(0, Name(suffix), OBJPROP_TEXT, DoubleToString(target, 2));
-      SetStatus(StringFormat("%s set to %.2f (%s).",
-                             suffix == "EQ_LOSS_VALUE" ? "Max Loss" : "Max Profit",
-                             target,
-                             m_equity_guard_mode == PM_EQUITY_THRESHOLD_PERCENT ? "Percent" : "Amount"));
-      UpdateEquityGuardVisuals();
      }
    bool HandleEditEnd(const string object_name)
      {
