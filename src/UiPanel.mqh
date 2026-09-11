@@ -809,11 +809,11 @@ private:
    bool ReadOrSeedStopPrice(const int index, const MqlTick &tick, double &price)
      {
       price = 0.0;
-      const string input = m_stop_committed[index];
-      if(input != "")
+      const string committed = m_stop_committed[index];
+      if(committed != "")
         {
-         if(!PMIsUnsignedDecimalText(input)) return false;
-         price = StringToDouble(input);
+         if(!PMIsUnsignedDecimalText(committed)) return false;
+         price = StringToDouble(committed);
          return MathIsValidNumber(price) && price > 0.0;
         }
       if(m_price_seed[index] > 0.0) { price = m_price_seed[index]; return true; }
@@ -1032,23 +1032,23 @@ private:
    void CommitStopEditor(const int index)
      {
       const string suffix = StopSuffix(index);
-      string input = ObjectGetString(0, Name(suffix), OBJPROP_TEXT);
+      string text = ObjectGetString(0, Name(suffix), OBJPROP_TEXT);
       if((index == 0 ? m_sl_mode : m_tp_mode) == PM_PRICE_ABSOLUTE &&
-         PMIsUnsignedDecimalText(input) &&
+         PMIsUnsignedDecimalText(text) &&
          (ArraySize(m_selected) == 0 || SelectedPriceSymbol()))
         {
          // Mixed-symbol forms keep their input precision for per-ticket validation.
          const string symbol = _Symbol;
-         const double price = PMNormalizePrice(StringToDouble(input),
+         const double price = PMNormalizePrice(StringToDouble(text),
                                                 SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE),
                                                 (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS));
          if(price > 0.0)
            {
-            input = PMFormatPrice(symbol, price);
-            ObjectSetString(0, Name(suffix), OBJPROP_TEXT, input);
+            text = PMFormatPrice(symbol, price);
+            ObjectSetString(0, Name(suffix), OBJPROP_TEXT, text);
            }
         }
-      m_stop_committed[index] = input;
+      m_stop_committed[index] = text;
       CancelPriceDrag();
      }
    bool HandlePriceMouse(const int x, const int y, const bool pressed, const bool started)
