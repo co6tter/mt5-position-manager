@@ -10,31 +10,24 @@ void TestEntryIntegration() {
                snapshot.sl_price == 0 && result.effective_tp == 0,
                "Initial Entry has no implicitly seeded protections");
     draft.SetPrice(0, 98, 2);
-    AssertTrue(service.Evaluate(_Symbol, draft, -1, 0, snapshot, result, reason) && result.effective_tp == 102,
-               "Setting SL generates default 1:1 TP");
+    AssertTrue(service.Evaluate(_Symbol, draft, -1, 0, snapshot, result, reason) &&
+               result.effective_tp == 0 && draft.tp_state == PM_TP_STATE_OFF,
+               "Setting SL alone never creates a TP");
+    draft.SetPrice(1, 102, 2);
+    service.Evaluate(_Symbol, draft, 1, 104, snapshot, result, reason);
+    AssertTrue(result.effective_tp == 104 && std::abs(result.rr - 2.0) < 1e-9 && draft.stop_text[1] == "102.00",
+               "TP drag previews a candidate without committing input");
+    service.Evaluate(_Symbol, draft, 0, 99, snapshot, result, reason);
+    AssertTrue(snapshot.sl_price == 99 && result.effective_tp == 102 && draft.stop_text[0] == "98.00",
+               "SL drag previews a candidate without moving TP or committing input");
     draft.CancelStop(0);
     AssertTrue(service.Evaluate(_Symbol, draft, -1, 0, snapshot, result, reason) &&
                snapshot.sl_price == 0 && result.effective_tp == 102 && draft.tp_state == PM_TP_STATE_MANUAL,
-               "SL cancellation retains the generated TP in Manual state");
-    draft.SetPrice(0, 97, 2);
-    service.Evaluate(_Symbol, draft, -1, 0, snapshot, result, reason);
-    AssertTrue(result.effective_tp == 102, "Restoring SL does not overwrite the frozen manual TP");
-    draft.CancelStop(1); draft.rr_text = "2";
-    service.Evaluate(_Symbol, draft, -1, 0, snapshot, result, reason);
-    AssertTrue(result.effective_tp == 0 && draft.tp_state == PM_TP_STATE_OFF, "RR changes preserve TP Off");
-    AssertTrue(draft.AutoTP(result.entry, snapshot.sl_price, reason), "Explicit Auto restore with SL succeeds");
-    service.Evaluate(_Symbol, draft, -1, 0, snapshot, result, reason);
-    AssertTrue(result.effective_tp == 106, "Restored Auto uses current SL and multiplier");
-    service.Evaluate(_Symbol, draft, 1, 104, snapshot, result, reason);
-    AssertTrue(result.effective_tp == 104 && std::abs(result.rr - 4.0/3) < 1e-9 && draft.tp_state == PM_TP_STATE_AUTO,
-               "TP drag previews manual candidate without committing state");
-    service.Evaluate(_Symbol, draft, 0, 99, snapshot, result, reason);
-    AssertTrue(result.effective_tp == 102 && snapshot.sl_price == 99 && draft.stop_text[0] == "97.00",
-               "SL drag previews matching Auto TP and preserves committed input");
-    draft.CancelStop(0);
+               "Clearing SL keeps an explicitly set TP");
     draft.CancelStop(1);
-    AssertTrue(!draft.AutoTP(100, 0, reason) && draft.tp_state == PM_TP_STATE_OFF,
-               "Auto restore without SL rejects and preserves Off");
+    AssertTrue(service.Evaluate(_Symbol, draft, -1, 0, snapshot, result, reason) &&
+               result.effective_tp == 0 && draft.tp_state == PM_TP_STATE_OFF,
+               "Clearing TP hides it independently of SL");
 
     // Every order side/type and every independent protection combination.
     for(int kind = 0; kind < 3; ++kind) for(int direction = 0; direction < 2; ++direction)
@@ -70,12 +63,12 @@ void TestEntryIntegration() {
     draft.order_type = PM_ENTRY_ORDER_LIMIT; draft.order_text = "95";
     draft.SetStop(0, "200"); draft.quantity_mode = PM_QUANTITY_RISK_AMOUNT; draft.risk_text = "100";
     AssertTrue(service.Evaluate(_Symbol, draft, -1, 0, snapshot, result, reason) &&
-               snapshot.sl_price == 93 && result.effective_tp == 97 && result.lot == .4,
-               "Pending Points sizing and Auto TP use order price, not Bid/Ask");
+               snapshot.sl_price == 93 && result.effective_tp == 0 && result.lot == .4,
+               "Pending Pips sizing uses order price, not Bid/Ask, and creates no TP");
     draft.quantity_mode = PM_QUANTITY_RISK_PERCENT; draft.risk_text = "1";
     AssertTrue(service.Evaluate(_Symbol, draft, -1, 0, snapshot, result, reason) && result.lot == .4,
                "One percent of balance equals the same amount budget");
-    draft.CancelStop(0);
+    draft.SetPrice(1, 97, 2); draft.CancelStop(0);
     AssertTrue(!service.Evaluate(_Symbol, draft, -1, 0, snapshot, result, reason) && !result.lot_ok && result.effective_tp == 97,
                "Cancel SL in risk mode invalidates lot and retains TP");
     draft.quantity_mode = PM_QUANTITY_MANUAL_LOT;
@@ -99,11 +92,7 @@ void TestEntryIntegration() {
 
     ResetBoundary();
     draft = CEntryDraft(); draft.SetPrice(0, 98, 2);
-    for(const auto &invalid : {"1oops", "", "nan", "-1", "0"}) {
-        draft.rr_text = invalid;
-        AssertTrue(!service.Evaluate(_Symbol, draft, -1, 0, snapshot, result, reason), "Invalid RR cannot fall back to previous multiplier");
-    }
-    draft.rr_text = "1"; draft.quantity_mode = PM_QUANTITY_RISK_AMOUNT;
+    draft.quantity_mode = PM_QUANTITY_RISK_AMOUNT;
     for(const auto &invalid : {"100oops", "", "-1", "0"}) {
         draft.risk_text = invalid;
         AssertTrue(!service.Evaluate(_Symbol, draft, -1, 0, snapshot, result, reason), "Invalid risk text blocks send");
@@ -144,33 +133,26 @@ void TestEntryIntegration() {
     AssertTrue(ui.m_entry_draft.unit[0] == PM_ENTRY_UNIT_PRICE && StringToDouble(ui.m_entry_draft.stop_text[0]) > 0 && sends == 0,
                "Set SL creates a committed price and does not send");
     ui.RefreshEntryComputation(false);
-    const double auto_tp = ui.m_entry_result.effective_tp;
+    AssertTrue(ui.m_entry_snapshot.sl_price > 0 && ui.m_entry_result.effective_tp == 0,
+               "UI Set SL alone leaves TP unset");
     ui.HandleEntryClick("ENTRY_SL_CLEAR", trades); ui.RefreshEntryComputation(false);
-    AssertTrue(ui.m_entry_snapshot.sl_price == 0 && ui.m_entry_result.effective_tp == auto_tp,
-               "UI Clear SL retains automatic TP");
+    AssertTrue(ui.m_entry_snapshot.sl_price == 0 && objects["ENTRY_SL_VALUE"] == "0",
+               "UI Clear SL resets the SL field to 0");
     AssertTrue(objects["SL_VALUE"] == "old position SL" && objects["TP_VALUE"] == "old position TP",
                "Entry clear/set operations leave existing-position edit objects untouched");
     ui.HandleEntryClick("ENTRY_TP_CLEAR", trades); ui.HandleEntryClick("ENTRY_TP_SET", trades); ui.RefreshEntryComputation(false);
     AssertTrue(ui.m_entry_snapshot.sl_price == 0 && ui.m_entry_result.effective_tp > 0 &&
                ui.m_entry_draft.tp_state == PM_TP_STATE_MANUAL, "Set TP alone creates only TP and enables manual sizing");
-    objects["ENTRY_RR"] = "2junk";
-    ui.RefreshEntryComputation(false);
-    AssertTrue(ui.m_entry_valid && ui.m_entry_draft.rr_text == "1.0", "Timer evaluation does not commit half-edited RR");
-    ui.HandleEntryClick("ENTRY_BUY", trades);
-    AssertTrue(sends == 0 && !ui.m_entry_valid, "Send commits latest malformed RR then rejects it");
-    objects["ENTRY_RR"] = "1";
     ui.HandleEntryClick("ENTRY_BUY", trades);
     AssertTrue(sends == 1 && sent_request.sl == 0 && sent_request.tp > 0, "TP-only send uses visible direction and resolved protections");
     ui.HandleEntryClick("ENTRY_SL_SET", trades);
     ui.SwitchEntryUnit(0); ui.RefreshEntryComputation(false);
-    AssertTrue(ui.m_entry_draft.unit[0] == PM_ENTRY_UNIT_POINTS && PMIsUnsignedIntegerText(objects["ENTRY_SL_POINTS"]),
-               "Price to Points conversion displays its rounded distance");
+    AssertTrue(ui.m_entry_draft.unit[0] == PM_ENTRY_UNIT_PIPS && objects["ENTRY_SL_VALUE"] == "2",
+               "Price to Pips conversion displays its distance in pips");
     ui.SwitchEntryUnit(0);
-    AssertTrue(ui.m_entry_draft.unit[0] == PM_ENTRY_UNIT_PRICE, "Points to Price conversion restores explicit price mode");
-    objects["ENTRY_SL_POINTS"] = "0"; ui.CommitEntryEditor("ENTRY_SL_POINTS"); ui.RefreshEntryComputation(false);
+    AssertTrue(ui.m_entry_draft.unit[0] == PM_ENTRY_UNIT_PRICE, "Pips to Price conversion restores explicit price mode");
+    objects["ENTRY_SL_VALUE"] = "0"; ui.CommitEntryEditor("ENTRY_SL_VALUE"); ui.RefreshEntryComputation(false);
     AssertTrue(ui.m_entry_snapshot.sl_price == 0 && ui.m_entry_result.effective_tp > 0, "Typing zero cancels SL without canceling TP");
-    ui.HandleEntryClick("ENTRY_AUTO_TP", trades);
-    AssertTrue(ui.m_entry_draft.tp_state == PM_TP_STATE_MANUAL, "UI auto restore without SL preserves manual TP");
     const int previous_sends = sends;
     ui.m_price_drag.Begin(0, "Entry", 98);
     ui.OpenEntry(trades);
@@ -190,10 +172,10 @@ void TestEntryIntegration() {
     AssertTrue(drag_ui.HandlePriceMouse(820, 210, true, true) && !mouse_scroll,
                "Grabbing Entry SL label captures the mouse and suspends scroll");
     drag_ui.HandlePriceMouse(820, 230, true, false);
-    AssertTrue(drag_ui.m_entry_snapshot.sl_price == 97.8 && drag_ui.m_entry_result.effective_tp == 102.2 &&
-               drag_ui.m_entry_draft.stop_text[0] == "98.00", "Real drag event updates RR/Auto TP preview without committing input");
+    AssertTrue(drag_ui.m_entry_snapshot.sl_price == 97.8 && drag_ui.m_entry_result.effective_tp == 0 &&
+               drag_ui.m_entry_draft.stop_text[0] == "98.00", "Real drag event previews SL without committing input or creating a TP");
     drag_ui.HandlePriceMouse(820, 230, false, false);
-    AssertTrue(drag_ui.m_entry_draft.stop_text[0] == "97.80" && objects["ENTRY_SL_POINTS"] == "97.80" && mouse_scroll,
+    AssertTrue(drag_ui.m_entry_draft.stop_text[0] == "97.80" && objects["ENTRY_SL_VALUE"] == "97.80" && mouse_scroll,
                "Drag release commits Entry Price and restores chart scrolling");
     AssertTrue(objects["SL_VALUE"] == "old SL" && objects["TP_VALUE"] == "old TP" && sends == 0,
                "Entry drag cannot overwrite position editors or submit an order");
@@ -209,7 +191,7 @@ void TestEntryIntegration() {
     const double manual_tp = result.effective_tp;
     current_tick.bid += .5; current_tick.ask += .5;
     service.Evaluate(_Symbol, draft, -1, 0, snapshot, result, reason);
-    AssertTrue(result.effective_tp == manual_tp, "Manual TP entered as Points stays at its committed price after ticks");
+    AssertTrue(result.effective_tp == manual_tp, "Manual TP entered as Pips stays at its committed price after ticks");
 
     ResetBoundary();
     EntryUiHarness render_ui;
@@ -249,11 +231,11 @@ void TestEntryIntegration() {
     simultaneous_ui.HandleEntryClick("ENTRY_TYPE", trades);
     objects["ENTRY_ORDER_PRICE"] = "95"; simultaneous_ui.CommitEntryEditor("ENTRY_ORDER_PRICE");
     objects["ENTRY_ORDER_PRICE"] = "94";
-    objects["ENTRY_TP_POINTS"] = "200"; objects["ENTRY_SL_POINTS"] = "200";
+    objects["ENTRY_TP_VALUE"] = "200"; objects["ENTRY_SL_VALUE"] = "200";
     simultaneous_ui.CommitEntryEditors(); simultaneous_ui.RefreshEntryComputation(false);
     AssertTrue(simultaneous_ui.m_entry_valid && simultaneous_ui.m_entry_result.entry == 94 &&
                simultaneous_ui.m_entry_snapshot.sl_price == 92 && simultaneous_ui.m_entry_result.effective_tp == 96,
-               "Simultaneous price and stop edits resolve manual TP Points from the latest pending price");
+               "Simultaneous price and stop edits resolve manual TP Pips from the latest pending price");
 
     // OBJ_LABEL keeps only 63 characters, so long Entry hints continue on a second row.
     ResetBoundary();
@@ -276,4 +258,25 @@ void TestEntryIntegration() {
     AssertTrue(hint_ui.m_entry_valid && objects["ENTRY_HINT_2"] == " " &&
                hint_ui.EntryPriceLineText(0, 98).find("Invalid") == string::npos,
                "A short hint blanks the second row with a space instead of MT5's default Label text");
+    AssertTrue(objects["ENTRY_SL_MODE"] == "Pips" && objects["ENTRY_TP_MODE"] == "Pips",
+               "Entry SL/TP start in Pips mode");
+
+    ResetBoundary();
+    symbol_values[SYMBOL_DIGITS] = 3; symbol_values[SYMBOL_POINT] = .001; symbol_values[SYMBOL_TRADE_TICK_SIZE] = .001;
+    draft = CEntryDraft(); draft.SetStop(0, "20"); draft.SetStop(1, "12.5");
+    AssertTrue(service.Evaluate(_Symbol, draft, -1, 0, snapshot, result, reason) &&
+               std::abs(snapshot.sl_price - 99.7) < 1e-9 && std::abs(result.effective_tp - 100.025) < 1e-9,
+               "Entry Pips use ten points per pip on a 3-digit symbol and accept decimals");
+
+    // SL/TP tab: Clear resets only its own draft to 0, which hides its line.
+    ResetBoundary();
+    EntryUiHarness stops_ui;
+    objects["SL_VALUE"] = "150.00"; objects["TP_VALUE"] = "155.00";
+    stops_ui.m_stop_committed[0] = "150.00"; stops_ui.m_stop_committed[1] = "155.00";
+    stops_ui.m_price_drag.Begin(0, "Stops", 150); mouse_scroll = false;
+    stops_ui.ResetStopEditor(0);
+    AssertTrue(objects["SL_VALUE"] == "0" && stops_ui.m_stop_committed[0] == "0" &&
+               stops_ui.m_price_drag.Index() < 0 && mouse_scroll &&
+               objects["TP_VALUE"] == "155.00" && stops_ui.m_stop_committed[1] == "155.00",
+               "Clear SL resets only the SL draft to 0 and ends its drag");
 }

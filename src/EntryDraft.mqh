@@ -14,8 +14,7 @@ public:
    PMTpState tp_state;
    PMEntryInputUnit unit[2];
    string stop_text[2];
-   string order_text, lot_text, risk_text, rr_text;
-   double last_auto_tp;
+   string order_text, lot_text, risk_text;
    double manual_tp_price;
 
    CEntryDraft()
@@ -23,11 +22,11 @@ public:
       order_type = PM_ENTRY_ORDER_MARKET;
       side = PM_ENTRY_BUY;
       quantity_mode = PM_QUANTITY_MANUAL_LOT;
-      tp_state = PM_TP_STATE_AUTO;
-      unit[0] = PM_ENTRY_UNIT_POINTS; unit[1] = PM_ENTRY_UNIT_POINTS;
+      tp_state = PM_TP_STATE_OFF;
+      unit[0] = PM_ENTRY_UNIT_PIPS; unit[1] = PM_ENTRY_UNIT_PIPS;
       stop_text[0] = "0"; stop_text[1] = "0";
-      order_text = ""; lot_text = "0.01"; risk_text = "0"; rr_text = "1.0";
-      last_auto_tp = 0.0; manual_tp_price = 0.0;
+      order_text = ""; lot_text = "0.01"; risk_text = "0";
+      manual_tp_price = 0.0;
      }
    bool Number(const string text, const bool zero_allowed, double &value)
      {
@@ -36,18 +35,8 @@ public:
       value = StringToDouble(text);
       return MathIsValidNumber(value) && (zero_allowed ? value >= 0.0 : value > 0.0);
      }
-   void FreezeAutoTP()
-     {
-      if(tp_state != PM_TP_STATE_AUTO) return;
-      unit[1] = PM_ENTRY_UNIT_PRICE;
-      stop_text[1] = DoubleToString(last_auto_tp, 8);
-      tp_state = PM_TP_STATE_MANUAL;
-      manual_tp_price = last_auto_tp;
-     }
    void SetStop(const int index, const string text)
      {
-      if(index == 0 && PMIsUnsignedDecimalText(text) && StringToDouble(text) == 0.0)
-         FreezeAutoTP();
       stop_text[index] = text;
       if(index == 1)
         {
@@ -62,15 +51,7 @@ public:
       SetStop(index, DoubleToString(price, digits));
      }
    void CancelStop(const int index) { SetStop(index, "0"); }
-   bool AutoTP(const double entry, const double sl, string &reason)
-     {
-      PMTpState next = tp_state;
-      if(!PMNextTakeProfitState(tp_state, PM_TP_EVENT_REVERT_TO_AUTO,
-                                PMIsStopLossOnLossSide(side, entry, sl), next, reason)) return false;
-      tp_state = next;
-      return true;
-     }
-   double PointsBase(const PMEntrySnapshot &snapshot, const double entry)
+   double PipsBase(const PMEntrySnapshot &snapshot, const double entry)
      {
       return order_type == PM_ENTRY_ORDER_MARKET ?
              (side == PM_ENTRY_BUY ? snapshot.bid : snapshot.ask) : entry;
@@ -81,15 +62,15 @@ public:
       price = 0.0;
       double value = 0.0;
       if(!Number(stop_text[index], true, value) ||
-         (unit[index] == PM_ENTRY_UNIT_POINTS &&
-          (!PMIsUnsignedIntegerText(stop_text[index]) || value > PM_MAX_TRAILING_POINTS)))
-        { reason = "SL/TP input is invalid for its Price/Points mode."; return false; }
+         (unit[index] == PM_ENTRY_UNIT_PIPS && value > PM_MAX_TRAILING_POINTS))
+        { reason = "SL/TP input is invalid for its Price/Pips mode."; return false; }
       if(value == 0.0) return true;
       if(unit[index] == PM_ENTRY_UNIT_PRICE) price = value;
       else
         {
          const bool upward = side == PM_ENTRY_BUY ? index == 1 : index == 0;
-         price = PointsBase(snapshot, entry) + (upward ? value : -value) * snapshot.point;
+         const double distance = PMPipsToPointDistance(value, snapshot.digits) * snapshot.point;
+         price = PipsBase(snapshot, entry) + (upward ? distance : -distance);
         }
       price = PMNormalizePrice(price, snapshot.tick_size, snapshot.digits);
       if(!MathIsValidNumber(price) || price <= 0.0)
@@ -118,14 +99,12 @@ public:
            {
             if(!ResolveStop(1, snapshot, entry, snapshot.tp_price, reason)) return false;
             // A directly entered TP becomes an absolute draft once resolved.
-            // Points remains the visible input unit, not a request to chase ticks.
+            // Pips remains the visible input unit, not a request to chase ticks.
             if(drag_index < 0) manual_tp_price = snapshot.tp_price;
            }
         }
       if(drag_index == 0) snapshot.sl_price = drag_price;
       if(drag_index == 1) { snapshot.tp_price = drag_price; snapshot.tp_state = PM_TP_STATE_MANUAL; }
-      if(!Number(rr_text, false, snapshot.rr_multiplier))
-        { reason = "RR must be a positive finite number."; return false; }
       if(quantity_mode == PM_QUANTITY_MANUAL_LOT)
         {
          if(!Number(lot_text, false, snapshot.manual_lot))

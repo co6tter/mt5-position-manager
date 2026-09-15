@@ -1331,6 +1331,19 @@ void TestLabelTextLimits()
               "Over-limit label text is shortened with a visible ellipsis");
   }
 
+void TestStopDraftPrice()
+  {
+   double price = -1.0;
+   AssertTrue(!PMStopDraftPrice("0", price) && price == 0.0,
+              "A zero SL/TP draft shows no line");
+   AssertTrue(!PMStopDraftPrice("", price),
+              "An empty SL/TP draft shows no line");
+   AssertTrue(!PMStopDraftPrice("abc", price) && !PMStopDraftPrice("-1", price),
+              "Malformed SL/TP drafts show no line");
+   AssertTrue(PMStopDraftPrice("154.588", price) && MathAbs(price - 154.588) < 0.0000001,
+              "A positive SL/TP draft shows its line at that price");
+  }
+
 void TestInputStepperHelpers()
   {
    AssertTrue(PMStepInteger(0, -1, 0, 1440) == 0,
@@ -1514,6 +1527,7 @@ void OnStart()
    TestEntryReviewRegressions();
    TestPanelLayoutHelpers();
    TestLabelTextLimits();
+   TestStopDraftPrice();
    TestInputStepperHelpers();
    TestPriceEditorHelpers();
    TestPriceDragLifecycle();

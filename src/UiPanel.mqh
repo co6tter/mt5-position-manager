@@ -77,7 +77,6 @@ private:
    CPriceEditDrag m_price_drag;
    string m_price_line_selection_key;
    string m_stop_committed[2];
-   double m_price_seed[2];
    bool m_price_line_visible[2];
    int m_price_line_y[2];
    double m_price_line_price[2];
@@ -162,8 +161,7 @@ public:
       m_price_mouse_start_price = 0.0;
       for(int i = 0; i < 2; i++)
         {
-         m_stop_committed[i] = "";
-         m_price_seed[i] = 0.0;
+         m_stop_committed[i] = "0";
          m_price_line_visible[i] = false;
          m_price_line_y[i] = 0;
          m_price_line_price[i] = 0.0;
@@ -242,33 +240,28 @@ public:
       created = CreateEdit("ENTRY_LOT", "0.01", 370, ContentTop() + 68, 108, 24) && created;
       created = CreateButton("ENTRY_LOT_INC", "+", 482, ContentTop() + 68, 24, 24) && created;
       created = CreateLabel("ENTRY_SL_LABEL", "SL", 12, ContentTop() + 110, clrSilver, 9) && created;
-      created = CreateButton("ENTRY_SL_MODE", "Points", 42, ContentTop() + 104, 70, 24) && created;
+      created = CreateButton("ENTRY_SL_MODE", "Pips", 42, ContentTop() + 104, 70, 24) && created;
       created = CreateButton("ENTRY_SL_DEC", "-", 120, ContentTop() + 104, 24, 24) && created;
-      created = CreateEdit("ENTRY_SL_POINTS", "0", 148, ContentTop() + 104, 135, 24) && created;
+      created = CreateEdit("ENTRY_SL_VALUE", "0", 148, ContentTop() + 104, 135, 24) && created;
       created = CreateButton("ENTRY_SL_INC", "+", 287, ContentTop() + 104, 24, 24) && created;
       created = CreateButton("ENTRY_SL_SET", "Set SL", 320, ContentTop() + 104, 85, 24) && created;
       created = CreateButton("ENTRY_SL_CLEAR", "Clear SL", 416, ContentTop() + 104, 90, 24) && created;
       created = CreateLabel("ENTRY_TP_LABEL", "TP", 12, ContentTop() + 146, clrSilver, 9) && created;
-      created = CreateButton("ENTRY_TP_MODE", "Points", 42, ContentTop() + 140, 70, 24) && created;
+      created = CreateButton("ENTRY_TP_MODE", "Pips", 42, ContentTop() + 140, 70, 24) && created;
       created = CreateButton("ENTRY_TP_DEC", "-", 120, ContentTop() + 140, 24, 24) && created;
-      created = CreateEdit("ENTRY_TP_POINTS", "0", 148, ContentTop() + 140, 135, 24) && created;
+      created = CreateEdit("ENTRY_TP_VALUE", "0", 148, ContentTop() + 140, 135, 24) && created;
       created = CreateButton("ENTRY_TP_INC", "+", 287, ContentTop() + 140, 24, 24) && created;
       created = CreateButton("ENTRY_TP_SET", "Set TP", 320, ContentTop() + 140, 85, 24) && created;
       created = CreateButton("ENTRY_TP_CLEAR", "Clear TP", 416, ContentTop() + 140, 90, 24) && created;
-      created = CreateLabel("ENTRY_RR_LABEL", "RR 1:", 12, ContentTop() + 182, clrSilver, 9) && created;
-      created = CreateButton("ENTRY_RR_DEC", "-", 70, ContentTop() + 176, 24, 24) && created;
-      created = CreateEdit("ENTRY_RR", "1.0", 98, ContentTop() + 176, 70, 24) && created;
-      created = CreateButton("ENTRY_RR_INC", "+", 172, ContentTop() + 176, 24, 24) && created;
-      created = CreateButton("ENTRY_AUTO_TP", "Auto TP", 208, ContentTop() + 176, 110, 24) && created;
-      created = CreateLabel("ENTRY_CURRENT_RR", "Current RR: N/A", 330, ContentTop() + 182, clrSilver, 8) && created;
-      created = CreateLabel("ENTRY_PREVIEW", "SL: - / TP: -", 12, ContentTop() + 212, clrSilver, 8) && created;
-      created = CreateLabel("ENTRY_ESTIMATE", "Est. SL: N/A / TP: N/A", 12, ContentTop() + 236, clrSilver, 8) && created;
-      created = CreateButton("ENTRY_BUY", "BUY MARKET", 350, ContentTop() + 230, 156, 28, clrDarkGreen) && created;
-      created = CreateButton("ENTRY_SELL", "SELL MARKET", 350, ContentTop() + 230, 156, 28, clrMaroon) && created;
-      created = CreateButton("ENTRY_LIMIT", "BUY LIMIT", 350, ContentTop() + 230, 156, 28, clrDarkGreen) && created;
-      created = CreateButton("ENTRY_STOP", "BUY STOP", 350, ContentTop() + 230, 156, 28, clrDarkGreen) && created;
-      created = CreateLabel("ENTRY_HINT", "Set SL/TP, then drag the line or label.", 12, ContentTop() + 270, clrSilver, 8) && created;
-      created = CreateLabel("ENTRY_HINT_2", " ", 12, ContentTop() + 284, clrSilver, 8) && created;
+      created = CreateLabel("ENTRY_PREVIEW", "SL - / TP -", 12, ContentTop() + 176, clrSilver, 8) && created;
+      created = CreateLabel("ENTRY_CURRENT_RR", "Current RR: N/A", 330, ContentTop() + 176, clrSilver, 8) && created;
+      created = CreateLabel("ENTRY_ESTIMATE", "Est. SL: N/A / TP: N/A", 12, ContentTop() + 200, clrSilver, 8) && created;
+      created = CreateButton("ENTRY_BUY", "BUY MARKET", 350, ContentTop() + 194, 156, 28, clrDarkGreen) && created;
+      created = CreateButton("ENTRY_SELL", "SELL MARKET", 350, ContentTop() + 194, 156, 28, clrMaroon) && created;
+      created = CreateButton("ENTRY_LIMIT", "BUY LIMIT", 350, ContentTop() + 194, 156, 28, clrDarkGreen) && created;
+      created = CreateButton("ENTRY_STOP", "BUY STOP", 350, ContentTop() + 194, 156, 28, clrDarkGreen) && created;
+      created = CreateLabel("ENTRY_HINT", "Set SL/TP, then drag the line or label.", 12, ContentTop() + 234, clrSilver, 8) && created;
+      created = CreateLabel("ENTRY_HINT_2", " ", 12, ContentTop() + 248, clrSilver, 8) && created;
 
       created = CreateLabel("FILTER_LABEL", "Filter", 12, ContentTop() + 4, clrSilver, 9) && created;
       created = CreateButton("FILTER_SYMBOL", "Symbol", 62, ContentTop(), 120, 22) && created;
@@ -286,14 +279,14 @@ public:
       created = CreateLabel("SL_LABEL", "SL", 12, ContentTop() + 5, clrSilver, 9) && created;
       created = CreateButton("SL_MODE", "Price", PM_STOPS_MODE_X, ContentTop(), 75, 22) && created;
       created = CreateButton("SL_DEC", "-", PM_STOPS_DEC_X, ContentTop(), 26, 22) && created;
-      created = CreateEdit("SL_VALUE", "", PM_STOPS_VALUE_X, ContentTop(), 110, 22) && created;
+      created = CreateEdit("SL_VALUE", "0", PM_STOPS_VALUE_X, ContentTop(), 110, 22) && created;
       created = CreateButton("SL_INC", "+", PM_STOPS_INC_X, ContentTop(), 26, 22) && created;
       created = CreateButton("SET_SL", "Set / Change", PM_STOPS_SET_BUTTON_X, ContentTop(), PM_STOPS_SET_BUTTON_WIDTH, 22) && created;
       created = CreateButton("CLEAR_SL", "Clear SL", 12, ContentTop() + 32, 90, 22) && created;
       created = CreateLabel("TP_LABEL", "TP", 12, ContentTop() + 37, clrSilver, 9) && created;
       created = CreateButton("TP_MODE", "Price", PM_STOPS_MODE_X, ContentTop() + 32, 75, 22) && created;
       created = CreateButton("TP_DEC", "-", PM_STOPS_DEC_X, ContentTop() + 32, 26, 22) && created;
-      created = CreateEdit("TP_VALUE", "", PM_STOPS_VALUE_X, ContentTop() + 32, 110, 22) && created;
+      created = CreateEdit("TP_VALUE", "0", PM_STOPS_VALUE_X, ContentTop() + 32, 110, 22) && created;
       created = CreateButton("TP_INC", "+", PM_STOPS_INC_X, ContentTop() + 32, 26, 22) && created;
       created = CreateButton("SET_TP", "Set / Change", PM_STOPS_SET_BUTTON_X, ContentTop() + 62, PM_STOPS_SET_BUTTON_WIDTH, 22) && created;
       created = CreateButton("CLEAR_TP", "Clear TP", 123, ContentTop() + 62, 90, 22) && created;
@@ -837,10 +830,9 @@ private:
       if(context == m_price_line_selection_key) return;
       CancelPriceDrag();
       m_price_line_selection_key = context;
-      for(int i = 0; i < 2; i++) m_price_seed[i] = 0.0;
       // Selection changes invalidate a drag, not the user's Price/Pips text.
      }
-   bool ReadOrSeedStopPrice(const int index, const MqlTick &tick, double &price)
+   bool ReadStopPrice(const int index, double &price)
      {
       price = 0.0;
       if(EntryPriceContext())
@@ -848,41 +840,7 @@ private:
          price = index == 0 ? m_entry_snapshot.sl_price : m_entry_result.effective_tp;
          return MathIsValidNumber(price) && price > 0.0;
         }
-      const string committed = m_stop_committed[index];
-      if(committed != "")
-        {
-         if(!PMIsUnsignedDecimalText(committed)) return false;
-         price = StringToDouble(committed);
-         return MathIsValidNumber(price) && price > 0.0;
-        }
-      if(m_price_seed[index] > 0.0) { price = m_price_seed[index]; return true; }
-      PMPosition first = {};
-      if(!FirstSelectedPosition(first)) return false;
-      const bool is_sl = index == 0;
-      double existing = is_sl ? first.sl : first.tp;
-      for(int i = 0; i < ArraySize(m_selected); i++)
-        {
-         PMPosition position = {};
-         if(!FindCachedPosition(m_selected[i], position)) return false;
-         if((is_sl ? position.sl : position.tp) != existing) existing = 0.0;
-        }
-      if(existing > 0.0 && MathIsValidNumber(existing))
-         price = existing;
-      else
-        {
-         const double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
-         const double tick_size = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
-         const long level = MathMax(SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL),
-                                     SymbolInfoInteger(_Symbol, SYMBOL_TRADE_FREEZE_LEVEL));
-         const double distance = level * point + MathMax(point, tick_size) * 2.0;
-         const double reference = first.type == POSITION_TYPE_BUY ? tick.bid : tick.ask;
-         const bool upward = first.type == POSITION_TYPE_BUY ? !is_sl : is_sl;
-         price = reference + (upward ? distance : -distance);
-        }
-      price = PMNormalizePrice(price, SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE),
-                                (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS));
-      m_price_seed[index] = price;
-      return price > 0.0;
+      return PMStopDraftPrice(m_stop_committed[index], price);
      }
    string SignedValue(const double value, const int digits)
      {
@@ -981,7 +939,7 @@ private:
         { HidePriceLine(index); return true; }
       double price = 0.0;
       if(m_price_drag.Index() == index) price = m_price_drag.Price();
-      else if(!ReadOrSeedStopPrice(index, tick, price))
+      else if(!ReadStopPrice(index, price))
         { HidePriceLine(index); return true; }
       price = PMNormalizePrice(price, SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE),
                                 (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS));
@@ -1065,16 +1023,19 @@ private:
         }
       bool invalid_input = false;
       for(int i = 0; i < 2; i++)
-         if((i == 0 ? m_sl_mode : m_tp_mode) == PM_PRICE_ABSOLUTE && m_stop_committed[i] != "")
+         if((i == 0 ? m_sl_mode : m_tp_mode) == PM_PRICE_ABSOLUTE)
            {
-            const double value = StringToDouble(m_stop_committed[i]);
-            if(!PMIsUnsignedDecimalText(m_stop_committed[i]) || !MathIsValidNumber(value) ||
-               PMNormalizePrice(value, tick_size, (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS)) <= 0.0)
+            const string committed = m_stop_committed[i];
+            const double value = StringToDouble(committed);
+            // "0" is the unset draft; only malformed or unroundable input is invalid.
+            if(!PMIsUnsignedDecimalText(committed) || !MathIsValidNumber(value) ||
+               (value > 0.0 && PMNormalizePrice(value, tick_size, (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS)) <= 0.0))
                invalid_input = true;
            }
       const string hint = !sl_ok || !tp_ok ? "Lines unavailable: chart object update failed." :
                           invalid_input ? "Lines unavailable: enter a positive Price value." :
                           sl_outside || tp_outside ? "Lines/labels outside view: resize chart or price scale." :
+                          !m_price_line_visible[0] && !m_price_line_visible[1] ? "Enter a Price above 0 to show its line." :
                           "Drag a line or its label; Set / Change applies the draft.";
       PriceText(Name("STOPS_HINT"), hint);
      }
@@ -1272,13 +1233,11 @@ private:
       PriceInteger(Name("ENTRY_LOT"), OBJPROP_READONLY, !manual);
       if(!manual) PriceText(Name("ENTRY_LOT"), m_entry_result.lot_ok ?
                               DoubleToString(m_entry_result.lot, VolumeDigits(m_entry_snapshot.volume_step)) : "N/A");
-      PriceText(Name("ENTRY_SL_MODE"), m_entry_draft.unit[0] == PM_ENTRY_UNIT_PRICE ? "Price" : "Points");
-      PriceText(Name("ENTRY_TP_MODE"), m_entry_draft.unit[1] == PM_ENTRY_UNIT_PRICE ? "Price" : "Points");
-      PriceText(Name("ENTRY_AUTO_TP"), m_entry_draft.tp_state == PM_TP_STATE_AUTO ? "Auto TP" : "Restore Auto");
+      PriceText(Name("ENTRY_SL_MODE"), m_entry_draft.unit[0] == PM_ENTRY_UNIT_PRICE ? "Price" : "Pips");
+      PriceText(Name("ENTRY_TP_MODE"), m_entry_draft.unit[1] == PM_ENTRY_UNIT_PRICE ? "Price" : "Pips");
       PriceText(Name("ENTRY_CURRENT_RR"), EntryRRText());
       PriceText(Name("ENTRY_PREVIEW"), "SL " + PMFormatPrice(_Symbol, m_entry_snapshot.sl_price) +
-                " / TP " + PMFormatPrice(_Symbol, m_entry_result.effective_tp) +
-                (m_entry_draft.tp_state == PM_TP_STATE_AUTO ? " (Auto)" : m_entry_draft.tp_state == PM_TP_STATE_OFF ? " (Off)" : " (Manual)"));
+                " / TP " + PMFormatPrice(_Symbol, m_entry_result.effective_tp));
       PriceText(Name("ENTRY_ESTIMATE"), "Est. SL " + m_entry_service.Estimate(_Symbol, m_entry_snapshot, m_entry_result, true) +
                 " / TP " + m_entry_service.Estimate(_Symbol, m_entry_snapshot, m_entry_result, false) +
                 " " + AccountInfoString(ACCOUNT_CURRENCY));
@@ -1292,7 +1251,7 @@ private:
       for(int i = 0; i < 4; i++) PriceInteger(Name(sends[i]), OBJPROP_COLOR, m_entry_valid ? clrWhite : clrSilver);
       FitEntryLabel("ENTRY_PRICE", 256);
       FitEntryLabel("ENTRY_CURRENT_RR", 176);
-      FitEntryLabel("ENTRY_PREVIEW", 494);
+      FitEntryLabel("ENTRY_PREVIEW", 310);
       FitEntryLabel("ENTRY_ESTIMATE", 326);
      }
    void RenderPositionSummary()
@@ -1465,9 +1424,16 @@ private:
         { SetStatus(validation_error); return; }
       SetStatus(BatchResultText(is_sl ? "SL update" : "TP update", result));
      }
+   void ResetStopEditor(const int index)
+     {
+      m_stop_committed[index] = "0";
+      ObjectSetString(0, Name(StopSuffix(index)), OBJPROP_TEXT, "0");
+      CancelPriceDrag();
+     }
    void ClearStopTarget(const bool is_sl, CPositionService &positions, CTradeManager &trades, CPositionActionService &actions)
      {
-      if(ArraySize(m_selected) == 0) { SetStatus("No positions selected."); return; }
+      ResetStopEditor(is_sl ? 0 : 1);
+      if(ArraySize(m_selected) == 0) { SetStatus(is_sl ? "SL draft cleared." : "TP draft cleared."); return; }
       PMBatchResult result;
       actions.ClearStopTarget(m_selected, is_sl, positions, trades, result);
       SetStatus(BatchResultText(is_sl ? "SL clear" : "TP clear", result));
@@ -1511,10 +1477,7 @@ private:
       else if(object_name == Name("TRAIL_DIST_VALUE")) { CommitIntegerValue("TRAIL_DIST_VALUE", m_trail_pips, PM_MAX_TRAILING_POINTS); SetStatus(StringFormat("Trailing Distance updated: %d pips.", m_trail_pips)); }
       else if(StringFind(object_name, Name("ENTRY_")) == 0)
         {
-         const bool tp_edit = object_name == Name(EntryStopSuffix(1));
          CommitEntryEditor(object_name);
-         if(tp_edit && m_entry_draft.tp_state == PM_TP_STATE_AUTO)
-            m_entry_draft.SetStop(1, ObjectGetString(0, object_name, OBJPROP_TEXT));
          CancelPriceDrag();
          RefreshEntryComputation(false);
          SetStatus(m_entry_valid ? "Entry draft updated." : m_entry_reason);
@@ -1621,7 +1584,7 @@ private:
             return true;
       return false;
      }
-   string EntryStopSuffix(const int index) { return index == 0 ? "ENTRY_SL_POINTS" : "ENTRY_TP_POINTS"; }
+   string EntryStopSuffix(const int index) { return index == 0 ? "ENTRY_SL_VALUE" : "ENTRY_TP_VALUE"; }
    bool IsEntrySendButton(const string name)
      {
       return name == Name("ENTRY_BUY") || name == Name("ENTRY_SELL") ||
@@ -1653,13 +1616,10 @@ private:
            }
         }
       else if(name == Name("ENTRY_RISK")) m_entry_draft.risk_text = text;
-      else if(name == Name("ENTRY_RR")) m_entry_draft.rr_text = text;
       else
          for(int i = 0; i < 2; i++)
             if(name == Name(EntryStopSuffix(i)) && text != m_entry_draft.stop_text[i])
               {
-               RefreshEntryComputation(false);
-               const bool was_auto = m_entry_draft.tp_state == PM_TP_STATE_AUTO;
                double price = 0.0;
                if(m_entry_draft.unit[i] == PM_ENTRY_UNIT_PRICE && m_entry_draft.Number(text, true, price) && price > 0.0)
                  {
@@ -1671,8 +1631,6 @@ private:
                  }
                else m_entry_draft.SetStop(i, text);
                ObjectSetString(0, name, OBJPROP_TEXT, m_entry_draft.stop_text[i]);
-               if(i == 0 && was_auto && m_entry_draft.tp_state == PM_TP_STATE_MANUAL)
-                  ObjectSetString(0, Name(EntryStopSuffix(1)), OBJPROP_TEXT, m_entry_draft.stop_text[1]);
               }
      }
    void CommitEntryEditors()
@@ -1680,8 +1638,6 @@ private:
       CommitEntryEditor(Name("ENTRY_ORDER_PRICE"));
       CommitEntryEditor(Name("ENTRY_LOT"));
       CommitEntryEditor(Name("ENTRY_RISK"));
-      CommitEntryEditor(Name("ENTRY_RR"));
-      // Resolve explicit TP Points from the latest entry before SL cancellation can freeze Auto TP.
       CommitEntryEditor(Name(EntryStopSuffix(1)));
       CommitEntryEditor(Name(EntryStopSuffix(0)));
      }
@@ -1698,7 +1654,7 @@ private:
          const bool upward = m_entry_draft.side == PM_ENTRY_BUY ? index == 1 : index == 0;
          double base = m_entry_result.entry;
          if(index == 0 && m_entry_draft.order_type == PM_ENTRY_ORDER_MARKET)
-            base = m_entry_draft.PointsBase(m_entry_snapshot, m_entry_result.entry);
+            base = m_entry_draft.PipsBase(m_entry_snapshot, m_entry_result.entry);
          price = PMNormalizePrice(base + (upward ? distance : -distance), tick, m_entry_snapshot.digits);
         }
       if(!MathIsValidNumber(price) || price <= 0.0) { SetStatus("Unable to seed a positive stop price."); return; }
@@ -1712,11 +1668,10 @@ private:
       if(!m_entry_result.entry_ok) { SetStatus(m_entry_result.entry_reason); return; }
       double value = 0.0;
       string reason = "";
-      if(!(index == 1 && m_entry_draft.tp_state == PM_TP_STATE_AUTO) &&
-         !(index == 1 && m_entry_draft.manual_tp_price > 0.0) &&
+      if(!(index == 1 && m_entry_draft.manual_tp_price > 0.0) &&
          !m_entry_draft.ResolveStop(index, m_entry_snapshot, m_entry_result.entry, price, reason))
         { SetStatus(reason); return; }
-      if(m_entry_draft.unit[index] == PM_ENTRY_UNIT_POINTS)
+      if(m_entry_draft.unit[index] == PM_ENTRY_UNIT_PIPS)
         {
          m_entry_draft.unit[index] = PM_ENTRY_UNIT_PRICE;
          m_entry_draft.stop_text[index] = DoubleToString(price, m_entry_snapshot.digits);
@@ -1725,17 +1680,18 @@ private:
         {
          const double point = m_entry_snapshot.point;
          if(point <= 0.0) { SetStatus("Point size is unavailable."); return; }
+         const int pip_digits = PMPipDigits(m_entry_snapshot.digits);
          if(price > 0.0)
            {
             const bool upward = m_entry_draft.side == PM_ENTRY_BUY ? index == 1 : index == 0;
-            value = (price - m_entry_draft.PointsBase(m_entry_snapshot, m_entry_result.entry)) / point * (upward ? 1.0 : -1.0);
+            value = (price - m_entry_draft.PipsBase(m_entry_snapshot, m_entry_result.entry)) / point /
+                    PMPointsPerPip(m_entry_snapshot.digits) * (upward ? 1.0 : -1.0);
             if(value < 0.0 || value > PM_MAX_TRAILING_POINTS)
-              { SetStatus("This price cannot be expressed as positive Points for this direction."); return; }
-            value = MathRound(value);
+              { SetStatus("This price cannot be expressed as positive Pips for this direction."); return; }
+            value = NormalizeDouble(value, pip_digits);
            }
-         if(index == 0 && price > 0.0 && value == 0.0) m_entry_draft.FreezeAutoTP();
-         m_entry_draft.unit[index] = PM_ENTRY_UNIT_POINTS;
-         m_entry_draft.stop_text[index] = DoubleToString(value, 0);
+         m_entry_draft.unit[index] = PM_ENTRY_UNIT_PIPS;
+         m_entry_draft.stop_text[index] = value == 0.0 ? "0" : DoubleToString(value, pip_digits);
         }
       if(index == 1 && m_entry_draft.tp_state == PM_TP_STATE_MANUAL)
          m_entry_draft.manual_tp_price = 0.0; // Re-resolve the explicit mode conversion and its rounding.
@@ -1770,16 +1726,18 @@ private:
                                     SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MAX), step);
          digits = VolumeDigits(step);
         }
-      else if(suffix == "ENTRY_RISK" || suffix == "ENTRY_RR")
+      else if(suffix == "ENTRY_RISK")
         {
          const bool percent = m_entry_draft.quantity_mode == PM_QUANTITY_RISK_PERCENT;
-         const double step = suffix == "ENTRY_RR" || percent ? 0.1 : 1.0;
-         const double minimum = suffix == "ENTRY_RR" ? 0.1 : 0.0;
-         const double maximum = suffix == "ENTRY_RISK" && percent ? 100.0 : PM_MAX_EQUITY_THRESHOLD;
          digits = 2;
-         value = PMStepDecimal(value, direction * step, minimum, maximum, digits);
+         value = PMStepDecimal(value, direction * (percent ? 0.1 : 1.0), 0.0,
+                               percent ? 100.0 : PM_MAX_EQUITY_THRESHOLD, digits);
         }
-      else value = MathMax(0.0, MathMin(PM_MAX_TRAILING_POINTS, value + direction));
+      else
+        {
+         value = MathMax(0.0, MathMin(PM_MAX_TRAILING_POINTS, value + direction));
+         if(value > 0.0) digits = PMPipDigits((int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS));
+        }
       ObjectSetString(0, name, OBJPROP_TEXT, DoubleToString(value, digits));
       CommitEntryEditor(name);
      }
@@ -1805,17 +1763,12 @@ private:
       else if(name == Name("ENTRY_TP_SET")) SetEntryStop(1);
       else if(name == Name("ENTRY_SL_CLEAR")) { m_entry_draft.CancelStop(0); WriteEntryStops(); }
       else if(name == Name("ENTRY_TP_CLEAR")) { m_entry_draft.CancelStop(1); WriteEntryStops(); }
-      else if(name == Name("ENTRY_AUTO_TP"))
-        {
-         string reason = "";
-         if(!m_entry_draft.AutoTP(m_entry_result.entry, m_entry_snapshot.sl_price, reason)) SetStatus(reason);
-        }
       else if(name == Name("ENTRY_SL_MODE")) SwitchEntryUnit(0);
       else if(name == Name("ENTRY_TP_MODE")) SwitchEntryUnit(1);
       else
         {
-         string prefixes[] = {"ENTRY_ORDER", "ENTRY_LOT", "ENTRY_RISK", "ENTRY_RR", "ENTRY_SL", "ENTRY_TP"};
-         string values[] = {"ENTRY_ORDER_PRICE", "ENTRY_LOT", "ENTRY_RISK", "ENTRY_RR", "ENTRY_SL_POINTS", "ENTRY_TP_POINTS"};
+         string prefixes[] = {"ENTRY_ORDER", "ENTRY_LOT", "ENTRY_RISK", "ENTRY_SL", "ENTRY_TP"};
+         string values[] = {"ENTRY_ORDER_PRICE", "ENTRY_LOT", "ENTRY_RISK", "ENTRY_SL_VALUE", "ENTRY_TP_VALUE"};
          for(int i = 0; i < ArraySize(prefixes); i++)
            {
             if(name == Name(prefixes[i] + "_DEC")) StepEntryInput(values[i], -1);
@@ -1972,9 +1925,9 @@ private:
       const bool entry = expanded && m_active_tab == PM_PANEL_TAB_ENTRY;
       string entry_controls[] = {"ENTRY_PRICE", "ENTRY_TYPE", "ENTRY_SIDE", "ENTRY_ORDER_PRICE_LABEL",
          "ENTRY_ORDER_PRICE", "ENTRY_QTY_MODE", "ENTRY_LOT_LABEL", "ENTRY_LOT", "ENTRY_SL_LABEL", "ENTRY_SL_MODE",
-         "ENTRY_SL_DEC", "ENTRY_SL_POINTS", "ENTRY_SL_INC", "ENTRY_SL_SET", "ENTRY_SL_CLEAR",
-         "ENTRY_TP_LABEL", "ENTRY_TP_MODE", "ENTRY_TP_DEC", "ENTRY_TP_POINTS", "ENTRY_TP_INC", "ENTRY_TP_SET", "ENTRY_TP_CLEAR",
-         "ENTRY_RR_LABEL", "ENTRY_RR", "ENTRY_RR_DEC", "ENTRY_RR_INC", "ENTRY_AUTO_TP", "ENTRY_CURRENT_RR",
+         "ENTRY_SL_DEC", "ENTRY_SL_VALUE", "ENTRY_SL_INC", "ENTRY_SL_SET", "ENTRY_SL_CLEAR",
+         "ENTRY_TP_LABEL", "ENTRY_TP_MODE", "ENTRY_TP_DEC", "ENTRY_TP_VALUE", "ENTRY_TP_INC", "ENTRY_TP_SET", "ENTRY_TP_CLEAR",
+         "ENTRY_CURRENT_RR",
          "ENTRY_PREVIEW", "ENTRY_ESTIMATE", "ENTRY_HINT", "ENTRY_HINT_2"};
       for(int i = 0; i < ArraySize(entry_controls); i++) SetVisible(entry_controls[i], entry);
       const bool manual = m_entry_draft.quantity_mode == PM_QUANTITY_MANUAL_LOT;

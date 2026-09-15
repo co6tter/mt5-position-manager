@@ -65,7 +65,7 @@ enum PMQuantityMode
 
 enum PMEntryInputUnit
   {
-   PM_ENTRY_UNIT_POINTS = 0,
+   PM_ENTRY_UNIT_PIPS = 0,
    PM_ENTRY_UNIT_PRICE = 1
   };
 

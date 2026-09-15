@@ -55,10 +55,17 @@ def verify_entry_controls(ui: str) -> None:
     if '"SL pts"' in ui or '"TP pts"' in ui:
         raise AssertionError("Entry labels must not contain pts")
     for control in ("ENTRY_TYPE", "ENTRY_SIDE", "ENTRY_ORDER_PRICE", "ENTRY_QTY_MODE",
-                    "ENTRY_RISK", "ENTRY_RISK_DEC", "ENTRY_RISK_INC", "ENTRY_RR", "ENTRY_AUTO_TP",
+                    "ENTRY_RISK", "ENTRY_RISK_DEC", "ENTRY_RISK_INC",
                     "ENTRY_SL_CLEAR", "ENTRY_TP_CLEAR", "ENTRY_SL_SET", "ENTRY_TP_SET", "ENTRY_SL_MODE", "ENTRY_TP_MODE", "ENTRY_LIMIT", "ENTRY_STOP"):
         if f'"{control}"' not in ui:
             raise AssertionError(f"Missing Entry control: {control}")
+
+
+def verify_stop_defaults(ui: str) -> None:
+    """SL/TP editors start at 0 (unset), so no line appears until a value is entered."""
+    for control in ("SL_VALUE", "TP_VALUE", "ENTRY_SL_VALUE", "ENTRY_TP_VALUE"):
+        if f'CreateEdit("{control}", "0"' not in ui:
+            raise AssertionError(f"{control} must initially display 0")
 
 
 def verify_status_line_visibility(ui: str) -> None:
@@ -120,17 +127,18 @@ def main() -> None:
     verify_trail_layout(ui_source)
     verify_entry_controls(ui_source)
     verify_status_line_visibility(ui_source)
+    verify_stop_defaults(ui_source)
     enum_names = ["PMEntrySide", "PMEntryOrderType", "PMQuantityMode", "PMEntryInputUnit",
                   "PMTpState", "PMTpEvent", "PMRRStatus"]
     struct_names = ["PMEntrySnapshot", "PMEntryComputation", "PMMarketEntryResult"]
-    helper_names = ["PMStepInteger", "PMStepDecimal", "PMPriceEditorStep", "PMShiftPriceEditorValue",
+    helper_names = ["PMPointsPerPip", "PMPipsToPointDistance", "PMPipDigits", "PMStepInteger", "PMStepDecimal", "PMPriceEditorStep", "PMShiftPriceEditorValue",
                     "PMNormalizePrice", "PMNormalizeVolume", "PMCalculateAssumedEntryPrice", "PMIsStopLossOnLossSide",
                     "PMIsTakeProfitOnProfitSide", "PMCalculateCurrentRR", "PMCalculateAutoTakeProfit",
                     "PMNextTakeProfitState", "PMCalculateRiskBudget", "PMCalculateRiskLot",
                     "PMRecomputeEntry", "PMIsUnsignedIntegerText", "PMIsUnsignedDecimalText",
                     "PMValidateEntryGeometry", "PMResetMarketEntryResult", "PMIsMarketEntrySuccessRetcode",
-                    "PMLabelLineBreak", "PMTruncateLabelText"]
-    test_names = ["TestLabelTextLimits", "TestInputStepperHelpers", "TestPriceEditorHelpers",
+                    "PMLabelLineBreak", "PMTruncateLabelText", "PMStopDraftPrice"]
+    test_names = ["TestLabelTextLimits", "TestStopDraftPrice", "TestInputStepperHelpers", "TestPriceEditorHelpers",
                   "TestPriceDragLifecycle", "TestPriceEstimateAggregation", "TestPriceLabelPlacement",
                   "TestEntryPricingAndRiskHelpers", "TestEntryRecomputeOrchestration",
                   "TestEntryReviewRegressions"]
@@ -198,7 +206,8 @@ void AssertTrue(bool condition, const string &name) {
     ui_methods = ["EntryRRText", "RefreshEntryComputation", "EntryStopSuffix", "IsEntrySendButton", "WriteEntryStops",
                   "CommitEntryEditor", "CommitEntryEditors", "SetEntryStop", "SwitchEntryUnit", "StepEntryInput",
                   "HandleEntryClick", "OpenEntry", "VolumeDigits", "HandlePriceMouse", "RenderEntryState", "FitEntryLabel",
-                  "LabelTextWidth", "LabelFittingCharacters", "SetEntryHint", "EntryPriceLineText"]
+                  "LabelTextWidth", "LabelFittingCharacters", "SetEntryHint", "EntryPriceLineText",
+                  "CancelPriceDrag", "ResetStopEditor"]
     source += "\nclass EntryUiHarness { public: CEntryDraft m_entry_draft; CEntryService m_entry_service; PMEntrySnapshot m_entry_snapshot; PMEntryComputation m_entry_result; bool m_entry_valid = false, m_visibility_dirty = false; string m_entry_reason, status; CPriceEditDrag m_price_drag; string Name(const string s) { return s; } void SetStatus(const string s) { status = s; }\n"
     source += r"""
     bool m_collapsed = false, m_price_scroll_before = true, m_price_drag_moved = false;

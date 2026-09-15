@@ -38,12 +38,8 @@ public:
          MathIsValidNumber(profit) && profit < 0.0)
          snapshot.reference_loss = -profit;
       PMRecomputeEntry(snapshot, result);
-      if(drag_index < 0 && snapshot.tp_state == PM_TP_STATE_AUTO && result.tp_auto_ok)
-         draft.last_auto_tp = result.effective_tp;
       if(!inputs_ok) { result.lot_ok = false; result.lot = 0.0; return false; }
       if(!result.entry_ok) { reason = result.entry_reason; return false; }
-      if(snapshot.tp_state == PM_TP_STATE_AUTO && snapshot.sl_price != 0.0 && !result.tp_auto_ok)
-        { reason = result.tp_reason; return false; }
       if(!result.lot_ok) { reason = result.lot_reason; return false; }
       // Verify at the actual rounded volume, not only by scaling the probe loss.
       if(snapshot.quantity_mode != PM_QUANTITY_MANUAL_LOT)

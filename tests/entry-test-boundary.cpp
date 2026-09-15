@@ -33,7 +33,7 @@ void ResetBoundary() {
         {SYMBOL_TRADE_STOPS_LEVEL, 0}, {SYMBOL_TRADE_FREEZE_LEVEL, 0},
         {SYMBOL_ORDER_MODE, 55}, {SYMBOL_EXPIRATION_MODE, 1}, {SYMBOL_FILLING_MODE, 1}, {SYMBOL_TRADE_EXEMODE, 2}};
     objects = {{"ENTRY_ORDER_PRICE", ""}, {"ENTRY_LOT", "0.01"}, {"ENTRY_RISK", "0"},
-               {"ENTRY_RR", "1.0"}, {"ENTRY_SL_POINTS", "0"}, {"ENTRY_TP_POINTS", "0"}};
+               {"ENTRY_SL_VALUE", "0"}, {"ENTRY_TP_VALUE", "0"}};
     current_tick = {}; checks = sends = 0; check_ok = send_ok = profit_ok = true;
     check_code = 0; send_code = TRADE_RETCODE_DONE; balance = 10000.0; final_loss_factor = 1.0;
 }

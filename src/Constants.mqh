@@ -24,7 +24,7 @@
 #define PM_PANEL_STATUS_LINE_HEIGHT 18
 #define PM_PANEL_CONTENT_GAP 10
 #define PM_STATUS_FONT_SIZE 10
-#define PM_PANEL_ENTRY_HEIGHT 300
+#define PM_PANEL_ENTRY_HEIGHT 264
 #define PM_PANEL_POSITIONS_HEADER_HEIGHT 80
 #define PM_PANEL_POSITION_ROW_HEIGHT 24
 #define PM_PANEL_STOPS_HEIGHT 92
@@ -135,6 +135,12 @@ double PMPipsToPointDistance(const double pips, const int digits)
    if(pips <= 0.0)
       return 0.0;
    return pips * PMPointsPerPip(digits);
+  }
+
+// 0.1 pip is one point on 3/5-digit symbols, so show one decimal there.
+int PMPipDigits(const int digits)
+  {
+   return PMPointsPerPip(digits) > 1 ? 1 : 0;
   }
 
 string PMAutoCloseConfigKey(const AutoCloseConfig &config)
@@ -987,6 +993,19 @@ string PMTruncateLabelText(const string text)
    if(StringLen(text) <= PM_MAX_LABEL_TEXT_LENGTH)
       return text;
    return StringSubstr(text, 0, PM_MAX_LABEL_TEXT_LENGTH - 3) + "...";
+  }
+
+// "0" is the unset SL/TP draft: only a positive committed price gets a line.
+bool PMStopDraftPrice(const string text, double &price)
+  {
+   price = 0.0;
+   if(!PMIsUnsignedDecimalText(text))
+      return false;
+   const double value = StringToDouble(text);
+   if(!MathIsValidNumber(value) || value <= 0.0)
+      return false;
+   price = value;
+   return true;
   }
 
 string PMFormatPrice(const string symbol, const double price)
