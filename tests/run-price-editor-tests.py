@@ -46,7 +46,7 @@ def verify_trail_layout(ui: str) -> None:
 
 
 def function(source: str, name: str) -> str:
-    match = re.search(r"^(?:int|double|void)\s+" + re.escape(name) + r"\s*\(", source, re.M)
+    match = re.search(r"^\w+\s+" + re.escape(name) + r"\s*\(", source, re.M)
     if not match:
         raise ValueError(f"Missing function: {name}")
     start = source.index("{", match.end())
@@ -61,16 +61,36 @@ def function(source: str, name: str) -> str:
     return source[match.start():end]
 
 
+def enum_block(source: str, name: str) -> str:
+    match = re.search(r"^enum\s+" + re.escape(name) + r"\b", source, re.M)
+    if not match:
+        raise ValueError(f"Missing enum: {name}")
+    start = source.index("{", match.end())
+    depth, end = 1, start + 1
+    while depth:
+        depth += (source[end] == "{") - (source[end] == "}")
+        end += 1
+    end = source.index(";", end) + 1
+    return source[match.start():end]
+
+
 def main() -> None:
     compiler = os.environ.get("CXX") or shutil.which("clang++") or shutil.which("g++")
     if not compiler:
         raise SystemExit("A C++17 compiler is required (set CXX or install clang++/g++).")
     helpers = (ROOT / "src/Constants.mqh").read_text()
+    models = (ROOT / "src/Models.mqh").read_text()
     tests = (ROOT / "tests/PositionManagerPureTests.mq5").read_text()
     verify_trail_layout((ROOT / "src/UiPanel.mqh").read_text())
-    helper_names = ["PMStepInteger", "PMStepDecimal", "PMPriceEditorStep", "PMShiftPriceEditorValue"]
+    enum_names = ["PMEntrySide", "PMEntryOrderType", "PMQuantityMode", "PMEntryInputUnit",
+                  "PMTpState", "PMTpEvent", "PMRRStatus"]
+    helper_names = ["PMStepInteger", "PMStepDecimal", "PMPriceEditorStep", "PMShiftPriceEditorValue",
+                    "PMNormalizePrice", "PMCalculateAssumedEntryPrice", "PMIsStopLossOnLossSide",
+                    "PMIsTakeProfitOnProfitSide", "PMCalculateCurrentRR", "PMCalculateAutoTakeProfit",
+                    "PMNextTakeProfitState", "PMCalculateRiskBudget", "PMCalculateRiskLot"]
     test_names = ["TestInputStepperHelpers", "TestPriceEditorHelpers",
-                  "TestPriceDragLifecycle", "TestPriceEstimateAggregation", "TestPriceLabelPlacement"]
+                  "TestPriceDragLifecycle", "TestPriceEstimateAggregation", "TestPriceLabelPlacement",
+                  "TestEntryPricingAndRiskHelpers"]
     prelude = r"""
 #include <algorithm>
 #include <cmath>
@@ -87,6 +107,7 @@ template<class A, class B> auto MathMin(A a, B b) {
 double MathAbs(double v) { return std::abs(v); }
 double MathCeil(double v) { return std::ceil(v); }
 double MathFloor(double v) { return std::floor(v); }
+double MathRound(double v) { return std::round(v); }
 bool MathIsValidNumber(double v) { return std::isfinite(v); }
 double NormalizeDouble(double v, int digits) {
     const double scale = std::pow(10.0, digits);
@@ -99,7 +120,8 @@ void AssertTrue(bool condition, const string &name) {
     if (!condition) { ++failures; std::cerr << "[FAIL] " << name << '\n'; }
 }
 """
-    source = prelude + "\n".join(function(helpers, name) for name in helper_names)
+    source = prelude + "\n".join(enum_block(models, name) for name in enum_names) + "\n"
+    source += "\n".join(function(helpers, name) for name in helper_names)
     source += "\n" + "\n".join(function(tests, name) for name in test_names)
     source += "\nint main() {\n" + "\n".join(name + "();" for name in test_names)
     source += r"""

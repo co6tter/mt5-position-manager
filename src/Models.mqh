@@ -49,6 +49,50 @@ enum PMEntrySide
    PM_ENTRY_SELL = 1
   };
 
+enum PMEntryOrderType
+  {
+   PM_ENTRY_ORDER_MARKET = 0,
+   PM_ENTRY_ORDER_LIMIT = 1,
+   PM_ENTRY_ORDER_STOP = 2
+  };
+
+enum PMQuantityMode
+  {
+   PM_QUANTITY_MANUAL_LOT = 0,
+   PM_QUANTITY_RISK_AMOUNT = 1,
+   PM_QUANTITY_RISK_PERCENT = 2
+  };
+
+enum PMEntryInputUnit
+  {
+   PM_ENTRY_UNIT_POINTS = 0,
+   PM_ENTRY_UNIT_PRICE = 1
+  };
+
+enum PMTpState
+  {
+   PM_TP_STATE_AUTO = 0,
+   PM_TP_STATE_MANUAL = 1,
+   PM_TP_STATE_OFF = 2
+  };
+
+enum PMTpEvent
+  {
+   PM_TP_EVENT_SL_CHANGED = 0,
+   PM_TP_EVENT_SL_CANCELED = 1,
+   PM_TP_EVENT_TP_SET_MANUAL = 2,
+   PM_TP_EVENT_TP_CANCELED = 3,
+   PM_TP_EVENT_REVERT_TO_AUTO = 4,
+   PM_TP_EVENT_RR_CHANGED = 5
+  };
+
+enum PMRRStatus
+  {
+   PM_RR_VALID = 0,
+   PM_RR_NOT_AVAILABLE = 1,
+   PM_RR_INVALID = 2
+  };
+
 enum PMTradeOperationType
   {
    PM_TRADE_OPERATION_CLOSE = 0,

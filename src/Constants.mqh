@@ -363,6 +363,311 @@ bool PMCalculateEntryStops(const PMEntrySide side,
    return true;
   }
 
+bool PMCalculateAssumedEntryPrice(const PMEntryOrderType order_type,
+                                  const PMEntrySide side,
+                                  const double bid,
+                                  const double ask,
+                                  const double order_price,
+                                  double &entry,
+                                  string &reason)
+  {
+   entry = 0.0;
+   reason = "";
+   if(side != PM_ENTRY_BUY && side != PM_ENTRY_SELL)
+     {
+      reason = "Direction is invalid.";
+      return false;
+     }
+   if(order_type == PM_ENTRY_ORDER_MARKET)
+     {
+      if(bid <= 0.0 || ask <= 0.0 || !MathIsValidNumber(bid) || !MathIsValidNumber(ask))
+        {
+         reason = "Current price is unavailable.";
+         return false;
+        }
+      entry = side == PM_ENTRY_BUY ? ask : bid;
+      return true;
+     }
+   if(order_type == PM_ENTRY_ORDER_LIMIT || order_type == PM_ENTRY_ORDER_STOP)
+     {
+      if(order_price <= 0.0 || !MathIsValidNumber(order_price))
+        {
+         reason = "Order price must be greater than zero.";
+         return false;
+        }
+      entry = order_price;
+      return true;
+     }
+   reason = "Order type is invalid.";
+   return false;
+  }
+
+bool PMIsStopLossOnLossSide(const PMEntrySide side, const double entry, const double sl)
+  {
+   if(!MathIsValidNumber(entry) || !MathIsValidNumber(sl) || entry <= 0.0 || sl <= 0.0)
+      return false;
+   if(side != PM_ENTRY_BUY && side != PM_ENTRY_SELL)
+      return false;
+   return side == PM_ENTRY_BUY ? sl < entry : sl > entry;
+  }
+
+bool PMIsTakeProfitOnProfitSide(const PMEntrySide side, const double entry, const double tp)
+  {
+   if(!MathIsValidNumber(entry) || !MathIsValidNumber(tp) || entry <= 0.0 || tp <= 0.0)
+      return false;
+   if(side != PM_ENTRY_BUY && side != PM_ENTRY_SELL)
+      return false;
+   return side == PM_ENTRY_BUY ? tp > entry : tp < entry;
+  }
+
+PMRRStatus PMCalculateCurrentRR(const PMEntrySide side,
+                                const double entry,
+                                const double sl,
+                                const double tp,
+                                double &rr,
+                                string &reason)
+  {
+   rr = 0.0;
+   reason = "";
+   if(!MathIsValidNumber(entry) || entry <= 0.0 ||
+      (side != PM_ENTRY_BUY && side != PM_ENTRY_SELL))
+     {
+      reason = "Entry price or direction is invalid.";
+      return PM_RR_INVALID;
+     }
+   if(sl <= 0.0 || !MathIsValidNumber(sl))
+     {
+      reason = "SL is not set.";
+      return PM_RR_NOT_AVAILABLE;
+     }
+   if(tp <= 0.0 || !MathIsValidNumber(tp))
+     {
+      reason = "TP is not set.";
+      return PM_RR_NOT_AVAILABLE;
+     }
+   if(!PMIsStopLossOnLossSide(side, entry, sl))
+     {
+      reason = "SL is not on the loss side of the entry price.";
+      return PM_RR_INVALID;
+     }
+   if(!PMIsTakeProfitOnProfitSide(side, entry, tp))
+     {
+      reason = "TP is not on the profit side of the entry price.";
+      return PM_RR_INVALID;
+     }
+   const double risk = MathAbs(entry - sl);
+   const double reward = MathAbs(tp - entry);
+   if(risk <= 0.0)
+     {
+      // Defensive: PMIsStopLossOnLossSide already implies risk > 0.
+      reason = "SL distance is zero.";
+      return PM_RR_INVALID;
+     }
+   rr = reward / risk;
+   if(!MathIsValidNumber(rr) || rr <= 0.0)
+     {
+      reason = "RR is not finite.";
+      rr = 0.0;
+      return PM_RR_INVALID;
+     }
+   reason = "";
+   return PM_RR_VALID;
+  }
+
+bool PMCalculateAutoTakeProfit(const PMEntrySide side,
+                               const double entry,
+                               const double sl,
+                               const double rr_multiplier,
+                               const double point,
+                               const double tick_size,
+                               const int digits,
+                               const long stops_level,
+                               const long freeze_level,
+                               double &tp,
+                               string &reason)
+  {
+   tp = 0.0;
+   reason = "";
+   if(!MathIsValidNumber(entry) || entry <= 0.0)
+     {
+      reason = "Entry price is invalid.";
+      return false;
+     }
+   // This single check covers unset SL, wrong-side SL, and an invalid side at once.
+   if(!PMIsStopLossOnLossSide(side, entry, sl))
+     {
+      reason = "Set a valid SL on the loss side of the entry price before generating an automatic Take Profit.";
+      return false;
+     }
+   if(!MathIsValidNumber(rr_multiplier) || rr_multiplier <= 0.0)
+     {
+      reason = "RR multiplier must be a positive number.";
+      return false;
+     }
+   if(point <= 0.0 || tick_size <= 0.0 || digits < 0 || stops_level < 0 || freeze_level < 0)
+     {
+      reason = "Current price or entry distance is invalid.";
+      return false;
+     }
+   const double distance = MathAbs(entry - sl);
+   const double raw = side == PM_ENTRY_BUY ? entry + distance * rr_multiplier :
+                                              entry - distance * rr_multiplier;
+   const double candidate = PMNormalizePrice(raw, tick_size, digits);
+   if(candidate <= 0.0)
+     {
+      reason = "The normalized take-profit price is invalid.";
+      return false;
+     }
+   const double minimum_distance = (double)MathMax(stops_level, freeze_level) * point;
+   if(side == PM_ENTRY_BUY ? candidate <= entry + minimum_distance :
+                             candidate >= entry - minimum_distance)
+     {
+      reason = side == PM_ENTRY_BUY ?
+               "Buy TP is inside the broker's Stops/Freeze Level." :
+               "Sell TP is inside the broker's Stops/Freeze Level.";
+      return false;
+     }
+   tp = candidate;
+   return true;
+  }
+
+bool PMNextTakeProfitState(const PMTpState current_state,
+                           const PMTpEvent event,
+                           const bool has_valid_stop_loss,
+                           PMTpState &next_state,
+                           string &reason)
+  {
+   reason = "";
+   next_state = current_state;
+   switch(event)
+     {
+      case PM_TP_EVENT_SL_CHANGED:
+         // Auto recomputes the TP price elsewhere; Manual/Off stay untouched.
+         return true;
+      case PM_TP_EVENT_SL_CANCELED:
+         // The caller freezes whatever TP price was already displayed.
+         if(current_state == PM_TP_STATE_AUTO)
+            next_state = PM_TP_STATE_MANUAL;
+         return true;
+      case PM_TP_EVENT_TP_SET_MANUAL:
+         next_state = PM_TP_STATE_MANUAL;
+         return true;
+      case PM_TP_EVENT_TP_CANCELED:
+         // The caller sets the TP price to 0.
+         next_state = PM_TP_STATE_OFF;
+         return true;
+      case PM_TP_EVENT_RR_CHANGED:
+         // Auto recomputes the TP price elsewhere; Manual/Off ignore RR changes.
+         return true;
+      case PM_TP_EVENT_REVERT_TO_AUTO:
+         if(has_valid_stop_loss)
+           {
+            next_state = PM_TP_STATE_AUTO;
+            return true;
+           }
+         reason = "Set a valid SL before reverting to automatic Take Profit.";
+         return false;
+      default:
+         reason = "Unknown Take Profit event.";
+         return false;
+     }
+  }
+
+bool PMCalculateRiskBudget(const PMQuantityMode mode,
+                           const double manual_amount,
+                           const double balance,
+                           const double percent,
+                           double &budget,
+                           string &reason)
+  {
+   budget = 0.0;
+   reason = "";
+   if(mode == PM_QUANTITY_RISK_AMOUNT)
+     {
+      if(!MathIsValidNumber(manual_amount) || manual_amount <= 0.0)
+        {
+         reason = "Risk amount must be greater than zero.";
+         return false;
+        }
+      budget = manual_amount;
+      return true;
+     }
+   if(mode == PM_QUANTITY_RISK_PERCENT)
+     {
+      if(!MathIsValidNumber(balance) || balance <= 0.0)
+        {
+         reason = "Account balance must be greater than zero.";
+         return false;
+        }
+      if(!MathIsValidNumber(percent) || percent <= 0.0 || percent > 100.0)
+        {
+         reason = "Risk percent must be greater than zero and at most 100.";
+         return false;
+        }
+      budget = balance * percent / 100.0;
+      return true;
+     }
+   // PM_QUANTITY_MANUAL_LOT (and any other value) never uses a risk budget;
+   // the caller in a later task never calls this function in Manual Lot mode.
+   reason = "Manual Lot mode does not use a risk budget.";
+   return false;
+  }
+
+bool PMCalculateRiskLot(const double budget,
+                        const double reference_volume,
+                        const double reference_loss,
+                        const double volume_min,
+                        const double volume_max,
+                        const double volume_step,
+                        double &lot,
+                        double &estimated_loss,
+                        string &reason)
+  {
+   lot = 0.0;
+   estimated_loss = 0.0;
+   reason = "";
+   if(!MathIsValidNumber(budget) || budget <= 0.0)
+     {
+      reason = "Risk budget must be greater than zero.";
+      return false;
+     }
+   if(!MathIsValidNumber(reference_volume) || reference_volume <= 0.0)
+     {
+      reason = "Reference volume is invalid.";
+      return false;
+     }
+   if(!MathIsValidNumber(reference_loss) || reference_loss <= 0.0)
+     {
+      reason = "Calculated loss is invalid.";
+      return false;
+     }
+   if(!MathIsValidNumber(volume_min) || !MathIsValidNumber(volume_max) ||
+      !MathIsValidNumber(volume_step) || volume_min <= 0.0 ||
+      volume_max < volume_min || volume_step <= 0.0)
+     {
+      reason = "Symbol volume limits are invalid.";
+      return false;
+     }
+   const double raw_lot = budget * reference_volume / reference_loss;
+   // Same epsilon as PMNormalizeVolume; intentionally floors instead of
+   // rounding to nearest (do not call PMNormalizeVolume from here -- it
+   // could round a risk-derived lot up past the budget).
+   const double aligned_maximum = volume_min +
+                                  MathFloor((volume_max - volume_min) / volume_step + 0.00000001) * volume_step;
+   if(raw_lot < volume_min)
+     {
+      reason = "Calculated lot is below the symbol's minimum volume.";
+      lot = 0.0;
+      estimated_loss = 0.0;
+      return false;
+     }
+   const double bounded = MathMin(raw_lot, aligned_maximum);
+   const double steps = MathFloor((bounded - volume_min) / volume_step + 0.00000001);
+   lot = NormalizeDouble(volume_min + steps * volume_step, 8);
+   estimated_loss = lot / reference_volume * reference_loss;
+   return true;
+  }
+
 int PMWrapStatus(const string text,
                  const int max_chars,
                  string &lines[])

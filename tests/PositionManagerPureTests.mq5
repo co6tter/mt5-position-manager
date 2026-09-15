@@ -715,6 +715,264 @@ void TestEntryHelpers()
               "Stopped unavailable results are errors");
   }
 
+void TestEntryPricingAndRiskHelpers()
+  {
+   double entry = 0.0;
+   string reason = "";
+
+   // PMCalculateAssumedEntryPrice
+   AssertTrue(PMCalculateAssumedEntryPrice(PM_ENTRY_ORDER_MARKET, PM_ENTRY_BUY,
+                                           100.0, 100.05, 0.0, entry, reason) &&
+              entry == 100.05,
+              "Market Buy assumed entry uses Ask");
+   AssertTrue(PMCalculateAssumedEntryPrice(PM_ENTRY_ORDER_MARKET, PM_ENTRY_SELL,
+                                           100.0, 100.05, 0.0, entry, reason) &&
+              entry == 100.0,
+              "Market Sell assumed entry uses Bid");
+   AssertTrue(PMCalculateAssumedEntryPrice(PM_ENTRY_ORDER_LIMIT, PM_ENTRY_BUY,
+                                           100.0, 100.05, 99.5, entry, reason) &&
+              entry == 99.5,
+              "Buy Limit assumed entry uses the order price");
+   AssertTrue(PMCalculateAssumedEntryPrice(PM_ENTRY_ORDER_LIMIT, PM_ENTRY_SELL,
+                                           100.0, 100.05, 100.5, entry, reason) &&
+              entry == 100.5,
+              "Sell Limit assumed entry uses the order price");
+   AssertTrue(PMCalculateAssumedEntryPrice(PM_ENTRY_ORDER_STOP, PM_ENTRY_BUY,
+                                           100.0, 100.05, 100.5, entry, reason) &&
+              entry == 100.5,
+              "Buy Stop assumed entry uses the order price");
+   AssertTrue(PMCalculateAssumedEntryPrice(PM_ENTRY_ORDER_STOP, PM_ENTRY_SELL,
+                                           100.0, 100.05, 99.0, entry, reason) &&
+              entry == 99.0,
+              "Sell Stop assumed entry uses the order price");
+   AssertTrue(!PMCalculateAssumedEntryPrice(PM_ENTRY_ORDER_MARKET, (PMEntrySide)99,
+                                            100.0, 100.05, 0.0, entry, reason) &&
+              entry == 0.0 && reason == "Direction is invalid.",
+              "Invalid direction is rejected before anything else");
+   AssertTrue(!PMCalculateAssumedEntryPrice(PM_ENTRY_ORDER_MARKET, PM_ENTRY_BUY,
+                                            0.0, 0.0, 0.0, entry, reason) &&
+              entry == 0.0 && reason == "Current price is unavailable.",
+              "Market order with no tick fails");
+   AssertTrue(!PMCalculateAssumedEntryPrice(PM_ENTRY_ORDER_LIMIT, PM_ENTRY_BUY,
+                                            100.0, 100.05, 0.0, entry, reason) &&
+              entry == 0.0 && reason == "Order price must be greater than zero.",
+              "Limit order with a non-positive order price fails");
+   AssertTrue(!PMCalculateAssumedEntryPrice(PM_ENTRY_ORDER_STOP, PM_ENTRY_SELL,
+                                            100.0, 100.05, -1.0, entry, reason) &&
+              entry == 0.0 && reason == "Order price must be greater than zero.",
+              "Stop order with a negative order price fails");
+   AssertTrue(!PMCalculateAssumedEntryPrice((PMEntryOrderType)99, PM_ENTRY_BUY,
+                                            100.0, 100.05, 99.0, entry, reason) &&
+              entry == 0.0 && reason == "Order type is invalid.",
+              "Unknown order type is rejected");
+
+   // PMIsStopLossOnLossSide
+   AssertTrue(PMIsStopLossOnLossSide(PM_ENTRY_BUY, 100.0, 98.0),
+              "Buy SL below entry is on the loss side");
+   AssertTrue(!PMIsStopLossOnLossSide(PM_ENTRY_BUY, 100.0, 100.0),
+              "Buy SL equal to entry is not on the loss side");
+   AssertTrue(!PMIsStopLossOnLossSide(PM_ENTRY_BUY, 100.0, 102.0),
+              "Buy SL above entry is not on the loss side");
+   AssertTrue(PMIsStopLossOnLossSide(PM_ENTRY_SELL, 100.0, 102.0),
+              "Sell SL above entry is on the loss side");
+   AssertTrue(!PMIsStopLossOnLossSide(PM_ENTRY_SELL, 100.0, 100.0),
+              "Sell SL equal to entry is not on the loss side");
+   AssertTrue(!PMIsStopLossOnLossSide(PM_ENTRY_SELL, 100.0, 98.0),
+              "Sell SL below entry is not on the loss side");
+   AssertTrue(!PMIsStopLossOnLossSide((PMEntrySide)99, 100.0, 98.0),
+              "An invalid direction is never on the loss side");
+   AssertTrue(!PMIsStopLossOnLossSide(PM_ENTRY_BUY, 0.0, 98.0),
+              "A non-positive entry price is never on the loss side");
+
+   // PMIsTakeProfitOnProfitSide
+   AssertTrue(PMIsTakeProfitOnProfitSide(PM_ENTRY_BUY, 100.0, 102.0),
+              "Buy TP above entry is on the profit side");
+   AssertTrue(!PMIsTakeProfitOnProfitSide(PM_ENTRY_BUY, 100.0, 100.0),
+              "Buy TP equal to entry is not on the profit side");
+   AssertTrue(!PMIsTakeProfitOnProfitSide(PM_ENTRY_BUY, 100.0, 98.0),
+              "Buy TP below entry is not on the profit side");
+   AssertTrue(PMIsTakeProfitOnProfitSide(PM_ENTRY_SELL, 100.0, 98.0),
+              "Sell TP below entry is on the profit side");
+   AssertTrue(!PMIsTakeProfitOnProfitSide(PM_ENTRY_SELL, 100.0, 100.0),
+              "Sell TP equal to entry is not on the profit side");
+   AssertTrue(!PMIsTakeProfitOnProfitSide(PM_ENTRY_SELL, 100.0, 102.0),
+              "Sell TP above entry is not on the profit side");
+   AssertTrue(!PMIsTakeProfitOnProfitSide((PMEntrySide)99, 100.0, 102.0),
+              "An invalid direction is never on the profit side");
+
+   // PMCalculateCurrentRR
+   double rr = 0.0;
+   AssertTrue(PMCalculateCurrentRR(PM_ENTRY_BUY, 100.0, 98.0, 102.0, rr, reason) == PM_RR_VALID &&
+              MathAbs(rr - 1.0) < 0.0000001,
+              "Buy RR of 1:1 matches acceptance criteria #4");
+   AssertTrue(PMCalculateCurrentRR(PM_ENTRY_BUY, 100.0, 98.0, 104.0, rr, reason) == PM_RR_VALID &&
+              MathAbs(rr - 2.0) < 0.0000001,
+              "Buy RR of 1:2 matches acceptance criteria #4");
+   AssertTrue(PMCalculateCurrentRR(PM_ENTRY_SELL, 100.0, 102.0, 98.0, rr, reason) == PM_RR_VALID &&
+              MathAbs(rr - 1.0) < 0.0000001,
+              "Sell RR of 1:1 matches acceptance criteria #4");
+   AssertTrue(PMCalculateCurrentRR(PM_ENTRY_SELL, 100.0, 102.0, 96.0, rr, reason) == PM_RR_VALID &&
+              MathAbs(rr - 2.0) < 0.0000001,
+              "Sell RR of 1:2 matches acceptance criteria #4");
+   AssertTrue(PMCalculateCurrentRR(PM_ENTRY_BUY, 100.0, 0.0, 102.0, rr, reason) == PM_RR_NOT_AVAILABLE &&
+              rr == 0.0,
+              "RR is not available without an SL");
+   AssertTrue(PMCalculateCurrentRR(PM_ENTRY_BUY, 100.0, 98.0, 0.0, rr, reason) == PM_RR_NOT_AVAILABLE &&
+              rr == 0.0,
+              "RR is not available without a TP");
+   AssertTrue(PMCalculateCurrentRR(PM_ENTRY_BUY, 100.0, 102.0, 104.0, rr, reason) == PM_RR_INVALID &&
+              rr == 0.0,
+              "RR is invalid when the SL is on the wrong side");
+   AssertTrue(PMCalculateCurrentRR(PM_ENTRY_BUY, 100.0, 98.0, 96.0, rr, reason) == PM_RR_INVALID &&
+              rr == 0.0,
+              "RR is invalid when the TP is on the wrong side");
+   AssertTrue(PMCalculateCurrentRR(PM_ENTRY_BUY, 100.0, 100.0, 102.0, rr, reason) == PM_RR_INVALID &&
+              rr == 0.0,
+              "RR is invalid, not a div-by-zero crash, when SL equals entry");
+   AssertTrue(PMCalculateCurrentRR((PMEntrySide)99, 100.0, 98.0, 102.0, rr, reason) == PM_RR_INVALID,
+              "RR is invalid when the direction is invalid");
+
+   // PMCalculateAutoTakeProfit
+   double tp = 0.0;
+   AssertTrue(PMCalculateAutoTakeProfit(PM_ENTRY_BUY, 100.0, 98.0, 1.0,
+                                        0.01, 0.01, 2, 0, 0, tp, reason) &&
+              MathAbs(tp - 102.0) < 0.0000001,
+              "Buy auto TP at RR 1:1 matches acceptance criteria #4 (entry 100, SL 98 -> TP 102)");
+   AssertTrue(PMCalculateAutoTakeProfit(PM_ENTRY_BUY, 100.0, 98.0, 2.0,
+                                        0.01, 0.01, 2, 0, 0, tp, reason) &&
+              MathAbs(tp - 104.0) < 0.0000001,
+              "Buy auto TP at RR 1:2 matches acceptance criteria #4 (entry 100, SL 98 -> TP 104)");
+   AssertTrue(PMCalculateAutoTakeProfit(PM_ENTRY_SELL, 100.0, 102.0, 1.0,
+                                        0.01, 0.01, 2, 0, 0, tp, reason) &&
+              MathAbs(tp - 98.0) < 0.0000001,
+              "Sell auto TP at RR 1:1 matches acceptance criteria #4 (entry 100, SL 102 -> TP 98)");
+   AssertTrue(PMCalculateAutoTakeProfit(PM_ENTRY_SELL, 100.0, 102.0, 2.0,
+                                        0.01, 0.01, 2, 0, 0, tp, reason) &&
+              MathAbs(tp - 96.0) < 0.0000001,
+              "Sell auto TP at RR 1:2 matches acceptance criteria #4 (entry 100, SL 102 -> TP 96)");
+   AssertTrue(!PMCalculateAutoTakeProfit(PM_ENTRY_BUY, 100.0, 0.0, 1.0,
+                                         0.01, 0.01, 2, 0, 0, tp, reason) &&
+              tp == 0.0,
+              "Auto TP fails without a valid SL");
+   AssertTrue(!PMCalculateAutoTakeProfit(PM_ENTRY_BUY, 100.0, 102.0, 1.0,
+                                         0.01, 0.01, 2, 0, 0, tp, reason) &&
+              tp == 0.0,
+              "Auto TP fails when the SL is on the wrong side");
+   AssertTrue(!PMCalculateAutoTakeProfit(PM_ENTRY_BUY, 100.0, 98.0, 0.0,
+                                         0.01, 0.01, 2, 0, 0, tp, reason) &&
+              tp == 0.0,
+              "Auto TP fails for a non-positive RR multiplier");
+   AssertTrue(!PMCalculateAutoTakeProfit(PM_ENTRY_BUY, 100.0, 98.0, -1.0,
+                                         0.01, 0.01, 2, 0, 0, tp, reason) &&
+              tp == 0.0,
+              "Auto TP fails for a negative RR multiplier");
+   AssertTrue(!PMCalculateAutoTakeProfit(PM_ENTRY_BUY, 100.0, 98.0, 1.0,
+                                         0.01, 0.01, 2, 1000, 0, tp, reason) &&
+              tp == 0.0 && reason == "Buy TP is inside the broker's Stops/Freeze Level.",
+              "Buy auto TP fails when the Stops/Freeze Level swallows the candidate");
+   AssertTrue(!PMCalculateAutoTakeProfit(PM_ENTRY_SELL, 100.0, 102.0, 1.0,
+                                         0.01, 0.01, 2, 1000, 0, tp, reason) &&
+              tp == 0.0 && reason == "Sell TP is inside the broker's Stops/Freeze Level.",
+              "Sell auto TP fails when the Stops/Freeze Level swallows the candidate");
+
+   // PMNextTakeProfitState -- one assertion per transition-table row
+   PMTpState next_state = PM_TP_STATE_AUTO;
+   AssertTrue(PMNextTakeProfitState(PM_TP_STATE_AUTO, PM_TP_EVENT_SL_CHANGED, true, next_state, reason) &&
+              next_state == PM_TP_STATE_AUTO,
+              "SL changed leaves Auto state unchanged");
+   AssertTrue(PMNextTakeProfitState(PM_TP_STATE_MANUAL, PM_TP_EVENT_SL_CHANGED, true, next_state, reason) &&
+              next_state == PM_TP_STATE_MANUAL,
+              "SL changed leaves Manual state unchanged");
+   AssertTrue(PMNextTakeProfitState(PM_TP_STATE_AUTO, PM_TP_EVENT_SL_CANCELED, false, next_state, reason) &&
+              next_state == PM_TP_STATE_MANUAL,
+              "SL canceled moves Auto to Manual so the caller freezes the TP price");
+   AssertTrue(PMNextTakeProfitState(PM_TP_STATE_MANUAL, PM_TP_EVENT_SL_CANCELED, false, next_state, reason) &&
+              next_state == PM_TP_STATE_MANUAL,
+              "SL canceled leaves Manual state unchanged");
+   AssertTrue(PMNextTakeProfitState(PM_TP_STATE_OFF, PM_TP_EVENT_SL_CANCELED, false, next_state, reason) &&
+              next_state == PM_TP_STATE_OFF,
+              "SL canceled leaves Off state unchanged");
+   AssertTrue(PMNextTakeProfitState(PM_TP_STATE_OFF, PM_TP_EVENT_TP_SET_MANUAL, true, next_state, reason) &&
+              next_state == PM_TP_STATE_MANUAL,
+              "Setting TP manually always moves to Manual regardless of prior state");
+   AssertTrue(PMNextTakeProfitState(PM_TP_STATE_AUTO, PM_TP_EVENT_TP_CANCELED, true, next_state, reason) &&
+              next_state == PM_TP_STATE_OFF,
+              "Canceling TP always moves to Off");
+   AssertTrue(PMNextTakeProfitState(PM_TP_STATE_MANUAL, PM_TP_EVENT_RR_CHANGED, true, next_state, reason) &&
+              next_state == PM_TP_STATE_MANUAL,
+              "RR changed leaves Manual state unchanged");
+   AssertTrue(PMNextTakeProfitState(PM_TP_STATE_AUTO, PM_TP_EVENT_RR_CHANGED, true, next_state, reason) &&
+              next_state == PM_TP_STATE_AUTO,
+              "RR changed leaves Auto state unchanged");
+   AssertTrue(PMNextTakeProfitState(PM_TP_STATE_MANUAL, PM_TP_EVENT_REVERT_TO_AUTO, true, next_state, reason) &&
+              next_state == PM_TP_STATE_AUTO,
+              "Revert to auto succeeds with a valid SL");
+   AssertTrue(!PMNextTakeProfitState(PM_TP_STATE_MANUAL, PM_TP_EVENT_REVERT_TO_AUTO, false, next_state, reason) &&
+              next_state == PM_TP_STATE_MANUAL &&
+              reason == "Set a valid SL before reverting to automatic Take Profit.",
+              "Revert to auto fails without a valid SL and leaves state unchanged");
+   AssertTrue(!PMNextTakeProfitState(PM_TP_STATE_AUTO, (PMTpEvent)99, true, next_state, reason) &&
+              next_state == PM_TP_STATE_AUTO && reason == "Unknown Take Profit event.",
+              "An unknown event is rejected and leaves state unchanged");
+
+   // PMCalculateRiskBudget
+   double budget = 0.0;
+   AssertTrue(PMCalculateRiskBudget(PM_QUANTITY_RISK_AMOUNT, 100.0, 0.0, 0.0, budget, reason) &&
+              MathAbs(budget - 100.0) < 0.0000001,
+              "Risk amount mode uses the manual amount directly");
+   AssertTrue(PMCalculateRiskBudget(PM_QUANTITY_RISK_PERCENT, 0.0, 10000.0, 1.0, budget, reason) &&
+              MathAbs(budget - 100.0) < 0.0000001,
+              "Risk percent mode (balance 10000, 1%) equals risk amount 100 (acceptance criteria #8)");
+   AssertTrue(!PMCalculateRiskBudget(PM_QUANTITY_RISK_AMOUNT, 0.0, 0.0, 0.0, budget, reason) &&
+              budget == 0.0,
+              "A risk amount of zero fails");
+   AssertTrue(!PMCalculateRiskBudget(PM_QUANTITY_RISK_AMOUNT, -1.0, 0.0, 0.0, budget, reason) &&
+              budget == 0.0,
+              "A negative risk amount fails");
+   AssertTrue(!PMCalculateRiskBudget(PM_QUANTITY_RISK_PERCENT, 0.0, 0.0, 1.0, budget, reason) &&
+              budget == 0.0,
+              "A non-positive balance fails");
+   AssertTrue(!PMCalculateRiskBudget(PM_QUANTITY_RISK_PERCENT, 0.0, 10000.0, 0.0, budget, reason) &&
+              budget == 0.0,
+              "A non-positive percent fails");
+   AssertTrue(!PMCalculateRiskBudget(PM_QUANTITY_RISK_PERCENT, 0.0, 10000.0, 100.1, budget, reason) &&
+              budget == 0.0,
+              "A percent above 100 fails");
+   AssertTrue(!PMCalculateRiskBudget(PM_QUANTITY_MANUAL_LOT, 100.0, 10000.0, 1.0, budget, reason) &&
+              budget == 0.0,
+              "Manual Lot mode never produces a risk budget");
+
+   // PMCalculateRiskLot
+   double lot = 0.0;
+   double estimated_loss = 0.0;
+   AssertTrue(PMCalculateRiskLot(100.0, 1.0, 250.0, 0.01, 100.0, 0.01, lot, estimated_loss, reason) &&
+              MathAbs(lot - 0.40) < 0.0000001,
+              "Risk lot for budget 100 / reference loss 250 is 0.40 (acceptance criteria #8)");
+   AssertTrue(PMCalculateRiskLot(3.7, 1.0, 100.0, 0.01, 100.0, 0.01, lot, estimated_loss, reason) &&
+              MathAbs(lot - 0.03) < 0.0000001,
+              "Raw lot 0.037 floors down to 0.03, not up to 0.04 (acceptance criteria #9)");
+   AssertTrue(!PMCalculateRiskLot(0.05, 1.0, 100.0, 0.01, 100.0, 0.01, lot, estimated_loss, reason) &&
+              lot == 0.0 && estimated_loss == 0.0,
+              "A raw lot below the symbol minimum fails and does not round up");
+   AssertTrue(PMCalculateRiskLot(50.0, 1.0, 100.0, 0.01, 0.30, 0.01, lot, estimated_loss, reason) &&
+              MathAbs(lot - 0.30) < 0.0000001 && MathAbs(estimated_loss - 30.0) < 0.0000001,
+              "A raw lot above the symbol maximum clips to the step-aligned maximum and recomputes the loss");
+   AssertTrue(!PMCalculateRiskLot(0.0, 1.0, 250.0, 0.01, 100.0, 0.01, lot, estimated_loss, reason),
+              "A non-positive budget fails");
+   AssertTrue(!PMCalculateRiskLot(-1.0, 1.0, 250.0, 0.01, 100.0, 0.01, lot, estimated_loss, reason),
+              "A negative budget fails");
+   AssertTrue(!PMCalculateRiskLot(100.0, 0.0, 250.0, 0.01, 100.0, 0.01, lot, estimated_loss, reason),
+              "A non-positive reference volume fails");
+   AssertTrue(!PMCalculateRiskLot(100.0, 1.0, 0.0, 0.01, 100.0, 0.01, lot, estimated_loss, reason),
+              "A non-positive reference loss fails");
+   AssertTrue(!PMCalculateRiskLot(100.0, 1.0, 250.0, 0.0, 100.0, 0.01, lot, estimated_loss, reason),
+              "A non-positive volume minimum fails");
+   AssertTrue(!PMCalculateRiskLot(100.0, 1.0, 250.0, 0.5, 0.1, 0.01, lot, estimated_loss, reason),
+              "A volume maximum below the minimum fails");
+   AssertTrue(!PMCalculateRiskLot(100.0, 1.0, 250.0, 0.01, 100.0, 0.0, lot, estimated_loss, reason),
+              "A non-positive volume step fails");
+  }
+
 void TestPanelLayoutHelpers()
   {
    AssertTrue(PM_PANEL_POSITIONS_HEADER_HEIGHT >= 52,
@@ -917,6 +1175,7 @@ void OnStart()
    TestIsMoreFavorableStop();
    TestBestStopCandidate();
    TestEntryHelpers();
+   TestEntryPricingAndRiskHelpers();
    TestPanelLayoutHelpers();
    TestInputStepperHelpers();
    TestPriceEditorHelpers();
