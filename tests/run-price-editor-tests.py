@@ -74,6 +74,19 @@ def enum_block(source: str, name: str) -> str:
     return source[match.start():end]
 
 
+def struct_block(source: str, name: str) -> str:
+    match = re.search(r"^struct\s+" + re.escape(name) + r"\b", source, re.M)
+    if not match:
+        raise ValueError(f"Missing struct: {name}")
+    start = source.index("{", match.end())
+    depth, end = 1, start + 1
+    while depth:
+        depth += (source[end] == "{") - (source[end] == "}")
+        end += 1
+    end = source.index(";", end) + 1
+    return source[match.start():end]
+
+
 def main() -> None:
     compiler = os.environ.get("CXX") or shutil.which("clang++") or shutil.which("g++")
     if not compiler:
@@ -84,13 +97,15 @@ def main() -> None:
     verify_trail_layout((ROOT / "src/UiPanel.mqh").read_text())
     enum_names = ["PMEntrySide", "PMEntryOrderType", "PMQuantityMode", "PMEntryInputUnit",
                   "PMTpState", "PMTpEvent", "PMRRStatus"]
+    struct_names = ["PMEntrySnapshot", "PMEntryComputation"]
     helper_names = ["PMStepInteger", "PMStepDecimal", "PMPriceEditorStep", "PMShiftPriceEditorValue",
                     "PMNormalizePrice", "PMCalculateAssumedEntryPrice", "PMIsStopLossOnLossSide",
                     "PMIsTakeProfitOnProfitSide", "PMCalculateCurrentRR", "PMCalculateAutoTakeProfit",
-                    "PMNextTakeProfitState", "PMCalculateRiskBudget", "PMCalculateRiskLot"]
+                    "PMNextTakeProfitState", "PMCalculateRiskBudget", "PMCalculateRiskLot",
+                    "PMRecomputeEntry"]
     test_names = ["TestInputStepperHelpers", "TestPriceEditorHelpers",
                   "TestPriceDragLifecycle", "TestPriceEstimateAggregation", "TestPriceLabelPlacement",
-                  "TestEntryPricingAndRiskHelpers"]
+                  "TestEntryPricingAndRiskHelpers", "TestEntryRecomputeOrchestration"]
     prelude = r"""
 #include <algorithm>
 #include <cmath>
@@ -121,6 +136,7 @@ void AssertTrue(bool condition, const string &name) {
 }
 """
     source = prelude + "\n".join(enum_block(models, name) for name in enum_names) + "\n"
+    source += "\n".join(struct_block(models, name) for name in struct_names) + "\n"
     source += "\n".join(function(helpers, name) for name in helper_names)
     source += "\n" + "\n".join(function(tests, name) for name in test_names)
     source += "\nint main() {\n" + "\n".join(name + "();" for name in test_names)

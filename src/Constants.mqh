@@ -668,6 +668,107 @@ bool PMCalculateRiskLot(const double budget,
    return true;
   }
 
+void PMRecomputeEntry(const PMEntrySnapshot &snapshot, PMEntryComputation &computation)
+  {
+   // Zero-initialize every field, then apply the pre-recompute effective_tp default.
+   computation.entry_ok = false;
+   computation.entry = 0.0;
+   computation.entry_reason = "";
+   computation.effective_tp = snapshot.tp_price;
+   computation.tp_auto_ok = false;
+   computation.tp_reason = "";
+   computation.rr_status = (PMRRStatus)0;
+   computation.rr = 0.0;
+   computation.rr_reason = "";
+   computation.lot_ok = false;
+   computation.lot = 0.0;
+   computation.estimated_loss = 0.0;
+   computation.lot_reason = "";
+
+   // 1. Entry price. Nothing downstream is meaningful without a valid entry.
+   computation.entry_ok = PMCalculateAssumedEntryPrice(snapshot.order_type, snapshot.side,
+                             snapshot.bid, snapshot.ask, snapshot.order_price,
+                             computation.entry, computation.entry_reason);
+   if(!computation.entry_ok)
+     {
+      computation.rr_status = PM_RR_INVALID;
+      computation.rr_reason = computation.entry_reason;
+      computation.tp_reason = computation.entry_reason;
+      computation.lot_reason = computation.entry_reason;
+      return;
+     }
+
+   // 2. Effective TP.
+   if(snapshot.tp_state == PM_TP_STATE_AUTO)
+     {
+      if(PMIsStopLossOnLossSide(snapshot.side, computation.entry, snapshot.sl_price))
+        {
+         computation.tp_auto_ok = PMCalculateAutoTakeProfit(snapshot.side, computation.entry, snapshot.sl_price,
+                                     snapshot.rr_multiplier, snapshot.point, snapshot.tick_size, snapshot.digits,
+                                     snapshot.stops_level, snapshot.freeze_level,
+                                     computation.effective_tp, computation.tp_reason);
+         if(!computation.tp_auto_ok)
+            computation.effective_tp = 0.0;
+        }
+      else
+        {
+         // No valid SL yet -- the normal "Auto but nothing to derive from" case, not an error.
+         computation.tp_auto_ok = false;
+         computation.effective_tp = 0.0;
+         computation.tp_reason = "Set a valid SL to generate an automatic Take Profit.";
+        }
+     }
+   else
+     {
+      // PM_TP_STATE_MANUAL or PM_TP_STATE_OFF: trust the snapshot's tp_price as-is.
+      computation.effective_tp = snapshot.tp_price;
+      computation.tp_auto_ok = true;
+      computation.tp_reason = "";
+     }
+
+   // 3. Current RR.
+   computation.rr_status = PMCalculateCurrentRR(snapshot.side, computation.entry,
+                              snapshot.sl_price, computation.effective_tp,
+                              computation.rr, computation.rr_reason);
+
+   // 4. Lot.
+   if(snapshot.quantity_mode == PM_QUANTITY_MANUAL_LOT)
+     {
+      computation.lot = snapshot.manual_lot;
+      computation.lot_ok = MathIsValidNumber(snapshot.manual_lot) && snapshot.manual_lot > 0.0;
+      computation.estimated_loss = 0.0;
+      if(!computation.lot_ok)
+         computation.lot_reason = "Entry lot must be greater than zero.";
+     }
+   else
+     {
+      double budget = 0.0;
+      string budget_reason = "";
+      const bool budget_ok = PMCalculateRiskBudget(snapshot.quantity_mode, snapshot.risk_amount,
+                                snapshot.balance, snapshot.risk_percent, budget, budget_reason);
+      if(!budget_ok)
+        {
+         computation.lot_ok = false;
+         computation.lot = 0.0;
+         computation.estimated_loss = 0.0;
+         computation.lot_reason = budget_reason;
+        }
+      else if(!PMIsStopLossOnLossSide(snapshot.side, computation.entry, snapshot.sl_price))
+        {
+         computation.lot_ok = false;
+         computation.lot = 0.0;
+         computation.estimated_loss = 0.0;
+         computation.lot_reason = "Set a valid SL on the loss side of the entry price to use risk-based sizing.";
+        }
+      else
+        {
+         computation.lot_ok = PMCalculateRiskLot(budget, snapshot.reference_volume, snapshot.reference_loss,
+                                 snapshot.volume_min, snapshot.volume_max, snapshot.volume_step,
+                                 computation.lot, computation.estimated_loss, computation.lot_reason);
+        }
+     }
+  }
+
 int PMWrapStatus(const string text,
                  const int max_chars,
                  string &lines[])

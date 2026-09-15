@@ -1004,6 +1004,173 @@ void TestEntryPricingAndRiskHelpers()
               "A non-finite volume step (NaN) fails");
   }
 
+void TestEntryRecomputeOrchestration()
+  {
+   PMEntrySnapshot snapshot = {};
+   PMEntryComputation computation = {};
+
+   // --- 1. Market Buy with a valid SL and Auto TP: entry derives from Ask, and
+   //        effective_tp matches a direct PMCalculateAutoTakeProfit call.
+   snapshot.order_type = PM_ENTRY_ORDER_MARKET;
+   snapshot.side = PM_ENTRY_BUY;
+   snapshot.bid = 99.95;
+   snapshot.ask = 100.0;
+   snapshot.order_price = 0.0;
+   snapshot.point = 0.01;
+   snapshot.tick_size = 0.01;
+   snapshot.digits = 2;
+   snapshot.stops_level = 0;
+   snapshot.freeze_level = 0;
+   snapshot.sl_price = 98.0;
+   snapshot.tp_price = 0.0;
+   snapshot.tp_state = PM_TP_STATE_AUTO;
+   snapshot.rr_multiplier = 1.0;
+   snapshot.quantity_mode = PM_QUANTITY_MANUAL_LOT;
+   snapshot.manual_lot = 0.01;
+   snapshot.risk_amount = 0.0;
+   snapshot.risk_percent = 0.0;
+   snapshot.balance = 0.0;
+   snapshot.reference_volume = 0.0;
+   snapshot.reference_loss = 0.0;
+   snapshot.volume_min = 0.0;
+   snapshot.volume_max = 0.0;
+   snapshot.volume_step = 0.0;
+
+   PMRecomputeEntry(snapshot, computation);
+   double expected_tp = 0.0;
+   string expected_tp_reason = "";
+   PMCalculateAutoTakeProfit(PM_ENTRY_BUY, 100.0, 98.0, 1.0, 0.01, 0.01, 2, 0, 0,
+                             expected_tp, expected_tp_reason);
+   AssertTrue(computation.entry_ok && MathAbs(computation.entry - 100.0) < 0.0000001,
+              "Market Buy orchestration derives entry from Ask");
+   AssertTrue(computation.tp_auto_ok && MathAbs(computation.effective_tp - expected_tp) < 0.0000001 &&
+              MathAbs(computation.effective_tp - 102.0) < 0.0000001,
+              "Auto TP effective_tp matches a direct PMCalculateAutoTakeProfit call at RR 1:1 (acceptance criteria #4)");
+   AssertTrue(computation.rr_status == PM_RR_VALID && MathAbs(computation.rr - 1.0) < 0.0000001,
+              "Orchestrated RR is 1.0 at RR multiplier 1.0");
+
+   snapshot.rr_multiplier = 2.0;
+   PMRecomputeEntry(snapshot, computation);
+   AssertTrue(computation.tp_auto_ok && MathAbs(computation.effective_tp - 104.0) < 0.0000001,
+              "Auto TP effective_tp is 104.0 at RR multiplier 2.0 (acceptance criteria #4)");
+   AssertTrue(computation.rr_status == PM_RR_VALID && MathAbs(computation.rr - 2.0) < 0.0000001,
+              "Orchestrated RR is 2.0 at RR multiplier 2.0");
+
+   // --- 2. Manual TP passes through verbatim and drives RR directly, ignoring the multiplier.
+   snapshot.tp_state = PM_TP_STATE_MANUAL;
+   snapshot.tp_price = 105.0;
+   PMRecomputeEntry(snapshot, computation);
+   AssertTrue(computation.tp_auto_ok && MathAbs(computation.effective_tp - 105.0) < 0.0000001,
+              "Manual TP price passes through verbatim, not recomputed from RR");
+   AssertTrue(computation.rr_status == PM_RR_VALID && MathAbs(computation.rr - 2.5) < 0.0000001,
+              "RR reflects the manual TP price (2.5), not the RR multiplier");
+
+   // --- 3. TP Off with no price: RR is not available.
+   snapshot.tp_state = PM_TP_STATE_OFF;
+   snapshot.tp_price = 0.0;
+   PMRecomputeEntry(snapshot, computation);
+   AssertTrue(computation.effective_tp == 0.0,
+              "TP Off keeps effective_tp at zero");
+   AssertTrue(computation.rr_status == PM_RR_NOT_AVAILABLE,
+              "RR is not available when TP is Off");
+
+   // --- 4. Auto TP with no SL yet is a normal state, not a failure.
+   snapshot.tp_state = PM_TP_STATE_AUTO;
+   snapshot.sl_price = 0.0;
+   PMRecomputeEntry(snapshot, computation);
+   AssertTrue(computation.entry_ok,
+              "Entry stays valid even when Auto TP has nothing to derive from");
+   AssertTrue(!computation.tp_auto_ok && computation.effective_tp == 0.0 && computation.tp_reason != "",
+              "Auto TP without a valid SL fails softly with a non-empty reason, not an overall failure");
+
+   // --- 5. Manual Lot mode.
+   snapshot.sl_price = 98.0;
+   snapshot.tp_state = PM_TP_STATE_OFF;
+   snapshot.tp_price = 0.0;
+   snapshot.quantity_mode = PM_QUANTITY_MANUAL_LOT;
+   snapshot.manual_lot = 0.05;
+   PMRecomputeEntry(snapshot, computation);
+   AssertTrue(computation.lot_ok && MathAbs(computation.lot - 0.05) < 0.0000001 &&
+              computation.estimated_loss == 0.0,
+              "Manual Lot mode uses the manual lot directly and never estimates a loss");
+
+   snapshot.manual_lot = 0.0;
+   PMRecomputeEntry(snapshot, computation);
+   AssertTrue(!computation.lot_ok && computation.lot == 0.0,
+              "A Manual Lot of zero fails");
+
+   snapshot.manual_lot = -1.0;
+   PMRecomputeEntry(snapshot, computation);
+   AssertTrue(!computation.lot_ok && computation.lot == -1.0,
+              "A negative Manual Lot fails, and lot mirrors the invalid input verbatim (per spec, unlike Risk mode)");
+
+   // --- 6. Risk Percent mode reproduces acceptance criteria #8 through the full orchestration.
+   snapshot.quantity_mode = PM_QUANTITY_RISK_PERCENT;
+   snapshot.balance = 10000.0;
+   snapshot.risk_percent = 1.0;
+   snapshot.reference_volume = 1.0;
+   snapshot.reference_loss = 250.0;
+   snapshot.volume_min = 0.01;
+   snapshot.volume_max = 100.0;
+   snapshot.volume_step = 0.01;
+   snapshot.sl_price = 98.0;
+   PMRecomputeEntry(snapshot, computation);
+   AssertTrue(computation.lot_ok && MathAbs(computation.lot - 0.40) < 0.0000001,
+              "Risk Percent orchestration reproduces acceptance criteria #8 (lot 0.40)");
+
+   // --- 7. Risk mode with an invalid SL fails and does not fall back to the previous valid lot.
+   snapshot.sl_price = 0.0;
+   PMRecomputeEntry(snapshot, computation);
+   AssertTrue(!computation.lot_ok && computation.lot == 0.0 &&
+              computation.lot_reason == "Set a valid SL on the loss side of the entry price to use risk-based sizing.",
+              "Risk mode with an unset SL fails and resets the previously valid lot to zero");
+
+   snapshot.sl_price = 102.0; // Wrong side for a Buy entry.
+   PMRecomputeEntry(snapshot, computation);
+   AssertTrue(!computation.lot_ok && computation.lot == 0.0 &&
+              computation.lot_reason == "Set a valid SL on the loss side of the entry price to use risk-based sizing.",
+              "Risk mode with an SL on the profit side fails the same way");
+
+   // --- 8. An out-of-range risk percent fails at the budget step, never reaching PMCalculateRiskLot.
+   snapshot.sl_price = 98.0;
+   snapshot.risk_percent = 150.0;
+   PMRecomputeEntry(snapshot, computation);
+   AssertTrue(!computation.lot_ok && computation.lot == 0.0 &&
+              computation.lot_reason == "Risk percent must be greater than zero and at most 100.",
+              "An out-of-range risk percent fails at the budget step even though a valid lot was otherwise reachable");
+
+   // --- 9. Invalid entry short-circuits everything; reasons propagate from entry_reason,
+   //        not independently invented generic messages.
+   PMEntrySnapshot invalid_snapshot = {};
+   invalid_snapshot.order_type = PM_ENTRY_ORDER_MARKET;
+   invalid_snapshot.side = PM_ENTRY_BUY;
+   invalid_snapshot.bid = 0.0;
+   invalid_snapshot.ask = 0.0;
+   invalid_snapshot.tp_state = PM_TP_STATE_AUTO;
+   invalid_snapshot.rr_multiplier = 1.0;
+   invalid_snapshot.sl_price = 98.0;
+   invalid_snapshot.quantity_mode = PM_QUANTITY_RISK_PERCENT;
+   invalid_snapshot.balance = 10000.0;
+   invalid_snapshot.risk_percent = 1.0;
+   invalid_snapshot.reference_volume = 1.0;
+   invalid_snapshot.reference_loss = 250.0;
+   invalid_snapshot.volume_min = 0.01;
+   invalid_snapshot.volume_max = 100.0;
+   invalid_snapshot.volume_step = 0.01;
+   PMEntryComputation invalid_computation = {};
+   PMRecomputeEntry(invalid_snapshot, invalid_computation);
+   AssertTrue(!invalid_computation.entry_ok && invalid_computation.entry_reason == "Current price is unavailable.",
+              "Invalid Market entry (no tick) fails with the entry-price reason");
+   AssertTrue(invalid_computation.rr_status == PM_RR_INVALID &&
+              invalid_computation.rr_reason == invalid_computation.entry_reason,
+              "Invalid entry propagates entry_reason into rr_reason, not a generic message");
+   AssertTrue(!invalid_computation.lot_ok && invalid_computation.lot == 0.0 &&
+              invalid_computation.lot_reason == invalid_computation.entry_reason,
+              "Invalid entry propagates entry_reason into lot_reason, not a generic message");
+   AssertTrue(invalid_computation.tp_reason == invalid_computation.entry_reason,
+              "Invalid entry propagates entry_reason into tp_reason too");
+  }
+
 void TestPanelLayoutHelpers()
   {
    AssertTrue(PM_PANEL_POSITIONS_HEADER_HEIGHT >= 52,
@@ -1207,6 +1374,7 @@ void OnStart()
    TestBestStopCandidate();
    TestEntryHelpers();
    TestEntryPricingAndRiskHelpers();
+   TestEntryRecomputeOrchestration();
    TestPanelLayoutHelpers();
    TestInputStepperHelpers();
    TestPriceEditorHelpers();

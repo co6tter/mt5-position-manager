@@ -170,6 +170,51 @@ struct PMMarketEntryResult
    double price;
   };
 
+struct PMEntrySnapshot
+  {
+   PMEntryOrderType order_type;
+   PMEntrySide side;
+   double bid;
+   double ask;
+   double order_price;      // Limit/Stop only; ignored for Market.
+   double point;
+   double tick_size;
+   int digits;
+   long stops_level;
+   long freeze_level;
+   double sl_price;         // 0.0 means SL is not set.
+   double tp_price;         // The currently committed TP price; 0.0 when TP state is Off or not yet set.
+   PMTpState tp_state;
+   double rr_multiplier;
+   PMQuantityMode quantity_mode;
+   double manual_lot;
+   double risk_amount;
+   double risk_percent;
+   double balance;
+   double reference_volume; // e.g. 1.0, the probe volume the caller used for reference_loss.
+   double reference_loss;   // Caller's own OrderCalcProfit(reference_volume, entry, sl) magnitude; 0.0 if not computed/unavailable.
+   double volume_min;
+   double volume_max;
+   double volume_step;
+  };
+
+struct PMEntryComputation
+  {
+   bool entry_ok;
+   double entry;
+   string entry_reason;
+   double effective_tp;     // tp_price as-is (Manual/Off), or the freshly computed Auto price.
+   bool tp_auto_ok;         // Only meaningful when tp_state == PM_TP_STATE_AUTO.
+   string tp_reason;
+   PMRRStatus rr_status;
+   double rr;
+   string rr_reason;
+   bool lot_ok;
+   double lot;
+   double estimated_loss;   // Only meaningful for Risk Amount / Risk Percent mode; see PMRecomputeEntry.
+   string lot_reason;
+  };
+
 struct AutoCloseConfig
   {
    bool enabled;
