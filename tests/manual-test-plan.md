@@ -69,7 +69,7 @@ MT5を使わない補助確認は`python3 tests/run-price-editor-tests.py`で実
 
 ## 数値入力・Priceラインの回帰
 
-1. 表示倍率100%・125%・150%、パネル幅560pxで全タブを確認する。Guardへ`1000000000.00`、Trailへ`1000000`、Auto Closeへ`1440`を入力して、数字と`-` / `+`、単位ラベル、説明、Statusが重ならず、欄内で値を確認できることを記録する。幅・高さの拡大縮小とタブ切替後も確認する。
+1. 表示倍率100%・125%・150%、パネル幅560pxで全タブを確認する。Guardへ`1000000000.00`、Trailへ`1000000`、Auto Closeへ`1440`を入力して、数字と`-` / `+`、単位ラベル、説明、Statusが重ならず、欄内で値を確認できることを記録する。Trailタブでは`Basis`ボタンの全文（`Average`/`Per Position`）がScope・Break Even行と重ならないことも確認する。幅・高さの拡大縮小とタブ切替後も確認する。
 2. SL/TPを空欄にし、ポジション選択後にPriceラインが出ても欄が空のままであることを確認する。ラインをクリックだけしても書き込まれず、左ドラッグして離したときのみ候補が入ることを確認する。
 3. SL/TP欄へ`159.`などの途中の文字列を入力し、フォーカスを保って3秒以上待つ。文字列・カーソルが書き換わらないことを確認する。確定後にラインが同期し、選択Ticket変更、Pips切替・再表示でも入力が消えないことを確認する。不正文字列を確定すると該当ラインが隠れ、理由が表示されることを確認する。
 4. ラインを数秒ドラッグし、Timer更新で戻らず、金額とpointsが追従することを確認する。元の位置へ戻して離した場合の価格も確認する。ラベルをつかんだ瞬間に価格が飛ばないこと、ライン操作でパネルが動かないこと、終了後のチャートスクロール設定が操作前と同じことを確認する。
@@ -107,14 +107,28 @@ MT5を使わない補助確認は`python3 tests/run-price-editor-tests.py`で実
 
 ## Trailing Stop / Break Even
 
+`Basis`が`Average`（既定）の状態で以下を確認する。
+
 1. Break Even・Trailingを両方OFFのまま複数ポジションを保有し、SLが一切変化しないことを確認する。
 2. 同じSymbol・Directionで建値の異なる複数ポジションを用意し、Break EvenをONにしてTrigger/Lockを設定する。加重平均建値からTrigger以上になった瞬間に、対象Ticket全件へ加重平均建値基準の共通SLが1回だけ設定されることを確認する（Expertsログの`[INFO] Position modified...`がTicketごとに出力されること）。
 3. TrailingをONにしてTriggerとDistanceを別々に設定し、バスケットの加重平均建値からの含み益がTrigger未満の間は全TicketのSLが動かず、Trigger以上になってから全Ticketへ現在価格からDistance分の共通SLが設定されることを確認する。価格が反落してもSLが後退しないことを確認する。
 4. Break Even・Trailing両方ONの状態で、バスケットごとに有利な候補が採用され、対象Ticket全件へ同じ候補価格が適用されることを確認する。
-5. Break EvenのTrigger/Lock、TrailingのTrigger/Distance欄に非数値・負数・空欄を入力し、それぞれの機能が実質的に無効になる（SLを一切動かさない）ことを確認する。Trailing Triggerを0または空欄にした場合は、Distanceが開始条件にも使われることを確認する。
+5. Break Even Trigger、Break Even Lock、Trailing Trigger、Trailing Distanceへそれぞれ`abc`・負数・空欄を入力して確定し、その欄が0へ正規化されることを確認する。Break Even Trigger=0はBE無効、Lock=0は建値SL、Trailing Trigger=0はDistanceを開始条件に使用、Distance=0はTrailing無効になることを、もう一方の機能をOFFにして個別に確認する。両Basisで同じ結果になることを確認する。
 6. バスケット内の1Ticketに未解決の変更・決済要求がある状態では、同じバスケットの他Ticketにもその周期は変更要求が送信されないことを確認する。
 7. Break EvenとTrailingがOFFのときボタンが赤、ONのとき緑になることを確認する。
 8. 対象外のSymbol・Directionのポジションが影響を受けないことを確認する。
+
+`Basis`ボタンとPer Positionモードを以下で確認する。hedging対応のデモ口座で複数Ticketを保有して検証する。
+
+9. Trailタブを開き、初期表示が`Average`であることを確認する。`Basis`ボタンをクリックするたびに`Average`と`Per Position`が交互に切り替わり、表示文字列と実際に適用される基準が一致することを確認する。
+10. 同じSymbol・Directionで建値の異なる2Ticket（例: A=1 lot、B=3 lots、Bが不利な建値）を保有し、`Basis`を`Per Position`に切り替える。Break EvenのTrigger/Lockを、Aだけが自身の建値から到達しBは到達しない値に設定し、Aだけにその建値基準のSLが設定され、Bは変更されないことを確認する。
+11. 同じ2Ticketで、TrailingのTrigger/Distanceを両Ticketが自身の建値から到達する値に設定し、両Ticketにそれぞれ現在価格基準のSLが設定されることを確認する（候補価格が同じ値になり得ることも確認する）。
+12. Per Positionのまま、片方のTicketにだけ未解決の変更・決済要求がある状態を作り、そのTicketだけが対象から除外され、同じSymbol・方向の他Ticketは通常どおり評価・更新されることを確認する。
+13. netting口座または単一ポジションで、`Average`と`Per Position`を切り替えても候補・更新結果が一致することを確認する。
+14. Trailingが稼働している状態（Timerが継続している状態）で`Basis`を切り替え、切り替え自体はSL・TP・ON/OFF・入力値を変更せず、次のTimer評価から新しい基準が使われることを確認する。切り替え前にキューへ入っていた再試行が既存の規則どおり完了することも確認する。
+15. チャートSymbol・時間足の変更でEAを再初期化し、`Basis`表示が`Average`へ戻ることを確認する。Entryを含むタブ切替・パネルの移動・折り畳み・リサイズでは`Basis`の選択が保持されることを確認する。
+16. 表示倍率100%・125%・150%、パネル幅560・800・1200pxで両方のBasis表記と4つの最大数値`1000000`を確認する。ON/OFF行と数値行、説明2行、Status、グリップが重ならず、最小幅でも数字が末尾まで見えることを確認する。全タブ切替・折り畳み後に追加部品が残らず、復帰後も表示できることを確認する。
+17. 同じバスケットへの変更送信中に価格が動く状況で、Averageの共通候補がTicketごとに別候補へ切り替わらないことを確認する。Per Positionでは各Ticketごとの候補検証・代替候補が働くことを確認する。決定的な補助確認は`python3 tests/run-trailing-stop-tests.py`で実行できるが、実際の取引APIの確認はMT5で行う。
 
 ## パフォーマンス回帰
 

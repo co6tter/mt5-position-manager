@@ -90,6 +90,8 @@ Pure Testsをコンパイルする場合は、次のように`-SourcePath`を指
 
 MT5がない環境では、Python 3とC++17コンパイラで`python3 tests/run-price-editor-tests.py`を実行できます。実際のヘルパーと共通テストを使い、増減・ドラッグ状態・損益集計・ラベル配置の純粋ロジックを確認します。MQL5のコンパイル、チャートイベント、実際の表示・取引APIの検証は含みません。
 
+Trailの補助確認には`python3 tests/run-trailing-stop-tests.py`を使えます。実際の候補計算・サービスコードと共通テストをC++へ変換し、平均／個別の判定、候補検証の単位、pending除外、SL後退防止とTP保持を確認します。端末・検証・取引APIはテスト用の代替実装であり、MQL5コンパイルや実際の取引・描画の検証は含みません。
+
 ## Usage
 
 EAをチャートへ適用し、AutoTradingを有効にします。SymbolやDirectionのボタンはクリックするたびに候補が切り替わります。Symbol候補には保有ポジションの銘柄と、同じEAパネルを表示しているチャートの銘柄が含まれます。
@@ -135,11 +137,17 @@ Max Loss / Max Profitへの入力は、Tab／Enter／欄外クリックで確定
 
 ### Trailing Stop / Break Even
 
-Break EvenとTrailingは1つのSymbol・Direction選択を共有し、Filter・Auto Close・Equity Guardの選択とは独立です。同じSymbol・Directionに複数ポジションがある場合は1つのバスケットとして扱い、BuyとSellは別バスケットです。
+Break EvenとTrailingは1つのSymbol・Direction選択と1つの計算基準（`Basis`）を共有し、Filter・Auto Close・Equity Guardの選択とは独立です。`Basis`は`Average`（既定）と`Per Position`をボタンクリックのたびに切り替えます。
 
-Break Evenは、バスケットのVolume加重平均建値から現在価格がTrigger（pips）以上有利に動いたら、加重平均建値からLock（pips）分有利な共通SLを全Ticketへ設定します。Trailingは、バスケットの加重平均建値から現在価格がTrigger（pips）以上有利に動いたら、現在価格からDistance（pips）分の共通SLで全Ticketの追従を開始します。共通SLはバスケット全体の加重平均建値より不利にはしませんが、個別の高値掴みポジションでは建値より不利な位置になる場合があります。Triggerが未入力または0の場合は、Distanceを開始条件にも使用します。入力されたpipsは銘柄の桁数に応じて内部でpointsへ変換されます。どちらも1秒Timer周期で再計算され、各TicketのSLが後退しないように更新されます。TPは変更しません。
+`Average`では、同じSymbol・Directionに複数ポジションがある場合は1つのバスケットとして扱い、BuyとSellは別バスケットです。Break Evenは、バスケットのVolume加重平均建値から現在価格がTrigger（pips）以上有利に動いたら、加重平均建値からLock（pips）分有利な共通SLを全Ticketへ設定します。Trailingは、バスケットの加重平均建値から現在価格がTrigger（pips）以上有利に動いたら、現在価格からDistance（pips）分の共通SLで全Ticketの追従を開始します。共通SLはバスケット全体の加重平均建値より不利にはしませんが、個別の高値掴みポジションでは建値より不利な位置になる場合があります。
 
-両方を同時に有効にした場合は、バスケットごとにその時点でより有利な方を採用します。Stops Level・Freeze Levelにより共通候補が拒否される場合は、もう一方の候補を試します。バスケット内に決済または変更の未解決要求がある場合は、全TicketをそのTimer周期の対象から除外します。
+`Per Position`では、バスケットにまとめず各Ticket自身の建値を基準に判定します。Break Evenは、各Ticket自身の建値から現在価格がTriggerへ到達したTicketだけに、その建値からLock分有利なSLを設定します。まだ到達していない同じSymbol・方向の他Ticketは更新されません。Trailingは、各Ticket自身のTrigger条件と「建値より不利にしない」条件の両方を満たしたTicketだけが現在価格からDistance分のSLで追従します。追従候補自体は現在価格基準の共通式のため、条件を満たした複数Ticketが同じSL候補になることがあります。
+
+Trailing Triggerが未入力または0の場合は、Distanceを開始条件にも使用します。Break Even Triggerが0の場合はBreak Evenが無効になり、Lockが0の場合は建値ちょうどをSL候補にします。入力されたpipsは銘柄の桁数に応じて内部でpointsへ変換されます。どちらのBasisでも1秒Timer周期で再計算され、各TicketのSLが後退しないように更新されます。TPは変更しません。
+
+両方（Break EvenとTrailing）を同時に有効にした場合は、判定単位（`Average`はバスケット、`Per Position`は各Ticket）ごとにその時点でより有利な方を採用します。Stops Level・Freeze Levelにより候補が拒否される場合は、もう一方の候補を試します。`Average`ではバスケット内に決済または変更の未解決要求があるTicketが1件でもあれば、そのバスケット全体をそのTimer周期の対象から除外します。`Per Position`では未解決要求のあるTicketだけを除外し、同じSymbol・方向の他Ticketは評価を続けます。
+
+`Basis`の切り替えはタブ切替・パネルの移動・折り畳み・リサイズでは保持されますが、EAの再初期化（Symbol・時間足の変更など）では既定の`Average`に戻ります。稼働中に切り替えても次回のTimer評価から新しい基準が使われるだけで、切り替え自体が取引要求を出すことはなく、既存のSL・TP・ON/OFF・入力値も変更しません。切り替え前にキューへ入っていた再試行は、既存の再試行規則に従って完了します。
 
 TriggerやDistanceがブローカーのStops Levelより小さい場合、候補が却下されてSLが動かないことがあります。ブローカーのStops Level以上の値を設定してください。Trigger / Lock / Distanceへの入力は、Tab／Enter／欄外クリックで確定するまで反映されません。入力単位はpipsです。
 

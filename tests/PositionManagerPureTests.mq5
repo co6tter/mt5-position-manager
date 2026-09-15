@@ -275,6 +275,200 @@ void TestPositionBasket()
               "An empty basket symbol clears stale output tickets");
   }
 
+void TestTrailBasisToggle()
+  {
+   AssertTrue(PMToggleTrailBasis(PM_TRAIL_BASIS_AVERAGE) == PM_TRAIL_BASIS_PER_POSITION,
+              "Toggling the average basis selects per-position");
+   AssertTrue(PMToggleTrailBasis(PM_TRAIL_BASIS_PER_POSITION) == PM_TRAIL_BASIS_AVERAGE,
+              "Toggling the per-position basis selects average");
+   AssertTrue(PMTrailBasisToString(PM_TRAIL_BASIS_AVERAGE) == "Average" &&
+              PMTrailBasisToString(PM_TRAIL_BASIS_PER_POSITION) == "Per Position",
+              "Each basis has a distinct display label");
+  }
+
+void TestResolveTrailingCandidatesBasisSelection()
+  {
+   // Four-digit point size: A: 1 lot @1.10000, B: 3 lots @1.10200, Bid 1.10300.
+   // Average entry is 1.10150; only A has individually reached the trigger.
+   PMPosition positions[];
+   ArrayResize(positions, 2);
+   positions[0].ticket = 201;
+   positions[0].symbol = "EURUSD";
+   positions[0].type = POSITION_TYPE_BUY;
+   positions[0].volume = 1.0;
+   positions[0].open_price = 1.10000;
+   positions[0].current_price = 1.10300;
+   positions[1].ticket = 202;
+   positions[1].symbol = "EURUSD";
+   positions[1].type = POSITION_TYPE_BUY;
+   positions[1].volume = 3.0;
+   positions[1].open_price = 1.10200;
+   positions[1].current_price = 1.10300;
+
+   double points[2] = {0.0001, 0.0001};
+   bool pending[2] = {false, false};
+   ulong result_tickets[];
+   int result_basis_index[];
+   double result_candidates[];
+   double result_fallback_candidates[];
+
+   AssertTrue(PMResolveTrailingCandidates(positions, PM_TRAIL_BASIS_AVERAGE, "EURUSD", PM_DIRECTION_BOTH,
+                                          points, pending, true, false, 20, 2, 0, 0,
+                                          result_tickets, result_basis_index,
+                                          result_candidates, result_fallback_candidates) == 0,
+              "Average basis Break Even does not fire when the weighted entry has not reached the trigger");
+
+   AssertTrue(PMResolveTrailingCandidates(positions, PM_TRAIL_BASIS_PER_POSITION, "EURUSD", PM_DIRECTION_BOTH,
+                                          points, pending, true, false, 20, 2, 0, 0,
+                                          result_tickets, result_basis_index,
+                                          result_candidates, result_fallback_candidates) == 1 &&
+              result_tickets[0] == 201 && MathAbs(result_candidates[0] - 1.10020) < 0.00001,
+              "Per-position basis Break Even fires only for the ticket whose own entry reached the trigger");
+  }
+
+void TestResolveTrailingCandidatesSharedCandidate()
+  {
+   // Same A/B pair with current Bid 1.10400: both tickets individually reach
+   // the trailing trigger, and the trailing candidate is price-derived rather
+   // than entry-derived, so per-position basis can still agree with average
+   // basis on one shared target.
+   PMPosition positions[];
+   ArrayResize(positions, 2);
+   positions[0].ticket = 201;
+   positions[0].symbol = "EURUSD";
+   positions[0].type = POSITION_TYPE_BUY;
+   positions[0].volume = 1.0;
+   positions[0].open_price = 1.10000;
+   positions[0].current_price = 1.10400;
+   positions[1].ticket = 202;
+   positions[1].symbol = "EURUSD";
+   positions[1].type = POSITION_TYPE_BUY;
+   positions[1].volume = 3.0;
+   positions[1].open_price = 1.10200;
+   positions[1].current_price = 1.10400;
+
+   double points[2] = {0.0001, 0.0001};
+   bool pending[2] = {false, false};
+   ulong result_tickets[];
+   int result_basis_index[];
+   double result_candidates[];
+   double result_fallback_candidates[];
+
+   AssertTrue(PMResolveTrailingCandidates(positions, PM_TRAIL_BASIS_AVERAGE, "EURUSD", PM_DIRECTION_BOTH,
+                                          points, pending, false, true, 0, 0, 20, 10,
+                                          result_tickets, result_basis_index,
+                                          result_candidates, result_fallback_candidates) == 2 &&
+              MathAbs(result_candidates[0] - 1.10300) < 0.00001 &&
+              MathAbs(result_candidates[1] - 1.10300) < 0.00001,
+              "Average basis trailing applies one shared candidate to every ticket in the basket");
+
+   AssertTrue(PMResolveTrailingCandidates(positions, PM_TRAIL_BASIS_PER_POSITION, "EURUSD", PM_DIRECTION_BOTH,
+                                          points, pending, false, true, 0, 0, 20, 10,
+                                          result_tickets, result_basis_index,
+                                          result_candidates, result_fallback_candidates) == 2 &&
+              result_tickets[0] == 201 && result_tickets[1] == 202 &&
+              MathAbs(result_candidates[0] - 1.10300) < 0.00001 &&
+              MathAbs(result_candidates[1] - 1.10300) < 0.00001,
+              "Per-position basis can independently agree with every ticket on the same price-derived candidate");
+  }
+
+void TestResolveTrailingCandidatesPendingExclusion()
+  {
+   PMPosition positions[];
+   ArrayResize(positions, 2);
+   positions[0].ticket = 201;
+   positions[0].symbol = "EURUSD";
+   positions[0].type = POSITION_TYPE_BUY;
+   positions[0].volume = 1.0;
+   positions[0].open_price = 1.10000;
+   positions[0].current_price = 1.10300;
+   positions[1].ticket = 202;
+   positions[1].symbol = "EURUSD";
+   positions[1].type = POSITION_TYPE_BUY;
+   positions[1].volume = 1.0;
+   positions[1].open_price = 1.10000;
+   positions[1].current_price = 1.10300;
+
+   double points[2] = {0.0001, 0.0001};
+   bool pending[2] = {true, false};
+   ulong result_tickets[];
+   int result_basis_index[];
+   double result_candidates[];
+   double result_fallback_candidates[];
+
+   AssertTrue(PMResolveTrailingCandidates(positions, PM_TRAIL_BASIS_AVERAGE, "EURUSD", PM_DIRECTION_BOTH,
+                                          points, pending, true, false, 20, 2, 0, 0,
+                                          result_tickets, result_basis_index,
+                                          result_candidates, result_fallback_candidates) == 0,
+              "Average basis skips the whole basket when any member ticket has a pending request");
+
+   AssertTrue(PMResolveTrailingCandidates(positions, PM_TRAIL_BASIS_PER_POSITION, "EURUSD", PM_DIRECTION_BOTH,
+                                          points, pending, true, false, 20, 2, 0, 0,
+                                          result_tickets, result_basis_index,
+                                          result_candidates, result_fallback_candidates) == 1 &&
+              result_tickets[0] == 202,
+              "Per-position basis excludes only the pending ticket and still evaluates the rest");
+  }
+
+void TestResolveTrailingCandidatesSellAndScope()
+  {
+   PMPosition positions[];
+   ArrayResize(positions, 4);
+   for(int i = 0; i < 4; i++)
+     {
+      positions[i].ticket = 301 + i;
+      positions[i].symbol = i == 3 ? "OTHER" : "EURUSD";
+      positions[i].type = i == 2 ? POSITION_TYPE_BUY : POSITION_TYPE_SELL;
+      positions[i].volume = i == 1 ? 3.0 : 1.0;
+      positions[i].open_price = i == 1 ? 1.1020 : 1.1040;
+      positions[i].current_price = 1.1010;
+     }
+   double points[4] = {0.0001, 0.0001, 0.0001, 0.0001};
+   bool pending[4] = {false, false, false, false};
+   ulong tickets[];
+   int indices[];
+   double candidates[];
+   double fallbacks[];
+   AssertTrue(PMResolveTrailingCandidates(positions, PM_TRAIL_BASIS_AVERAGE,
+                                          "EURUSD", PM_DIRECTION_SHORT, points, pending,
+                                          true, true, 20, 2, 20, 10,
+                                          tickets, indices, candidates, fallbacks) == 0,
+              "Sell average below trigger ignores other symbols and Buy positions");
+   AssertTrue(PMResolveTrailingCandidates(positions, PM_TRAIL_BASIS_PER_POSITION,
+                                          "EURUSD", PM_DIRECTION_SHORT, points, pending,
+                                          true, true, 20, 2, 20, 10,
+                                          tickets, indices, candidates, fallbacks) == 1 &&
+              tickets[0] == 301 && indices[0] == 0 &&
+              MathAbs(candidates[0] - 1.1020) < 0.000001 &&
+              MathAbs(fallbacks[0] - 1.1038) < 0.000001,
+              "Only triggered Sell gets its favorable trailing and entry-based fallback");
+   AssertTrue(PMResolveTrailingCandidates(positions, PM_TRAIL_BASIS_PER_POSITION,
+                                          "EURUSD", PM_DIRECTION_SHORT, points, pending,
+                                          false, true, 20, 2, 20, 40,
+                                          tickets, indices, candidates, fallbacks) == 0 &&
+              ArraySize(indices) == 0 && ArraySize(candidates) == 0 && ArraySize(fallbacks) == 0,
+              "Trailing beyond own Sell entry is rejected and stale results are cleared");
+   ArrayResize(positions, 1);
+   PMResolveTrailingCandidates(positions, PM_TRAIL_BASIS_AVERAGE,
+                               "EURUSD", PM_DIRECTION_SHORT, points, pending,
+                               true, false, 20, 0, 0, 0,
+                               tickets, indices, candidates, fallbacks);
+   AssertTrue(ArraySize(tickets) == 1 && MathAbs(candidates[0] - 1.1040) < 0.000001,
+              "Single Sell average with zero lock sets entry SL");
+   PMResolveTrailingCandidates(positions, PM_TRAIL_BASIS_PER_POSITION,
+                               "EURUSD", PM_DIRECTION_SHORT, points, pending,
+                               true, false, 20, 0, 0, 0,
+                               tickets, indices, candidates, fallbacks);
+   AssertTrue(ArraySize(tickets) == 1 && MathAbs(candidates[0] - 1.1040) < 0.000001,
+              "Single Sell per-position with zero lock agrees with average");
+   ArrayResize(positions, 0);
+   AssertTrue(PMResolveTrailingCandidates(positions, PM_TRAIL_BASIS_PER_POSITION,
+                                          "EURUSD", PM_DIRECTION_SHORT, points, pending,
+                                          true, true, 20, 2, 20, 10,
+                                          tickets, indices, candidates, fallbacks) == 0,
+              "Empty position snapshot clears previous results");
+  }
+
 void TestProfitPoints()
   {
    AssertTrue(MathAbs(PMProfitPoints(1.1000, POSITION_TYPE_BUY, 1.1020, 0.0001) - 20.0) < 0.00001,
@@ -434,6 +628,18 @@ void TestPanelLayoutHelpers()
               PM_STOPS_SET_BUTTON_WIDTH + PM_STOPS_BUTTON_GAP +
               PM_STOPS_CLEAR_BUTTON_WIDTH,
               "Minimum panel width keeps Set and Clear on one line");
+   AssertTrue(PM_MIN_PANEL_WIDTH >= PM_TRAIL_TOGGLE_X + PM_TRAIL_BASIS_TOGGLE_WIDTH,
+              "Minimum panel width fits the Basis toggle on its own row");
+   AssertTrue(PM_MIN_PANEL_WIDTH - 12 >= PM_TRAIL_INPUT2_X + PM_TRAIL_INPUT_WIDTH + 34 + 26 &&
+              PM_TRAIL_INPUT1_X + PM_TRAIL_INPUT_WIDTH + 34 + 26 + 12 <= PM_TRAIL_LABEL2_X,
+              "Trail numeric groups preserve inner padding and leave room for the next label");
+   AssertTrue(PM_TRAIL_BE_ROW_Y >= PM_TRAIL_BASIS_ROW_Y + 22 + 8 &&
+              PM_TRAIL_BE_INPUT_ROW_Y >= PM_TRAIL_BE_ROW_Y + 22 + 8 &&
+              PM_TRAIL_ROW_Y >= PM_TRAIL_BE_INPUT_ROW_Y + 22 + 8 &&
+              PM_TRAIL_INPUT_ROW_Y >= PM_TRAIL_ROW_Y + 22 + 8 &&
+              PM_TRAIL_HINT_ROW_Y >= PM_TRAIL_INPUT_ROW_Y + 22 + 8 &&
+              PM_PANEL_TRAIL_HEIGHT >= PM_TRAIL_HINT_ROW_Y + 24 + 24,
+              "Trail rows and both hint lines fit before the status block without overlap");
    AssertTrue(PMResolvePanelHeight(320, 500) == 500,
               "A taller user-requested panel height is preserved");
    AssertTrue(PMResolvePanelHeight(500, 320) == 500,
@@ -608,6 +814,11 @@ void OnStart()
    TestBreakEvenCandidate();
    TestTrailingCandidate();
    TestPositionBasket();
+   TestTrailBasisToggle();
+   TestResolveTrailingCandidatesBasisSelection();
+   TestResolveTrailingCandidatesSharedCandidate();
+   TestResolveTrailingCandidatesPendingExclusion();
+   TestResolveTrailingCandidatesSellAndScope();
    TestProfitPoints();
    TestPipConversion();
    TestIsMoreFavorableStop();

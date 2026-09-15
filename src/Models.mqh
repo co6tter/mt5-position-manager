@@ -26,6 +26,12 @@ enum PMEquityThresholdMode
    PM_EQUITY_THRESHOLD_PERCENT = 1
   };
 
+enum PMTrailBasis
+  {
+   PM_TRAIL_BASIS_AVERAGE = 0,
+   PM_TRAIL_BASIS_PER_POSITION = 1
+  };
+
 enum PMPanelTab
   {
    PM_PANEL_TAB_ENTRY = 0,
@@ -142,6 +148,7 @@ struct TrailingStopConfig
    bool enabled_trailing;
    string symbol;
    PMDirection direction;
+   PMTrailBasis basis;
    int be_trigger_points;
    int be_lock_points;
    int trail_trigger_points;

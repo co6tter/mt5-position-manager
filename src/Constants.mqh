@@ -30,13 +30,20 @@
 #define PM_PANEL_STOPS_HEIGHT 92
 #define PM_PANEL_AUTO_HEIGHT 108
 #define PM_PANEL_GUARD_HEIGHT 126
-#define PM_PANEL_TRAIL_HEIGHT 108
-#define PM_TRAIL_TOGGLE_X 100
-#define PM_TRAIL_LABEL1_X 170
-#define PM_TRAIL_INPUT1_X 215
-#define PM_TRAIL_LABEL2_X 345
-#define PM_TRAIL_INPUT2_X 400
-#define PM_TRAIL_INPUT_WIDTH 60
+#define PM_PANEL_TRAIL_HEIGHT 240
+#define PM_TRAIL_TOGGLE_X 120
+#define PM_TRAIL_LABEL1_X 12
+#define PM_TRAIL_INPUT1_X 80
+#define PM_TRAIL_LABEL2_X 280
+#define PM_TRAIL_INPUT2_X 368
+#define PM_TRAIL_INPUT_WIDTH 120
+#define PM_TRAIL_BASIS_ROW_Y 32
+#define PM_TRAIL_BASIS_TOGGLE_WIDTH 150
+#define PM_TRAIL_BE_ROW_Y 64
+#define PM_TRAIL_BE_INPUT_ROW_Y 96
+#define PM_TRAIL_ROW_Y 128
+#define PM_TRAIL_INPUT_ROW_Y 160
+#define PM_TRAIL_HINT_ROW_Y 192
 #define PM_STOPS_MODE_X 42
 #define PM_STOPS_DEC_X 123
 #define PM_STOPS_VALUE_X 153
@@ -77,6 +84,16 @@ string PMDirectionToString(const PMDirection direction)
 string PMPositionTypeToString(const ENUM_POSITION_TYPE type)
   {
    return type == POSITION_TYPE_BUY ? "Long" : "Short";
+  }
+
+string PMTrailBasisToString(const PMTrailBasis basis)
+  {
+   return basis == PM_TRAIL_BASIS_PER_POSITION ? "Per Position" : "Average";
+  }
+
+PMTrailBasis PMToggleTrailBasis(const PMTrailBasis basis)
+  {
+   return basis == PM_TRAIL_BASIS_AVERAGE ? PM_TRAIL_BASIS_PER_POSITION : PM_TRAIL_BASIS_AVERAGE;
   }
 
 bool PMDirectionMatches(const PMDirection direction,
