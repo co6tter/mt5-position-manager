@@ -1306,6 +1306,31 @@ void TestPanelLayoutHelpers()
               "Panel height never shrinks below required content");
   }
 
+void TestLabelTextLimits()
+  {
+   const string status = "Status: Set a valid SL before reverting to automatic Take Profit.";
+   const int cut = PMLabelLineBreak(status, 1000);
+   AssertTrue(cut <= PM_MAX_LABEL_TEXT_LENGTH && StringSubstr(status, 0, cut) ==
+              "Status: Set a valid SL before reverting to automatic Take ",
+              "A line that fits in pixels still breaks at a word before the OBJ_LABEL limit");
+   AssertTrue(PMLabelLineBreak("Take Profit.", 1000) == 12,
+              "Short text stays on one line");
+   AssertTrue(PMLabelLineBreak("aaa bbb ccc", 6) == 4,
+              "A pixel-limited line breaks after the last fitting space");
+   const string unbroken = "0123456789012345678901234567890123456789012345678901234567890123456789";
+   AssertTrue(PMLabelLineBreak(unbroken, 1000) == PM_MAX_LABEL_TEXT_LENGTH,
+              "Text without spaces is cut at the OBJ_LABEL limit");
+   AssertTrue(PMLabelLineBreak("abc", 0) == 1,
+              "A line always takes at least one character");
+   AssertTrue(PMTruncateLabelText("TP 154.935 | Est. N/A JPY | RR N/A") ==
+              "TP 154.935 | Est. N/A JPY | RR N/A",
+              "Label text within the limit is unchanged");
+   const string truncated = PMTruncateLabelText(unbroken);
+   AssertTrue(StringLen(truncated) == PM_MAX_LABEL_TEXT_LENGTH &&
+              StringSubstr(truncated, PM_MAX_LABEL_TEXT_LENGTH - 3) == "...",
+              "Over-limit label text is shortened with a visible ellipsis");
+  }
+
 void TestInputStepperHelpers()
   {
    AssertTrue(PMStepInteger(0, -1, 0, 1440) == 0,
@@ -1488,6 +1513,7 @@ void OnStart()
    TestEntryRecomputeOrchestration();
    TestEntryReviewRegressions();
    TestPanelLayoutHelpers();
+   TestLabelTextLimits();
    TestInputStepperHelpers();
    TestPriceEditorHelpers();
    TestPriceDragLifecycle();

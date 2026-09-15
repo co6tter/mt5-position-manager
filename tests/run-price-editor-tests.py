@@ -61,6 +61,12 @@ def verify_entry_controls(ui: str) -> None:
             raise AssertionError(f"Missing Entry control: {control}")
 
 
+def verify_status_line_visibility(ui: str) -> None:
+    """Unused Status rows hold empty text, which MT5 draws as "Label"."""
+    if "line < m_status_line_count" not in function(ui, "ApplyTabVisibility"):
+        raise AssertionError("Tab visibility must show only the Status rows in use")
+
+
 def function(source: str, name: str) -> str:
     match = re.search(r"^\s*\w+\s+" + re.escape(name) + r"\s*\(", source, re.M)
     if not match:
@@ -113,6 +119,7 @@ def main() -> None:
     ui_source = (ROOT / "src/UiPanel.mqh").read_text()
     verify_trail_layout(ui_source)
     verify_entry_controls(ui_source)
+    verify_status_line_visibility(ui_source)
     enum_names = ["PMEntrySide", "PMEntryOrderType", "PMQuantityMode", "PMEntryInputUnit",
                   "PMTpState", "PMTpEvent", "PMRRStatus"]
     struct_names = ["PMEntrySnapshot", "PMEntryComputation", "PMMarketEntryResult"]
@@ -121,8 +128,9 @@ def main() -> None:
                     "PMIsTakeProfitOnProfitSide", "PMCalculateCurrentRR", "PMCalculateAutoTakeProfit",
                     "PMNextTakeProfitState", "PMCalculateRiskBudget", "PMCalculateRiskLot",
                     "PMRecomputeEntry", "PMIsUnsignedIntegerText", "PMIsUnsignedDecimalText",
-                    "PMValidateEntryGeometry", "PMResetMarketEntryResult", "PMIsMarketEntrySuccessRetcode"]
-    test_names = ["TestInputStepperHelpers", "TestPriceEditorHelpers",
+                    "PMValidateEntryGeometry", "PMResetMarketEntryResult", "PMIsMarketEntrySuccessRetcode",
+                    "PMLabelLineBreak", "PMTruncateLabelText"]
+    test_names = ["TestLabelTextLimits", "TestInputStepperHelpers", "TestPriceEditorHelpers",
                   "TestPriceDragLifecycle", "TestPriceEstimateAggregation", "TestPriceLabelPlacement",
                   "TestEntryPricingAndRiskHelpers", "TestEntryRecomputeOrchestration",
                   "TestEntryReviewRegressions"]
@@ -142,6 +150,7 @@ const unsigned int TRADE_RETCODE_DONE = 10009, TRADE_RETCODE_DONE_PARTIAL = 1001
 using string = std::string;
 int StringLen(const string &s) { return (int)s.size(); }
 ushort StringGetCharacter(const string &s, int i) { return s.at(i); }
+string StringSubstr(const string &s, int start, int length = -1) { return s.substr(start, length < 0 ? string::npos : (size_t)length); }
 double StringToDouble(const string &s) { try { return std::stod(s); } catch (...) { return 0.0; } }
 string DoubleToString(double v, int digits) { std::ostringstream s; s << std::fixed << std::setprecision(digits) << v; return s.str(); }
 template<class T, size_t N> int ArraySize(const T (&)[N]) { return (int)N; }
@@ -169,7 +178,7 @@ void AssertTrue(bool condition, const string &name) {
     if (!condition) { ++failures; std::cerr << "[FAIL] " << name << '\n'; }
 }
 """
-    for constant in ("PM_MAX_TRAILING_POINTS", "PM_MAX_EQUITY_THRESHOLD"):
+    for constant in ("PM_MAX_TRAILING_POINTS", "PM_MAX_EQUITY_THRESHOLD", "PM_MAX_LABEL_TEXT_LENGTH"):
         prelude += re.search(r"^#define " + constant + r" .*", helpers, re.M).group(0) + "\n"
     source = prelude + "\n".join(enum_block(models, name) for name in enum_names) + "\n"
     source += "\n".join(struct_block(models, name) for name in struct_names) + "\n"
@@ -188,7 +197,8 @@ void AssertTrue(bool condition, const string &name) {
     source += "\nclass CTradeManager { public: int m_deviation_points = 10;\n" + function((ROOT / "src/TradeManager.mqh").read_text(), "SubmitEntry") + "\n};\n"
     ui_methods = ["EntryRRText", "RefreshEntryComputation", "EntryStopSuffix", "IsEntrySendButton", "WriteEntryStops",
                   "CommitEntryEditor", "CommitEntryEditors", "SetEntryStop", "SwitchEntryUnit", "StepEntryInput",
-                  "HandleEntryClick", "OpenEntry", "VolumeDigits", "HandlePriceMouse", "RenderEntryState", "FitEntryLabel"]
+                  "HandleEntryClick", "OpenEntry", "VolumeDigits", "HandlePriceMouse", "RenderEntryState", "FitEntryLabel",
+                  "LabelTextWidth", "LabelFittingCharacters", "SetEntryHint", "EntryPriceLineText"]
     source += "\nclass EntryUiHarness { public: CEntryDraft m_entry_draft; CEntryService m_entry_service; PMEntrySnapshot m_entry_snapshot; PMEntryComputation m_entry_result; bool m_entry_valid = false, m_visibility_dirty = false; string m_entry_reason, status; CPriceEditDrag m_price_drag; string Name(const string s) { return s; } void SetStatus(const string s) { status = s; }\n"
     source += r"""
     bool m_collapsed = false, m_price_scroll_before = true, m_price_drag_moved = false;

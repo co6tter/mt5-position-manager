@@ -76,6 +76,5 @@ bool ChartXYToTimePrice(int, int, int y, int &window, datetime &time, double &pr
 
 const int clrDarkGreen = 1, clrMaroon = 2, clrWhite = 3, clrSilver = 4, FW_NORMAL = 400;
 std::map<std::pair<string, int>, long> object_properties;
-string StringSubstr(const string &text, int start, int length) { return text.substr(start, length); }
 bool TextSetFont(const string &, int, int) { return true; }
 bool TextGetSize(const string &text, unsigned int &width, unsigned int &height) { width = text.size() * 6; height = 12; return true; }

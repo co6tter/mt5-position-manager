@@ -57,6 +57,7 @@ private:
    bool m_controls_dirty;
    bool m_visibility_dirty;
    bool m_status_layout_dirty;
+   int m_status_line_count;
    bool m_schedule_dirty;
    bool m_positions_dirty;
    bool m_force_redraw;
@@ -136,6 +137,7 @@ public:
       m_rendered_rows = 0;
       m_visible_rows = 0;
       m_row_render_error_reported = false;
+      m_status_line_count = 0;
       m_controls_dirty = true;
       m_visibility_dirty = true;
       m_status_layout_dirty = true;
@@ -266,6 +268,7 @@ public:
       created = CreateButton("ENTRY_LIMIT", "BUY LIMIT", 350, ContentTop() + 230, 156, 28, clrDarkGreen) && created;
       created = CreateButton("ENTRY_STOP", "BUY STOP", 350, ContentTop() + 230, 156, 28, clrDarkGreen) && created;
       created = CreateLabel("ENTRY_HINT", "Set SL/TP, then drag the line or label.", 12, ContentTop() + 270, clrSilver, 8) && created;
+      created = CreateLabel("ENTRY_HINT_2", " ", 12, ContentTop() + 284, clrSilver, 8) && created;
 
       created = CreateLabel("FILTER_LABEL", "Filter", 12, ContentTop() + 4, clrSilver, 9) && created;
       created = CreateButton("FILTER_SYMBOL", "Symbol", 62, ContentTop(), 120, 22) && created;
@@ -743,10 +746,9 @@ private:
      {
       return index == 0 ? PM_SL_EDIT_LINE_NAME : PM_TP_EDIT_LINE_NAME;
      }
-   string PriceLabelName(const int index, const int row)
+   string PriceLabelName(const int index)
      {
-      return (index == 0 ? PM_SL_EDIT_LABEL_NAME : PM_TP_EDIT_LABEL_NAME) +
-             IntegerToString(row);
+      return index == 0 ? PM_SL_EDIT_LABEL_NAME : PM_TP_EDIT_LABEL_NAME;
      }
    string StopSuffix(const int index) { return index == 0 ? "SL_VALUE" : "TP_VALUE"; }
    void CancelPriceDrag()
@@ -762,8 +764,7 @@ private:
       for(int i = 0; i < 2; i++)
         {
          ObjectDelete(0, PriceLineName(i));
-         for(int row = 0; row < 4; row++)
-            ObjectDelete(0, PriceLabelName(i, row));
+         ObjectDelete(0, PriceLabelName(i));
          m_price_line_visible[i] = false;
         }
      }
@@ -789,9 +790,8 @@ private:
       m_price_label_height[index] = 0;
       if(ObjectFind(0, PriceLineName(index)) >= 0)
          PriceInteger(PriceLineName(index), OBJPROP_TIMEFRAMES, OBJ_NO_PERIODS);
-      for(int row = 0; row < 4; row++)
-         if(ObjectFind(0, PriceLabelName(index, row)) >= 0)
-            PriceInteger(PriceLabelName(index, row), OBJPROP_TIMEFRAMES, OBJ_NO_PERIODS);
+      if(ObjectFind(0, PriceLabelName(index)) >= 0)
+         PriceInteger(PriceLabelName(index), OBJPROP_TIMEFRAMES, OBJ_NO_PERIODS);
      }
    void HidePriceLines()
      {
@@ -889,18 +889,19 @@ private:
       const double rounded = NormalizeDouble(value, digits);
       return (rounded >= 0.0 ? "+" : "") + DoubleToString(rounded, digits);
      }
-   void BuildPriceLineText(const int index, const double price, string &lines[])
+   string EntryPriceLineText(const int index, const double price)
      {
-      ArrayResize(lines, 4);
-      if(EntryPriceContext())
-        {
-         lines[0] = (index == 0 ? "SL " : "TP ") + PMFormatPrice(_Symbol, price);
-         lines[1] = "Est. " + m_entry_service.Estimate(_Symbol, m_entry_snapshot, m_entry_result, index == 0) +
-                    " " + AccountInfoString(ACCOUNT_CURRENCY);
-         lines[2] = EntryRRText();
-         lines[3] = m_entry_valid ? "Entry draft" : "Invalid: " + m_entry_reason;
-         return;
-        }
+      const string rr = m_entry_result.rr_status == PM_RR_VALID ? "RR 1:" + DoubleToString(m_entry_result.rr, 2) :
+                        m_entry_result.rr_status == PM_RR_INVALID ? "RR Invalid" : "RR N/A";
+      // The Entry hint carries the reason; the line only flags an invalid draft.
+      return PMTruncateLabelText((index == 0 ? "SL " : "TP ") + PMFormatPrice(_Symbol, price) +
+                                 " | Est. " + m_entry_service.Estimate(_Symbol, m_entry_snapshot, m_entry_result, index == 0) +
+                                 " " + AccountInfoString(ACCOUNT_CURRENCY) + " | " + rr +
+                                 (m_entry_valid ? "" : " | Invalid"));
+     }
+   string PriceLineText(const int index, const double price)
+     {
+      if(EntryPriceContext()) return EntryPriceLineText(index, price);
       CPriceEditEstimate estimate;
       bool money_ok = true, valid = true;
       CValidationService validator;
@@ -923,14 +924,18 @@ private:
                        calculated, profit);
         }
       const int digits = (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS);
-      lines[0] = (index == 0 ? "SL" : "TP") + " draft " + DoubleToString(price, digits) +
-                 (valid ? "" : " | Invalid");
-      lines[1] = "Est. " + (money_ok && estimate.MoneyKnown() ?
-                 SignedValue(estimate.Money(), (int)AccountInfoInteger(ACCOUNT_CURRENCY_DIGITS)) : "N/A") +
-                 " " + AccountInfoString(ACCOUNT_CURRENCY) + StringFormat(" | %d pos", ArraySize(m_selected));
+      string text = (index == 0 ? "SL " : "TP ") + DoubleToString(price, digits) + (valid ? "" : " Invalid") +
+                    " | Est. " + (money_ok && estimate.MoneyKnown() ?
+                    SignedValue(estimate.Money(), (int)AccountInfoInteger(ACCOUNT_CURRENCY_DIGITS)) : "N/A") +
+                    " " + AccountInfoString(ACCOUNT_CURRENCY) + StringFormat(" | %d pos", ArraySize(m_selected));
       const double points_per_pip = PMPointsPerPip(digits);
-      lines[2] = estimate.HasBuy() ? "Buy avg " + SignedValue(estimate.BuyPoints() / points_per_pip, 1) + " pips" : "";
-      lines[3] = estimate.HasSell() ? "Sell avg " + SignedValue(estimate.SellPoints() / points_per_pip, 1) + " pips" : "";
+      if(estimate.HasBuy())
+         text += " | Buy " + SignedValue(estimate.BuyPoints() / points_per_pip, 1);
+      if(estimate.HasSell())
+         text += (estimate.HasBuy() ? " / Sell " : " | Sell ") + SignedValue(estimate.SellPoints() / points_per_pip, 1);
+      if(estimate.HasBuy() || estimate.HasSell())
+         text += " pips";
+      return PMTruncateLabelText(text);
      }
    bool EnsurePriceObjects(const int index, const double price)
      {
@@ -954,22 +959,19 @@ private:
          ok = ObjectSetDouble(0, name, OBJPROP_PRICE, price) && ok;
          m_force_redraw = true;
         }
-      for(int row = 0; row < 4; row++)
+      const string label = PriceLabelName(index);
+      if(ObjectFind(0, label) < 0)
         {
-         const string label = PriceLabelName(index, row);
-         if(ObjectFind(0, label) < 0)
-           {
-            if(!ObjectCreate(0, label, OBJ_LABEL, 0, 0, 0)) return false;
-            ObjectSetString(0, label, OBJPROP_FONT, "Arial");
-            m_force_redraw = true;
-           }
-         ok = PriceInteger(label, OBJPROP_SELECTABLE, false) && ok;
-         ok = PriceInteger(label, OBJPROP_HIDDEN, true) && ok;
-         ok = PriceInteger(label, OBJPROP_CORNER, CORNER_LEFT_UPPER) && ok;
-         ok = PriceInteger(label, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER) && ok;
-         ok = PriceInteger(label, OBJPROP_FONTSIZE, 9) && ok;
-         ok = PriceInteger(label, OBJPROP_COLOR, line_color) && ok;
+         if(!ObjectCreate(0, label, OBJ_LABEL, 0, 0, 0)) return false;
+         ObjectSetString(0, label, OBJPROP_FONT, "Arial");
+         m_force_redraw = true;
         }
+      ok = PriceInteger(label, OBJPROP_SELECTABLE, false) && ok;
+      ok = PriceInteger(label, OBJPROP_HIDDEN, true) && ok;
+      ok = PriceInteger(label, OBJPROP_CORNER, CORNER_LEFT_UPPER) && ok;
+      ok = PriceInteger(label, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER) && ok;
+      ok = PriceInteger(label, OBJPROP_FONTSIZE, 9) && ok;
+      ok = PriceInteger(label, OBJPROP_COLOR, line_color) && ok;
       return ok;
      }
    bool UpdatePriceLine(const int index, const MqlTick &tick, bool &outside)
@@ -989,18 +991,12 @@ private:
         { HidePriceLine(index); outside = true; return true; }
       if(price_y < 0 || price_y >= m_chart_height)
         { HidePriceLine(index); outside = true; return true; }
-      string lines[];
-      BuildPriceLineText(index, price, lines);
-      int width = 0, row_height = 18;
+      const string text = PriceLineText(index, price);
+      uint text_width = 0, text_height = 0;
       TextSetFont("Arial", -90, FW_NORMAL);
-      for(int row = 0; row < 4; row++)
-        {
-         uint w = 0, h = 0;
-         if(!TextGetSize(lines[row], w, h)) w = StringLen(lines[row]) * 8;
-         width = MathMax(width, (int)w);
-         row_height = MathMax(row_height, (int)h + 3);
-        }
-      const int height = 4 * row_height;
+      if(!TextGetSize(text, text_width, text_height)) text_width = StringLen(text) * 8;
+      const int width = (int)text_width;
+      const int height = MathMax(18, (int)text_height + 3);
       const int other = 1 - index;
       int label_x = 0, label_y = 0;
       const bool placed = PMPlacePriceLabel((int)m_chart_width, (int)m_chart_height,
@@ -1019,15 +1015,11 @@ private:
       m_price_label_y[index] = label_y;
       m_price_label_width[index] = placed ? width : 0;
       m_price_label_height[index] = placed ? height : 0;
-      for(int row = 0; row < 4; row++)
-        {
-         const string label = PriceLabelName(index, row);
-         ok = PriceInteger(label, OBJPROP_XDISTANCE, label_x) && ok;
-         ok = PriceInteger(label, OBJPROP_YDISTANCE, label_y + row * row_height) && ok;
-         ok = PriceText(label, lines[row]) && ok;
-         ok = PriceInteger(label, OBJPROP_TIMEFRAMES,
-                            placed && lines[row] != "" ? OBJ_ALL_PERIODS : OBJ_NO_PERIODS) && ok;
-        }
+      const string label = PriceLabelName(index);
+      ok = PriceInteger(label, OBJPROP_XDISTANCE, label_x) && ok;
+      ok = PriceInteger(label, OBJPROP_YDISTANCE, label_y) && ok;
+      ok = PriceText(label, text) && ok;
+      ok = PriceInteger(label, OBJPROP_TIMEFRAMES, placed ? OBJ_ALL_PERIODS : OBJ_NO_PERIODS) && ok;
       if(!placed) outside = true;
       if(!ok) HidePriceLine(index);
       return ok;
@@ -1054,7 +1046,9 @@ private:
          point <= 0.0 || tick_size <= 0.0)
         {
          HidePriceLines();
-         PriceText(Name(EntryPriceContext() ? "ENTRY_HINT" : "STOPS_HINT"), "Lines unavailable: no price or symbol settings.");
+         const string unavailable = "Lines unavailable: no price or symbol settings.";
+         if(EntryPriceContext()) SetEntryHint(unavailable);
+         else PriceText(Name("STOPS_HINT"), unavailable);
          return;
         }
       // Place SL first, then TP around it, so equal-price labels remain accessible.
@@ -1066,7 +1060,7 @@ private:
       if(EntryPriceContext())
         {
          if(!sl_ok || !tp_ok || sl_outside || tp_outside)
-            PriceText(Name("ENTRY_HINT"), "Lines/labels outside view: adjust chart scale or size.");
+            SetEntryHint("Lines/labels outside view: adjust chart scale or size.");
          return;
         }
       bool invalid_input = false;
@@ -1233,14 +1227,32 @@ private:
         }
       PriceInteger(name, OBJPROP_FONTSIZE, font_size);
       TextSetFont("Arial", -font_size * 10, FW_NORMAL);
-      if(!TextGetSize(full_text, measured, height) || (int)measured <= width) return;
+      const bool too_long = StringLen(full_text) > PM_MAX_LABEL_TEXT_LENGTH;
+      if(!too_long && (!TextGetSize(full_text, measured, height) || (int)measured <= width)) return;
       string shortened = full_text;
+      if(too_long)
+        {
+         shortened = StringSubstr(full_text, 0, PM_MAX_LABEL_TEXT_LENGTH - 3);
+         if(!TextGetSize(shortened + "...", measured, height)) measured = 0;
+        }
       while(StringLen(shortened) > 0 && (int)measured > width)
         {
          shortened = StringSubstr(shortened, 0, StringLen(shortened) - 1);
          if(!TextGetSize(shortened + "...", measured, height)) break;
         }
       PriceText(name, shortened + "...");
+     }
+   void SetEntryHint(const string hint)
+     {
+      const int width = m_panel_width - 24;
+      const int cut = PMLabelLineBreak(hint, LabelFittingCharacters(hint, width, 8));
+      string rest = StringSubstr(hint, cut);
+      while(StringLen(rest) > 0 && StringGetCharacter(rest, 0) == 32)
+         rest = StringSubstr(rest, 1);
+      // MT5 draws an OBJ_LABEL with empty text as "Label"; a space keeps a row blank.
+      PriceText(Name("ENTRY_HINT"), cut > 0 ? StringSubstr(hint, 0, cut) : " ");
+      PriceText(Name("ENTRY_HINT_2"), rest != "" ? rest : " ");
+      if(rest != "") FitEntryLabel("ENTRY_HINT_2", width);
      }
    void RenderEntryState()
      {
@@ -1270,8 +1282,8 @@ private:
       PriceText(Name("ENTRY_ESTIMATE"), "Est. SL " + m_entry_service.Estimate(_Symbol, m_entry_snapshot, m_entry_result, true) +
                 " / TP " + m_entry_service.Estimate(_Symbol, m_entry_snapshot, m_entry_result, false) +
                 " " + AccountInfoString(ACCOUNT_CURRENCY));
-      PriceText(Name("ENTRY_HINT"), !m_entry_valid ? m_entry_reason :
-                m_entry_result.rr_status != PM_RR_VALID ? m_entry_result.rr_reason : "Drag SL/TP lines or labels to adjust prices.");
+      SetEntryHint(!m_entry_valid ? m_entry_reason :
+                   m_entry_result.rr_status != PM_RR_VALID ? m_entry_result.rr_reason : "Drag SL/TP lines or labels to adjust prices.");
       PriceText(Name("ENTRY_LIMIT"), buy ? "BUY LIMIT" : "SELL LIMIT");
       PriceText(Name("ENTRY_STOP"), buy ? "BUY STOP" : "SELL STOP");
       PriceInteger(Name("ENTRY_LIMIT"), OBJPROP_BGCOLOR, buy ? clrDarkGreen : clrMaroon);
@@ -1282,7 +1294,6 @@ private:
       FitEntryLabel("ENTRY_CURRENT_RR", 176);
       FitEntryLabel("ENTRY_PREVIEW", 494);
       FitEntryLabel("ENTRY_ESTIMATE", 326);
-      FitEntryLabel("ENTRY_HINT", m_panel_width - 24);
      }
    void RenderPositionSummary()
      {
@@ -1964,7 +1975,7 @@ private:
          "ENTRY_SL_DEC", "ENTRY_SL_POINTS", "ENTRY_SL_INC", "ENTRY_SL_SET", "ENTRY_SL_CLEAR",
          "ENTRY_TP_LABEL", "ENTRY_TP_MODE", "ENTRY_TP_DEC", "ENTRY_TP_POINTS", "ENTRY_TP_INC", "ENTRY_TP_SET", "ENTRY_TP_CLEAR",
          "ENTRY_RR_LABEL", "ENTRY_RR", "ENTRY_RR_DEC", "ENTRY_RR_INC", "ENTRY_AUTO_TP", "ENTRY_CURRENT_RR",
-         "ENTRY_PREVIEW", "ENTRY_ESTIMATE", "ENTRY_HINT"};
+         "ENTRY_PREVIEW", "ENTRY_ESTIMATE", "ENTRY_HINT", "ENTRY_HINT_2"};
       for(int i = 0; i < ArraySize(entry_controls); i++) SetVisible(entry_controls[i], entry);
       const bool manual = m_entry_draft.quantity_mode == PM_QUANTITY_MANUAL_LOT;
       const bool market = m_entry_draft.order_type == PM_ENTRY_ORDER_MARKET;
@@ -2064,8 +2075,9 @@ private:
          SetVisible("ROW_DETAIL_" + IntegerToString(row), row_visible);
          SetVisible("ROW_DIRECTION_" + IntegerToString(row), row_visible);
         }
+      // Unused rows hold empty text, which MT5 would draw as "Label".
       for(int line = 0; line < PM_MAX_STATUS_LINES; line++)
-         SetVisible("STATUS_LINE_" + IntegerToString(line), expanded);
+         SetVisible("STATUS_LINE_" + IntegerToString(line), expanded && line < m_status_line_count);
       SetVisible("RESIZE_GRIP", expanded);
       ObjectSetString(0, Name("COLLAPSE"), OBJPROP_TEXT, m_collapsed ? "+" : "-");
       ObjectSetInteger(0, Name("BACKGROUND"), OBJPROP_YSIZE, PanelHeight());
@@ -2146,8 +2158,9 @@ private:
       if(ArraySize(lines) > PM_MAX_STATUS_LINES)
         {
          ArrayResize(lines, PM_MAX_STATUS_LINES);
-         lines[PM_MAX_STATUS_LINES - 1] = lines[PM_MAX_STATUS_LINES - 1] + " ...";
+         lines[PM_MAX_STATUS_LINES - 1] = PMTruncateLabelText(lines[PM_MAX_STATUS_LINES - 1] + " ...");
         }
+      m_status_line_count = ArraySize(lines);
       const int content_bottom = ContentTop() + ContentHeight() +
                                  PM_PANEL_CONTENT_GAP;
       const int status_block_height = PM_PANEL_STATUS_LINE_HEIGHT *
@@ -2172,19 +2185,19 @@ private:
       ObjectSetInteger(0, Name("BACKGROUND"), OBJPROP_YSIZE, PanelHeight());
       SetObjectY(Name("RESIZE_GRIP"), m_origin_y + PanelHeight() - 18);
      }
-   int StatusTextWidth(const string text)
+   int LabelTextWidth(const string text, const int font_size)
      {
-      TextSetFont("Arial", -PM_STATUS_FONT_SIZE * 10, FW_NORMAL);
+      TextSetFont("Arial", -font_size * 10, FW_NORMAL);
       uint width = 0;
       uint height = 0;
       if(TextGetSize(text, width, height))
          return (int)width;
       return StringLen(text) * 7;
      }
-   int StatusFittingCharacters(const string text, const int max_width)
+   int LabelFittingCharacters(const string text, const int max_width, const int font_size)
      {
       const int length = StringLen(text);
-      if(length == 0 || StatusTextWidth(text) <= max_width)
+      if(length == 0 || LabelTextWidth(text, font_size) <= max_width)
          return length;
 
       int low = 1;
@@ -2192,7 +2205,7 @@ private:
       while(low < high)
         {
          const int middle = (low + high + 1) / 2;
-         if(StatusTextWidth(StringSubstr(text, 0, middle)) <= max_width)
+         if(LabelTextWidth(StringSubstr(text, 0, middle), font_size) <= max_width)
             low = middle;
          else
             high = middle - 1;
@@ -2208,20 +2221,8 @@ private:
       string remaining = text;
       while(StringLen(remaining) > 0)
         {
-         const int fitting = StatusFittingCharacters(remaining, width);
-         if(fitting >= StringLen(remaining))
-           {
-            const int count = ArraySize(lines);
-            ArrayResize(lines, count + 1);
-            lines[count] = remaining;
-            break;
-           }
-
-         int cut = fitting;
-         while(cut > 1 && StringGetCharacter(remaining, cut - 1) != 32)
-            cut--;
-         if(cut <= 1)
-            cut = fitting;
+         const int cut = PMLabelLineBreak(remaining,
+                                          LabelFittingCharacters(remaining, width, PM_STATUS_FONT_SIZE));
          const int count = ArraySize(lines);
          ArrayResize(lines, count + 1);
          lines[count] = StringSubstr(remaining, 0, cut);

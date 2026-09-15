@@ -51,6 +51,8 @@
 #define PM_STOPS_BUTTON_GAP 6
 #define PM_STOPS_CLEAR_BUTTON_WIDTH 90
 #define PM_MAX_STATUS_LINES 20
+// MT5 silently cuts OBJ_LABEL text after this many characters.
+#define PM_MAX_LABEL_TEXT_LENGTH 63
 #define PM_TITLEBAR_HEIGHT 28
 #define PM_TAB_BAR_HEIGHT 26
 #define PM_RESIZE_HANDLE_HIT_SIZE 28
@@ -964,6 +966,27 @@ int PMResolvePanelHeight(const int required_height,
    if(requested_height > resolved)
       resolved = requested_height;
    return resolved;
+  }
+
+// Characters that belong on the current label row: the pixel fit capped by the
+// OBJ_LABEL limit, ending after a space when the row must break.
+int PMLabelLineBreak(const string text, const int fitting)
+  {
+   const int length = StringLen(text);
+   const int limit = MathMax(1, MathMin(fitting, PM_MAX_LABEL_TEXT_LENGTH));
+   if(limit >= length)
+      return length;
+   int cut = limit;
+   while(cut > 1 && StringGetCharacter(text, cut - 1) != 32)
+      cut--;
+   return cut > 1 ? cut : limit;
+  }
+
+string PMTruncateLabelText(const string text)
+  {
+   if(StringLen(text) <= PM_MAX_LABEL_TEXT_LENGTH)
+      return text;
+   return StringSubstr(text, 0, PM_MAX_LABEL_TEXT_LENGTH - 3) + "...";
   }
 
 string PMFormatPrice(const string symbol, const double price)

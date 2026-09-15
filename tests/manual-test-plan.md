@@ -24,13 +24,13 @@ MT5を使わない補助確認は`python3 tests/run-price-editor-tests.py`で実
 2. パネル内に上下左右の余白があり、四隅が通常の角形であることを確認する。
 3. Entryタブで注文種別（Market／Limit／Stop）と方向（Buy／Sell）を切り替えても発注されず、専用の注文ボタンを押した場合だけ送信されることを確認する。Limit／StopではPrice欄の編集と価格方向の検証を確認する。
 4. EntryでLot、SL/TPを編集し、`-` / `+`クリックでLotはVolume Step、Pointsは1 point、Priceは1 pip相当（最低1 tick）ずつ変化することを確認する。各SL/TPのPrice／Points切替と丸め結果を確認する。ラベルが`SL`／`TP`であり、`pts`を含まないことを確認する。
-5. SL/TPラインとラベルを保有ポジション0件でドラッグし、価格へ反映されることを確認する。SL設定時にRR 1:1のTPが表示され、RR変更、TPドラッグ後の手動固定、現在RR表示を確認する。
+5. SL/TPラインとラベルを保有ポジション0件でドラッグし、価格へ反映されることを確認する。SL設定時にRR 1:1のTPが表示され、RR変更、TPドラッグ後の手動固定、現在RR表示を確認する。各ラベルがラインの直上に1行（価格 | Est. | RR）で表示され、下書きが無効なら末尾に`Invalid`、理由はパネルのヒントに出ることを確認する。
 6. SL／TPを個別にキャンセルし、該当ラインだけが消え、もう一方の価格が残ることを確認する。SLキャンセル時に自動生成済みTPが保持され、TPキャンセル後にSLを動かしてもTPが復活しないことを確認する。`Set SL`／`Set TP`または自動復帰で明示的に再設定できることを確認する。
 7. Manual LotでSLのみ、TPのみ、両方、両方なしをBuy／Sellの各注文種別で送信し、未設定側が0になることを確認する。
-8. Risk AmountとRisk Percentを切り替え、同じ予算で同じLotになることを確認する。SLキャンセル中はLotとSL損失が無効化され、送信が止まり、Manual Lotへ切り替えるかSLを再設定すると再開することを確認する。
+8. Risk AmountとRisk Percentを切り替え、同じ予算で同じLotになることを確認する。SLキャンセル中はLotとSL損失が無効化され、送信が止まり、Manual Lotへ切り替えるかSLを再設定すると再開することを確認する。数量方式を切り替えた直後にStatusの下へ`Label`の行が出ないこと、SL未設定の理由ヒントが2行で末尾まで表示されることを確認する。
 9. 成功時にStatusとExpertsログへside、symbol、要求Lot、結果Lot、価格、Deal／Order、retcodeが記録されることを確認する。予約注文は受付と約定を混同せず、自動再送しないことを確認する。
 10. Auto Close、Equity Guard、Trailの全数値欄で`-` / `+`を操作し、単位ごとの増減、下限・上限、手入力後の正規化を確認する。
-11. SL/TPタブでPriceモードを選び、選択した同一銘柄のポジションにSL/TPライン、価格、概算金額、pointsが表示されることを確認する。ラインをドラッグしてValueへ反映されるが、`Set / Change`までは注文要求が出ないことを確認する。
+11. SL/TPタブでPriceモードを選び、選択した同一銘柄のポジションにSL/TPライン、価格、概算金額、pointsがラインの直上の1行ラベルで表示されることを確認する。ラインをドラッグしてValueへ反映されるが、`Set / Change`までは注文要求が出ないことを確認する。
 12. 選択解除、別銘柄、Pipsモード、ポジション消失、Tick取得不可でラインが消え、古いドラッグ価格が入力欄へ戻らないことを確認する。Stops/Freeze Level違反の候補は`Invalid`と表示し、金額取得失敗の`N/A`と区別する。
 13. タイトルバーの`-`で折り畳み、タイトルと`+`以外が消えることを確認する。展開ボタン以外のタイトルバーをドラッグして移動し、`+`で再展開できることを確認する。
 14. チャートSymbolに複数の同方向ポジションを作り、Lot加重平均建値に幅1pxの薄いピンクのEquity / Break-even破線がチャート背景に表示され、操作パネルを覆わないことを確認する。
@@ -93,6 +93,7 @@ MT5を使わない補助確認は`python3 tests/run-price-editor-tests.py`で実
 1. USDJPYでTPが`159.520`のポジションを表示し、末尾の0を含む`TP=159.520`、Profit、Ticketが確認できることを確認する。
 2. `SL clear stopped: trading unavailable (auto trading disabled by client)`とticket・retcodeを含む長文Statusを発生させ、Statusが複数行で全文表示されることを確認する。
 3. 成功・待機・失敗に相当する操作を行い、Statusが通常は明るい色、成功は緑、待機は黄色、失敗は赤で表示され、文字も本文より少し大きいことを確認する。
+4. SLなしで`Restore Auto`を押し、63文字を超える`Status: Set a valid SL before reverting to automatic Take Profit.`が単語の区切りで2行に分かれ、末尾の`Profit.`まで表示されることを確認する。
 
 ## Auto Close
 

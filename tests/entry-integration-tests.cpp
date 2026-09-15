@@ -254,4 +254,26 @@ void TestEntryIntegration() {
     AssertTrue(simultaneous_ui.m_entry_valid && simultaneous_ui.m_entry_result.entry == 94 &&
                simultaneous_ui.m_entry_snapshot.sl_price == 92 && simultaneous_ui.m_entry_result.effective_tp == 96,
                "Simultaneous price and stop edits resolve manual TP Points from the latest pending price");
+
+    // OBJ_LABEL keeps only 63 characters, so long Entry hints continue on a second row.
+    ResetBoundary();
+    EntryUiHarness hint_ui;
+    hint_ui.m_entry_draft.quantity_mode = PM_QUANTITY_RISK_AMOUNT;
+    hint_ui.m_entry_draft.risk_text = "14";
+    hint_ui.RenderEntryState();
+    AssertTrue(!hint_ui.m_entry_valid && hint_ui.m_entry_reason.size() > PM_MAX_LABEL_TEXT_LENGTH &&
+               objects["ENTRY_HINT"].size() <= PM_MAX_LABEL_TEXT_LENGTH &&
+               objects["ENTRY_HINT_2"].size() <= PM_MAX_LABEL_TEXT_LENGTH &&
+               objects["ENTRY_HINT"] + objects["ENTRY_HINT_2"] == hint_ui.m_entry_reason,
+               "A hint longer than the OBJ_LABEL limit wraps onto the second hint row without losing text");
+    const string invalid_line = hint_ui.EntryPriceLineText(1, 102);
+    AssertTrue(invalid_line.size() <= PM_MAX_LABEL_TEXT_LENGTH && invalid_line.rfind("TP ", 0) == 0 &&
+               invalid_line.find("RR ") != string::npos && invalid_line.find('\n') == string::npos &&
+               invalid_line.size() >= 10 && invalid_line.substr(invalid_line.size() - 10) == " | Invalid",
+               "Entry line label is one short row that flags an invalid draft");
+    hint_ui.m_entry_draft.quantity_mode = PM_QUANTITY_MANUAL_LOT;
+    hint_ui.RenderEntryState();
+    AssertTrue(hint_ui.m_entry_valid && objects["ENTRY_HINT_2"] == " " &&
+               hint_ui.EntryPriceLineText(0, 98).find("Invalid") == string::npos,
+               "A short hint blanks the second row with a space instead of MT5's default Label text");
 }
