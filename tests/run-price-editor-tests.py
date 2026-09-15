@@ -54,17 +54,55 @@ def verify_entry_controls(ui: str) -> None:
         raise AssertionError("Entry TP label must be TP")
     if '"SL pts"' in ui or '"TP pts"' in ui:
         raise AssertionError("Entry labels must not contain pts")
-    for control in ("ENTRY_TYPE", "ENTRY_SIDE", "ENTRY_ORDER_PRICE", "ENTRY_QTY_MODE",
-                    "ENTRY_RISK", "ENTRY_RISK_DEC", "ENTRY_RISK_INC",
-                    "ENTRY_SL_CLEAR", "ENTRY_TP_CLEAR", "ENTRY_SL_SET", "ENTRY_TP_SET", "ENTRY_SL_MODE", "ENTRY_TP_MODE", "ENTRY_LIMIT", "ENTRY_STOP"):
+    for control in ("ENTRY_SUB_MARKET", "ENTRY_SUB_LIMIT", "ENTRY_SUB_STOP", "ENTRY_ORDER_PRICE",
+                    "ENTRY_QTY_LABEL", "ENTRY_QTY_MODE", "ENTRY_RISK", "ENTRY_RISK_DEC", "ENTRY_RISK_INC",
+                    "ENTRY_SL_CLEAR", "ENTRY_TP_CLEAR", "ENTRY_SL_SET", "ENTRY_TP_SET",
+                    "ENTRY_SL_MODE", "ENTRY_TP_MODE", "ENTRY_SELL_PREVIEW", "ENTRY_BUY_PREVIEW"):
         if f'"{control}"' not in ui:
             raise AssertionError(f"Missing Entry control: {control}")
+    # The side is never a toggle, and the order type is never a cycling button.
+    for removed in ("ENTRY_SIDE", "ENTRY_TYPE", "ENTRY_LIMIT", "ENTRY_STOP"):
+        if f'"{removed}"' in ui:
+            raise AssertionError(f"Entry must not bring back the {removed} control")
+    # Both sides stay visible whenever the tab is, so neither may be gated separately.
+    visibility = function(ui, "ApplyTabVisibility")
+    if '"ENTRY_SELL", "ENTRY_BUY"' not in visibility:
+        raise AssertionError("Both Entry send buttons must share the tab visibility list")
+    for send in ('SetVisible("ENTRY_BUY"', 'SetVisible("ENTRY_SELL"'):
+        if send in visibility:
+            raise AssertionError(f"{send} must not gate a send button on anything but the tab")
+
+
+def verify_entry_layout(ui: str) -> None:
+    """Protect the user-visible Entry row grouping from regressions."""
+    rows = {
+        "PM_ENTRY_SUBTAB_ROW_Y": ['CreateButton("ENTRY_SUB_MARKET"', 'CreateButton("ENTRY_SUB_LIMIT"',
+                                  'CreateButton("ENTRY_SUB_STOP"', 'CreateLabel("ENTRY_PRICE"'],
+        "PM_ENTRY_QTY_ROW_Y": ['CreateLabel("ENTRY_QTY_LABEL"', 'CreateButton("ENTRY_QTY_MODE"',
+                               'CreateNumericInput("ENTRY_LOT"', 'CreateNumericInput("ENTRY_RISK"',
+                               'CreateLabel("ENTRY_ORDER_PRICE_LABEL"', 'CreateNumericInput("ENTRY_ORDER"'],
+        "PM_ENTRY_SL_ROW_Y": ['CreateLabel("ENTRY_SL_LABEL"', 'CreateButton("ENTRY_SL_MODE"',
+                              'CreateNumericInput("ENTRY_SL"', 'CreateButton("ENTRY_SL_SET"',
+                              'CreateButton("ENTRY_SL_CLEAR"'],
+        "PM_ENTRY_TP_ROW_Y": ['CreateLabel("ENTRY_TP_LABEL"', 'CreateButton("ENTRY_TP_MODE"',
+                              'CreateNumericInput("ENTRY_TP"', 'CreateButton("ENTRY_TP_SET"',
+                              'CreateButton("ENTRY_TP_CLEAR"'],
+        "PM_ENTRY_SEND_ROW_Y": ['CreateButton("ENTRY_SELL"', 'CreateButton("ENTRY_BUY"'],
+    }
+    lines = ui.splitlines()
+    for row, controls in rows.items():
+        for control in controls:
+            line = next((item for item in lines if control in item), None)
+            if line is None or row not in line:
+                raise AssertionError(f"{control} must remain on {row}")
 
 
 def verify_stop_defaults(ui: str) -> None:
     """SL/TP editors start at 0 (unset), so no line appears until a value is entered."""
     for control in ("SL_VALUE", "TP_VALUE", "ENTRY_SL_VALUE", "ENTRY_TP_VALUE"):
-        if f'CreateEdit("{control}", "0"' not in ui:
+        seeded = (f'CreateEdit("{control}", "0"' in ui or
+                  f'"{control}", "0"' in ui)
+        if not seeded:
             raise AssertionError(f"{control} must initially display 0")
 
 
@@ -126,6 +164,7 @@ def main() -> None:
     ui_source = (ROOT / "src/UiPanel.mqh").read_text()
     verify_trail_layout(ui_source)
     verify_entry_controls(ui_source)
+    verify_entry_layout(ui_source)
     verify_status_line_visibility(ui_source)
     verify_stop_defaults(ui_source)
     enum_names = ["PMEntrySide", "PMEntryOrderType", "PMQuantityMode", "PMEntryInputUnit",
@@ -203,12 +242,15 @@ void AssertTrue(bool condition, const string &name) {
     source += "\nclass CValidationService { public:\n" + function((ROOT / "src/ValidationService.mqh").read_text(), "ValidateEntryPrices") + "\n};\n"
     source += without_includes("src/EntryService.mqh")
     source += "\nclass CTradeManager { public: int m_deviation_points = 10;\n" + function((ROOT / "src/TradeManager.mqh").read_text(), "SubmitEntry") + "\n};\n"
-    ui_methods = ["EntryRRText", "RefreshEntryComputation", "EntryStopSuffix", "IsEntrySendButton", "WriteEntryStops",
+    ui_methods = ["EntryReferenceSide", "EntrySideName", "EntryRRText", "EntryStopPreview", "EntryPreviewText",
+                  "EntryQuantityModeLabel", "EntryHintText", "SetEntrySubTabColor", "SetEntrySendVisual",
+                  "RefreshEntryComputation", "EntryStopSuffix", "IsEntrySendButton", "WriteEntryStops",
                   "CommitEntryEditor", "CommitEntryEditors", "SetEntryStop", "SwitchEntryUnit", "StepEntryInput",
-                  "HandleEntryClick", "OpenEntry", "VolumeDigits", "HandlePriceMouse", "RenderEntryState", "FitEntryLabel",
+                  "SelectEntryOrderType", "HandleEntryClick", "OpenEntry", "VolumeDigits", "HandlePriceMouse",
+                  "RenderEntryState", "FitEntryLabel",
                   "LabelTextWidth", "LabelFittingCharacters", "SetEntryHint", "EntryPriceLineText",
                   "CancelPriceDrag", "ResetStopEditor"]
-    source += "\nclass EntryUiHarness { public: CEntryDraft m_entry_draft; CEntryService m_entry_service; PMEntrySnapshot m_entry_snapshot; PMEntryComputation m_entry_result; bool m_entry_valid = false, m_visibility_dirty = false; string m_entry_reason, status; CPriceEditDrag m_price_drag; string Name(const string s) { return s; } void SetStatus(const string s) { status = s; }\n"
+    source += "\nclass EntryUiHarness { public: CEntryDraft m_entry_draft; CEntryService m_entry_service; PMEntrySnapshot m_entry_snapshot[2]; PMEntryComputation m_entry_result[2]; bool m_entry_valid[2] = {false, false}; bool m_visibility_dirty = false; string m_entry_reason[2], status; CPriceEditDrag m_price_drag; string Name(const string s) { return s; } void SetStatus(const string s) { status = s; }\n"
     source += r"""
     bool m_collapsed = false, m_price_scroll_before = true, m_price_drag_moved = false;
     int m_active_tab = PM_PANEL_TAB_ENTRY, m_origin_x = 0, m_origin_y = 0, m_panel_width = 560;

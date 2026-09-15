@@ -5,29 +5,32 @@
 #include "Constants.mqh"
 
 // Committed Entry input only. Chart objects and position-edit drafts are not state.
+// The side is not part of the draft: the panel evaluates the same draft once per
+// side and the button the user presses decides which evaluation is submitted.
 class CEntryDraft
   {
 public:
    PMEntryOrderType order_type;
-   PMEntrySide side;
    PMQuantityMode quantity_mode;
    PMTpState tp_state;
    PMEntryInputUnit unit[2];
    string stop_text[2];
    string order_text, lot_text, risk_text;
-   double manual_tp_price;
+   // A Pips TP resolves to a different price per side, so the "freeze on commit"
+   // rule keeps one latched price for each side instead of a single value.
+   double manual_tp_price[2];
 
    CEntryDraft()
      {
       order_type = PM_ENTRY_ORDER_MARKET;
-      side = PM_ENTRY_BUY;
       quantity_mode = PM_QUANTITY_MANUAL_LOT;
       tp_state = PM_TP_STATE_OFF;
       unit[0] = PM_ENTRY_UNIT_PIPS; unit[1] = PM_ENTRY_UNIT_PIPS;
       stop_text[0] = "0"; stop_text[1] = "0";
       order_text = ""; lot_text = "0.01"; risk_text = "0";
-      manual_tp_price = 0.0;
+      ClearManualTp();
      }
+   void ClearManualTp() { manual_tp_price[0] = 0.0; manual_tp_price[1] = 0.0; }
    bool Number(const string text, const bool zero_allowed, double &value)
      {
       value = 0.0;
@@ -40,7 +43,7 @@ public:
       stop_text[index] = text;
       if(index == 1)
         {
-         manual_tp_price = 0.0;
+         ClearManualTp();
          tp_state = PMIsUnsignedDecimalText(text) && StringToDouble(text) == 0.0 ?
                     PM_TP_STATE_OFF : PM_TP_STATE_MANUAL;
         }
@@ -51,12 +54,12 @@ public:
       SetStop(index, DoubleToString(price, digits));
      }
    void CancelStop(const int index) { SetStop(index, "0"); }
-   double PipsBase(const PMEntrySnapshot &snapshot, const double entry)
+   double PipsBase(const PMEntrySide side, const PMEntrySnapshot &snapshot, const double entry)
      {
       return order_type == PM_ENTRY_ORDER_MARKET ?
              (side == PM_ENTRY_BUY ? snapshot.bid : snapshot.ask) : entry;
      }
-   bool ResolveStop(const int index, const PMEntrySnapshot &snapshot,
+   bool ResolveStop(const int index, const PMEntrySide side, const PMEntrySnapshot &snapshot,
                     const double entry, double &price, string &reason)
      {
       price = 0.0;
@@ -70,7 +73,7 @@ public:
         {
          const bool upward = side == PM_ENTRY_BUY ? index == 1 : index == 0;
          const double distance = PMPipsToPointDistance(value, snapshot.digits) * snapshot.point;
-         price = PipsBase(snapshot, entry) + (upward ? distance : -distance);
+         price = PipsBase(side, snapshot, entry) + (upward ? distance : -distance);
         }
       price = PMNormalizePrice(price, snapshot.tick_size, snapshot.digits);
       if(!MathIsValidNumber(price) || price <= 0.0)
@@ -78,7 +81,7 @@ public:
       return true;
      }
    // Fill one snapshot used by lines, RR, sizing, estimates and order submission.
-   bool Resolve(PMEntrySnapshot &snapshot, const int drag_index,
+   bool Resolve(const PMEntrySide side, PMEntrySnapshot &snapshot, const int drag_index,
                 const double drag_price, string &reason)
      {
       reason = "";
@@ -91,16 +94,16 @@ public:
       double entry = 0.0;
       if(!PMCalculateAssumedEntryPrice(order_type, side, snapshot.bid, snapshot.ask,
                                        snapshot.order_price, entry, reason)) return false;
-      if(!ResolveStop(0, snapshot, entry, snapshot.sl_price, reason)) return false;
+      if(!ResolveStop(0, side, snapshot, entry, snapshot.sl_price, reason)) return false;
       if(tp_state == PM_TP_STATE_MANUAL)
         {
-         if(manual_tp_price > 0.0) snapshot.tp_price = manual_tp_price;
+         if(manual_tp_price[side] > 0.0) snapshot.tp_price = manual_tp_price[side];
          else
            {
-            if(!ResolveStop(1, snapshot, entry, snapshot.tp_price, reason)) return false;
+            if(!ResolveStop(1, side, snapshot, entry, snapshot.tp_price, reason)) return false;
             // A directly entered TP becomes an absolute draft once resolved.
             // Pips remains the visible input unit, not a request to chase ticks.
-            if(drag_index < 0) manual_tp_price = snapshot.tp_price;
+            if(drag_index < 0) manual_tp_price[side] = snapshot.tp_price;
            }
         }
       if(drag_index == 0) snapshot.sl_price = drag_price;

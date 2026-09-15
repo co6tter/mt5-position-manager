@@ -4,7 +4,8 @@ enum { SYMBOL_POINT, SYMBOL_TRADE_TICK_SIZE, SYMBOL_VOLUME_MIN, SYMBOL_VOLUME_MA
        SYMBOL_DIGITS, SYMBOL_TRADE_STOPS_LEVEL, SYMBOL_TRADE_FREEZE_LEVEL, SYMBOL_ORDER_MODE,
        SYMBOL_EXPIRATION_MODE, SYMBOL_FILLING_MODE, SYMBOL_TRADE_EXEMODE,
        ACCOUNT_BALANCE, ACCOUNT_CURRENCY_DIGITS, ACCOUNT_CURRENCY, OBJPROP_TEXT,
-       OBJPROP_TOOLTIP, OBJPROP_FONTSIZE, OBJPROP_COLOR, OBJPROP_READONLY, OBJPROP_BGCOLOR };
+       OBJPROP_TOOLTIP, OBJPROP_FONTSIZE, OBJPROP_COLOR, OBJPROP_READONLY, OBJPROP_BGCOLOR,
+       OBJPROP_BORDER_COLOR };
 enum { SYMBOL_ORDER_MARKET = 1, SYMBOL_ORDER_LIMIT = 2, SYMBOL_ORDER_STOP = 4, SYMBOL_ORDER_SL = 16,
        SYMBOL_ORDER_TP = 32, SYMBOL_EXPIRATION_GTC = 1, SYMBOL_FILLING_FOK = 1, SYMBOL_FILLING_IOC = 2,
        SYMBOL_TRADE_EXECUTION_MARKET = 2 };
@@ -74,7 +75,10 @@ bool ChartXYToTimePrice(int, int, int y, int &window, datetime &time, double &pr
     window = 0; time = 1; price = 100.0 - y * .01; return true;
 }
 
+using color = int;
 const int clrDarkGreen = 1, clrMaroon = 2, clrWhite = 3, clrSilver = 4, FW_NORMAL = 400;
+const int PM_ACTIVE_TAB_COLOR = 10, PM_INACTIVE_TAB_COLOR = 11;
+const int PM_ACTIVE_TAB_BORDER_COLOR = 12, PM_INACTIVE_TAB_BORDER_COLOR = 13;
 std::map<std::pair<string, int>, long> object_properties;
 bool TextSetFont(const string &, int, int) { return true; }
 bool TextGetSize(const string &text, unsigned int &width, unsigned int &height) { width = text.size() * 6; height = 12; return true; }

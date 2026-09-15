@@ -6,7 +6,9 @@
 class CEntryService
   {
 public:
-   bool Evaluate(const string symbol, CEntryDraft &draft,
+   // Evaluated once per side: the draft carries no side of its own, so the caller
+   // asks for BUY and SELL separately and enables each send button on its own result.
+   bool Evaluate(const string symbol, const PMEntrySide side, CEntryDraft &draft,
                   const int drag_index, const double drag_price,
                   PMEntrySnapshot &snapshot, PMEntryComputation &result,
                   string &reason)
@@ -25,7 +27,7 @@ public:
       snapshot.volume_max = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX);
       snapshot.volume_step = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
       snapshot.balance = AccountInfoDouble(ACCOUNT_BALANCE);
-      const bool inputs_ok = draft.Resolve(snapshot, drag_index, drag_price, reason);
+      const bool inputs_ok = draft.Resolve(side, snapshot, drag_index, drag_price, reason);
       double entry = 0.0;
       string entry_reason = "";
       PMCalculateAssumedEntryPrice(snapshot.order_type, snapshot.side, tick.bid, tick.ask,
@@ -67,15 +69,15 @@ public:
      {
       const double price = is_sl ? snapshot.sl_price : result.effective_tp;
       if(!result.lot_ok || (is_sl ? !PMIsStopLossOnLossSide(snapshot.side, result.entry, price) :
-                                   !PMIsTakeProfitOnProfitSide(snapshot.side, result.entry, price))) return "N/A";
+                                   !PMIsTakeProfitOnProfitSide(snapshot.side, result.entry, price))) return "-";
       string reason = "";
       CValidationService validator;
       if(!validator.ValidateEntryPrices(symbol, snapshot.order_type, snapshot.side,
                                         result.entry, snapshot.bid, snapshot.ask,
-                                        is_sl ? price : 0.0, is_sl ? 0.0 : price, reason)) return "N/A";
+                                        is_sl ? price : 0.0, is_sl ? 0.0 : price, reason)) return "-";
       double profit = 0.0;
       if(!OrderCalcProfit(snapshot.side == PM_ENTRY_BUY ? ORDER_TYPE_BUY : ORDER_TYPE_SELL,
-                          symbol, result.lot, result.entry, price, profit) || !MathIsValidNumber(profit)) return "N/A";
+                          symbol, result.lot, result.entry, price, profit) || !MathIsValidNumber(profit)) return "-";
       return DoubleToString(profit, (int)AccountInfoInteger(ACCOUNT_CURRENCY_DIGITS));
      }
   };
