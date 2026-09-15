@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Run the chart-independent price editor tests without MT5.
 
-Compiles the actual MQL helper bodies and shared test functions as C++.
-This checks their logic only; it does not validate MQL compilation, chart
-events, font metrics, trade APIs, or any other MT5 integration.
+Checks the Trail control grouping/defaults, then compiles the actual MQL helper
+bodies and shared test functions as C++. It does not validate MQL compilation,
+chart events, font metrics, trade APIs, or any other MT5 integration.
 Requires Python 3 and a C++17 compiler (CXX, clang++, or g++).
 """
 
@@ -15,6 +15,34 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def verify_trail_layout(ui: str) -> None:
+    """Protect the user-visible single-row Trail layout from regressions."""
+    rows = {
+        "PM_TRAIL_BE_ROW_Y": [
+            'CreateLabel("BE_LABEL"', 'CreateButton("BE_ENABLED"',
+            'CreateLabel("BE_TRIGGER_LABEL"', 'CreateNumericInput("BE_TRIGGER"',
+            'CreateLabel("BE_LOCK_LABEL"', 'CreateNumericInput("BE_LOCK"',
+        ],
+        "PM_TRAIL_ROW_Y": [
+            'CreateLabel("TRAIL_LABEL"', 'CreateButton("TRAIL_ENABLED"',
+            'CreateLabel("TRAIL_TRIGGER_LABEL"', 'CreateNumericInput("TRAIL_TRIGGER"',
+            'CreateLabel("TRAIL_DIST_LABEL"', 'CreateNumericInput("TRAIL_DIST"',
+        ],
+    }
+    lines = ui.splitlines()
+    for row, controls in rows.items():
+        for control in controls:
+            line = next((item for item in lines if control in item), None)
+            if line is None or row not in line:
+                raise AssertionError(f"{control} must remain on {row}")
+    for control in ("BE_TRIGGER", "BE_LOCK", "TRAIL_TRIGGER", "TRAIL_DIST"):
+        expected = f'CreateNumericInput("{control}", "{control}_VALUE", "0"'
+        if expected not in ui:
+            raise AssertionError(f"{control} must initially display 0")
+    if 'CreateButton("BASIS_TOGGLE", "Per Position"' not in ui:
+        raise AssertionError("Trail Basis must initially display Per Position")
 
 
 def function(source: str, name: str) -> str:
@@ -39,6 +67,7 @@ def main() -> None:
         raise SystemExit("A C++17 compiler is required (set CXX or install clang++/g++).")
     helpers = (ROOT / "src/Constants.mqh").read_text()
     tests = (ROOT / "tests/PositionManagerPureTests.mq5").read_text()
+    verify_trail_layout((ROOT / "src/UiPanel.mqh").read_text())
     helper_names = ["PMStepInteger", "PMStepDecimal", "PMPriceEditorStep", "PMShiftPriceEditorValue"]
     test_names = ["TestInputStepperHelpers", "TestPriceEditorHelpers",
                   "TestPriceDragLifecycle", "TestPriceEstimateAggregation", "TestPriceLabelPlacement"]

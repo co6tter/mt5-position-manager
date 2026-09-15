@@ -289,19 +289,17 @@ public:
       created = CreateButton("BASIS_TOGGLE", "Per Position", PM_TRAIL_TOGGLE_X, ContentTop() + PM_TRAIL_BASIS_ROW_Y, PM_TRAIL_BASIS_TOGGLE_WIDTH, 22) && created;
       created = CreateLabel("BE_LABEL", "Break Even", 12, ContentTop() + PM_TRAIL_BE_ROW_Y + 5, clrSilver, 9) && created;
       created = CreateButton("BE_ENABLED", "OFF", PM_TRAIL_TOGGLE_X, ContentTop() + PM_TRAIL_BE_ROW_Y, 60, 22) && created;
-      created = CreateLabel("BE_TRIGGER_LABEL", "Trigger", PM_TRAIL_LABEL1_X, ContentTop() + PM_TRAIL_BE_INPUT_ROW_Y + 5, clrSilver, 9) && created;
-      created = CreateNumericInput("BE_TRIGGER", "BE_TRIGGER_VALUE", "0", PM_TRAIL_INPUT1_X, ContentTop() + PM_TRAIL_BE_INPUT_ROW_Y, PM_TRAIL_INPUT_WIDTH) && created;
-      created = CreateLabel("BE_LOCK_LABEL", "Lock", PM_TRAIL_LABEL2_X, ContentTop() + PM_TRAIL_BE_INPUT_ROW_Y + 5, clrSilver, 9) && created;
-      created = CreateNumericInput("BE_LOCK", "BE_LOCK_VALUE", "0", PM_TRAIL_INPUT2_X, ContentTop() + PM_TRAIL_BE_INPUT_ROW_Y, PM_TRAIL_INPUT_WIDTH) && created;
+      created = CreateLabel("BE_TRIGGER_LABEL", "Trigger", PM_TRAIL_LABEL1_X, ContentTop() + PM_TRAIL_BE_ROW_Y + 5, clrSilver, 9) && created;
+      created = CreateNumericInput("BE_TRIGGER", "BE_TRIGGER_VALUE", "0", PM_TRAIL_INPUT1_X, ContentTop() + PM_TRAIL_BE_ROW_Y, PM_TRAIL_INPUT_WIDTH) && created;
+      created = CreateLabel("BE_LOCK_LABEL", "Lock", PM_TRAIL_LABEL2_X, ContentTop() + PM_TRAIL_BE_ROW_Y + 5, clrSilver, 9) && created;
+      created = CreateNumericInput("BE_LOCK", "BE_LOCK_VALUE", "0", PM_TRAIL_INPUT2_X, ContentTop() + PM_TRAIL_BE_ROW_Y, PM_TRAIL_INPUT_WIDTH) && created;
       created = CreateLabel("TRAIL_LABEL", "Trailing", 12, ContentTop() + PM_TRAIL_ROW_Y + 5, clrSilver, 9) && created;
       created = CreateButton("TRAIL_ENABLED", "OFF", PM_TRAIL_TOGGLE_X, ContentTop() + PM_TRAIL_ROW_Y, 60, 22) && created;
-      created = CreateLabel("TRAIL_TRIGGER_LABEL", "Trigger", PM_TRAIL_LABEL1_X, ContentTop() + PM_TRAIL_INPUT_ROW_Y + 5, clrSilver, 9) && created;
-      created = CreateNumericInput("TRAIL_TRIGGER", "TRAIL_TRIGGER_VALUE", "0", PM_TRAIL_INPUT1_X, ContentTop() + PM_TRAIL_INPUT_ROW_Y, PM_TRAIL_INPUT_WIDTH) && created;
-      created = CreateLabel("TRAIL_DIST_LABEL", "Distance", PM_TRAIL_LABEL2_X, ContentTop() + PM_TRAIL_INPUT_ROW_Y + 5, clrSilver, 9) && created;
-      created = CreateNumericInput("TRAIL_DIST", "TRAIL_DIST_VALUE", "0", PM_TRAIL_INPUT2_X, ContentTop() + PM_TRAIL_INPUT_ROW_Y, PM_TRAIL_INPUT_WIDTH) && created;
-      created = CreateLabel("TRAIL_HINT", "Trailing Trigger 0 uses Distance.", 12, ContentTop() + PM_TRAIL_HINT_ROW_Y, clrSilver, 8) && created;
-
-      created = CreateLabel("TRAIL_UNITS_HINT", "All distances are pips.", 12, ContentTop() + PM_TRAIL_HINT_ROW_Y + 24, clrSilver, 8) && created;
+      created = CreateLabel("TRAIL_TRIGGER_LABEL", "Trigger", PM_TRAIL_LABEL1_X, ContentTop() + PM_TRAIL_ROW_Y + 5, clrSilver, 9) && created;
+      created = CreateNumericInput("TRAIL_TRIGGER", "TRAIL_TRIGGER_VALUE", "0", PM_TRAIL_INPUT1_X, ContentTop() + PM_TRAIL_ROW_Y, PM_TRAIL_INPUT_WIDTH) && created;
+      created = CreateLabel("TRAIL_DIST_LABEL", "Distance", PM_TRAIL_LABEL2_X, ContentTop() + PM_TRAIL_ROW_Y + 5, clrSilver, 9) && created;
+      created = CreateNumericInput("TRAIL_DIST", "TRAIL_DIST_VALUE", "0", PM_TRAIL_INPUT2_X, ContentTop() + PM_TRAIL_ROW_Y, PM_TRAIL_INPUT_WIDTH) && created;
+      created = CreateLabel("TRAIL_HINT", "Trailing Trigger 0 uses Distance. All distances are pips.", 12, ContentTop() + PM_TRAIL_HINT_ROW_Y, clrSilver, 8) && created;
 
       created = CreateLabel("SESSION_LABEL", "Session close: - | Auto close: -", 14, 0, clrSilver, 9) && created;
       for(int line = 0; line < PM_MAX_STATUS_LINES; line++)
@@ -1900,7 +1898,6 @@ private:
       SetVisible("TRAIL_DIST_VALUE", trail);
       SetVisible("TRAIL_DIST_INC", trail);
       SetVisible("TRAIL_HINT", trail);
-      SetVisible("TRAIL_UNITS_HINT", trail);
       SetVisible("SESSION_LABEL", expanded);
       for(int row = 0; row < m_rendered_rows; row++)
         {

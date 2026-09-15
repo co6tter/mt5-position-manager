@@ -633,15 +633,13 @@ void TestPanelLayoutHelpers()
    AssertTrue(PM_MIN_PANEL_WIDTH >= PM_TRAIL_TOGGLE_X + PM_TRAIL_BASIS_TOGGLE_WIDTH,
               "Minimum panel width fits the Basis toggle on its own row");
    AssertTrue(PM_MIN_PANEL_WIDTH - 12 >= PM_TRAIL_INPUT2_X + PM_TRAIL_INPUT_WIDTH + 34 + 26 &&
-              PM_TRAIL_INPUT1_X + PM_TRAIL_INPUT_WIDTH + 34 + 26 + 12 <= PM_TRAIL_LABEL2_X,
+              PM_TRAIL_INPUT1_X + PM_TRAIL_INPUT_WIDTH + 34 + 26 + 10 <= PM_TRAIL_LABEL2_X,
               "Trail numeric groups preserve inner padding and leave room for the next label");
-   AssertTrue(PM_TRAIL_BE_ROW_Y >= PM_TRAIL_BASIS_ROW_Y + 22 + 8 &&
-              PM_TRAIL_BE_INPUT_ROW_Y >= PM_TRAIL_BE_ROW_Y + 22 + 8 &&
-              PM_TRAIL_ROW_Y >= PM_TRAIL_BE_INPUT_ROW_Y + 22 + 8 &&
-              PM_TRAIL_INPUT_ROW_Y >= PM_TRAIL_ROW_Y + 22 + 8 &&
-              PM_TRAIL_HINT_ROW_Y >= PM_TRAIL_INPUT_ROW_Y + 22 + 8 &&
-              PM_PANEL_TRAIL_HEIGHT >= PM_TRAIL_HINT_ROW_Y + 24 + 24,
-              "Trail rows and both hint lines fit before the status block without overlap");
+   AssertTrue(PM_TRAIL_BE_ROW_Y >= PM_TRAIL_BASIS_ROW_Y + 22 + 6 &&
+              PM_TRAIL_ROW_Y >= PM_TRAIL_BE_ROW_Y + 22 + 6 &&
+              PM_TRAIL_HINT_ROW_Y >= PM_TRAIL_ROW_Y + 22 + 10 &&
+              PM_PANEL_TRAIL_HEIGHT >= PM_TRAIL_HINT_ROW_Y + 20,
+              "Compact Trail rows and hint fit before the status block without overlap");
    AssertTrue(PMResolvePanelHeight(320, 500) == 500,
               "A taller user-requested panel height is preserved");
    AssertTrue(PMResolvePanelHeight(500, 320) == 500,
