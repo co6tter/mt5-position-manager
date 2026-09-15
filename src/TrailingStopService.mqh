@@ -30,6 +30,25 @@ bool PMBreakEvenCandidate(const double open_price,
    return true;
   }
 
+// Trailing SL updates snap to a coarser grid than the broker's raw tick so the
+// stop advances in whole "1 pip" steps for standard 3/5-digit FX quotes and
+// "0.1" steps for 2-digit quotes (XAUUSD-style), instead of chasing every
+// sub-pip tick move. Other digit counts are left at point-level granularity.
+int PMTrailingSnapPoints(const int digits)
+  {
+   if(digits == 2)
+      return 10;
+   return PMPointsPerPip(digits);
+  }
+
+double PMSnapTrailingCandidate(const double candidate, const double point, const int digits)
+  {
+   if(point <= 0.0)
+      return candidate;
+   const double step = point * PMTrailingSnapPoints(digits);
+   return MathRound(candidate / step) * step;
+  }
+
 bool PMTrailingCandidate(const double open_price,
                          const ENUM_POSITION_TYPE type,
                          const double current_price,
@@ -163,10 +182,12 @@ void PMAppendTrailingCandidateResult(ulong &tickets[],
 // Decides, for every position, whether a Break Even / Trailing candidate
 // applies and which reference price it is measured from -- the volume-weighted
 // basket average for PM_TRAIL_BASIS_AVERAGE, or the position's own entry for
-// PM_TRAIL_BASIS_PER_POSITION. Pure and side-effect free: point sizes and
-// pending flags are supplied by the caller (index-aligned with all_positions)
-// instead of being fetched here, so the exact basis-selection logic the
-// service runs can be unit tested without a live terminal connection.
+// PM_TRAIL_BASIS_PER_POSITION. Pure and side-effect free: point sizes, symbol
+// digits and pending flags are supplied by the caller (index-aligned with
+// all_positions) instead of being fetched here, so the exact basis-selection
+// logic the service runs can be unit tested without a live terminal connection.
+// digits_for_position[] only affects the Trailing candidate (see
+// PMSnapTrailingCandidate); Break Even candidates are unaffected.
 //
 // result_basis_index[] points back into all_positions[] with a position that
 // shares the candidate's symbol/type, for callers that need it to run broker
@@ -178,6 +199,7 @@ int PMResolveTrailingCandidates(const PMPosition &all_positions[],
                                 const string scope_symbol,
                                 const PMDirection scope_direction,
                                 const double &point_for_position[],
+                                const int &digits_for_position[],
                                 const bool &pending_for_position[],
                                 const bool enabled_break_even,
                                 const bool enabled_trailing,
@@ -221,6 +243,9 @@ int PMResolveTrailingCandidates(const PMPosition &all_positions[],
             PMTrailingCandidate(all_positions[i].open_price, all_positions[i].type,
                                 all_positions[i].current_price, point_for_position[i],
                                 trail_trigger_points, trail_points, trailing_candidate);
+         if(has_trailing)
+            trailing_candidate = PMSnapTrailingCandidate(trailing_candidate, point_for_position[i],
+                                                         digits_for_position[i]);
          if(!PMBestStopCandidate(all_positions[i].type, has_break_even, break_even_candidate,
                                  has_trailing, trailing_candidate, best))
             continue;
@@ -286,6 +311,8 @@ int PMResolveTrailingCandidates(const PMPosition &all_positions[],
       const bool has_trailing = enabled_trailing &&
          PMTrailingCandidate(basket_open_price, basket_type, basket_current_price, point,
                              trail_trigger_points, trail_points, trailing_candidate);
+      if(has_trailing)
+         trailing_candidate = PMSnapTrailingCandidate(trailing_candidate, point, digits_for_position[i]);
       if(!PMBestStopCandidate(basket_type, has_break_even, break_even_candidate,
                               has_trailing, trailing_candidate, best))
          continue;
@@ -326,16 +353,22 @@ public:
          PrintFormat("[WARN] Trailing/Break Even: point size unavailable for %s.", config.symbol);
          return false;
         }
+      const int scoped_digits = has_symbol_scope ?
+                                (int)SymbolInfoInteger(config.symbol, SYMBOL_DIGITS) : 0;
 
       const int total = ArraySize(all_positions);
       double point_for_position[];
+      int digits_for_position[];
       bool pending_for_position[];
       ArrayResize(point_for_position, total);
+      ArrayResize(digits_for_position, total);
       ArrayResize(pending_for_position, total);
       for(int i = 0; i < total; i++)
         {
          point_for_position[i] = has_symbol_scope ? scoped_point :
                                  SymbolInfoDouble(all_positions[i].symbol, SYMBOL_POINT);
+         digits_for_position[i] = has_symbol_scope ? scoped_digits :
+                                  (int)SymbolInfoInteger(all_positions[i].symbol, SYMBOL_DIGITS);
          pending_for_position[i] = trades.HasPending(all_positions[i].ticket);
         }
 
@@ -344,7 +377,7 @@ public:
       double result_candidates[];
       double result_fallback_candidates[];
       PMResolveTrailingCandidates(all_positions, config.basis, config.symbol, config.direction,
-                                  point_for_position, pending_for_position,
+                                  point_for_position, digits_for_position, pending_for_position,
                                   config.enabled_break_even, config.enabled_trailing,
                                   config.be_trigger_points, config.be_lock_points,
                                   config.trail_trigger_points, config.trail_points,

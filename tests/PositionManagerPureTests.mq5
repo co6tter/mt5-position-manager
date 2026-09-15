@@ -308,6 +308,7 @@ void TestResolveTrailingCandidatesBasisSelection()
    positions[1].current_price = 1.10300;
 
    double points[2] = {0.0001, 0.0001};
+   int digits[2] = {5, 5};
    bool pending[2] = {false, false};
    ulong result_tickets[];
    int result_basis_index[];
@@ -315,13 +316,13 @@ void TestResolveTrailingCandidatesBasisSelection()
    double result_fallback_candidates[];
 
    AssertTrue(PMResolveTrailingCandidates(positions, PM_TRAIL_BASIS_AVERAGE, "EURUSD", PM_DIRECTION_BOTH,
-                                          points, pending, true, false, 20, 2, 0, 0,
+                                          points, digits, pending, true, false, 20, 2, 0, 0,
                                           result_tickets, result_basis_index,
                                           result_candidates, result_fallback_candidates) == 0,
               "Average basis Break Even does not fire when the weighted entry has not reached the trigger");
 
    AssertTrue(PMResolveTrailingCandidates(positions, PM_TRAIL_BASIS_PER_POSITION, "EURUSD", PM_DIRECTION_BOTH,
-                                          points, pending, true, false, 20, 2, 0, 0,
+                                          points, digits, pending, true, false, 20, 2, 0, 0,
                                           result_tickets, result_basis_index,
                                           result_candidates, result_fallback_candidates) == 1 &&
               result_tickets[0] == 201 && MathAbs(result_candidates[0] - 1.10020) < 0.00001,
@@ -350,6 +351,7 @@ void TestResolveTrailingCandidatesSharedCandidate()
    positions[1].current_price = 1.10400;
 
    double points[2] = {0.0001, 0.0001};
+   int digits[2] = {5, 5};
    bool pending[2] = {false, false};
    ulong result_tickets[];
    int result_basis_index[];
@@ -357,7 +359,7 @@ void TestResolveTrailingCandidatesSharedCandidate()
    double result_fallback_candidates[];
 
    AssertTrue(PMResolveTrailingCandidates(positions, PM_TRAIL_BASIS_AVERAGE, "EURUSD", PM_DIRECTION_BOTH,
-                                          points, pending, false, true, 0, 0, 20, 10,
+                                          points, digits, pending, false, true, 0, 0, 20, 10,
                                           result_tickets, result_basis_index,
                                           result_candidates, result_fallback_candidates) == 2 &&
               MathAbs(result_candidates[0] - 1.10300) < 0.00001 &&
@@ -365,7 +367,7 @@ void TestResolveTrailingCandidatesSharedCandidate()
               "Average basis trailing applies one shared candidate to every ticket in the basket");
 
    AssertTrue(PMResolveTrailingCandidates(positions, PM_TRAIL_BASIS_PER_POSITION, "EURUSD", PM_DIRECTION_BOTH,
-                                          points, pending, false, true, 0, 0, 20, 10,
+                                          points, digits, pending, false, true, 0, 0, 20, 10,
                                           result_tickets, result_basis_index,
                                           result_candidates, result_fallback_candidates) == 2 &&
               result_tickets[0] == 201 && result_tickets[1] == 202 &&
@@ -392,6 +394,7 @@ void TestResolveTrailingCandidatesPendingExclusion()
    positions[1].current_price = 1.10300;
 
    double points[2] = {0.0001, 0.0001};
+   int digits[2] = {5, 5};
    bool pending[2] = {true, false};
    ulong result_tickets[];
    int result_basis_index[];
@@ -399,13 +402,13 @@ void TestResolveTrailingCandidatesPendingExclusion()
    double result_fallback_candidates[];
 
    AssertTrue(PMResolveTrailingCandidates(positions, PM_TRAIL_BASIS_AVERAGE, "EURUSD", PM_DIRECTION_BOTH,
-                                          points, pending, true, false, 20, 2, 0, 0,
+                                          points, digits, pending, true, false, 20, 2, 0, 0,
                                           result_tickets, result_basis_index,
                                           result_candidates, result_fallback_candidates) == 0,
               "Average basis skips the whole basket when any member ticket has a pending request");
 
    AssertTrue(PMResolveTrailingCandidates(positions, PM_TRAIL_BASIS_PER_POSITION, "EURUSD", PM_DIRECTION_BOTH,
-                                          points, pending, true, false, 20, 2, 0, 0,
+                                          points, digits, pending, true, false, 20, 2, 0, 0,
                                           result_tickets, result_basis_index,
                                           result_candidates, result_fallback_candidates) == 1 &&
               result_tickets[0] == 202,
@@ -426,18 +429,19 @@ void TestResolveTrailingCandidatesSellAndScope()
       positions[i].current_price = 1.1010;
      }
    double points[4] = {0.0001, 0.0001, 0.0001, 0.0001};
+   int digits[4] = {5, 5, 5, 5};
    bool pending[4] = {false, false, false, false};
    ulong tickets[];
    int indices[];
    double candidates[];
    double fallbacks[];
    AssertTrue(PMResolveTrailingCandidates(positions, PM_TRAIL_BASIS_AVERAGE,
-                                          "EURUSD", PM_DIRECTION_SHORT, points, pending,
+                                          "EURUSD", PM_DIRECTION_SHORT, points, digits, pending,
                                           true, true, 20, 2, 20, 10,
                                           tickets, indices, candidates, fallbacks) == 0,
               "Sell average below trigger ignores other symbols and Buy positions");
    AssertTrue(PMResolveTrailingCandidates(positions, PM_TRAIL_BASIS_PER_POSITION,
-                                          "EURUSD", PM_DIRECTION_SHORT, points, pending,
+                                          "EURUSD", PM_DIRECTION_SHORT, points, digits, pending,
                                           true, true, 20, 2, 20, 10,
                                           tickets, indices, candidates, fallbacks) == 1 &&
               tickets[0] == 301 && indices[0] == 0 &&
@@ -445,30 +449,100 @@ void TestResolveTrailingCandidatesSellAndScope()
               MathAbs(fallbacks[0] - 1.1038) < 0.000001,
               "Only triggered Sell gets its favorable trailing and entry-based fallback");
    AssertTrue(PMResolveTrailingCandidates(positions, PM_TRAIL_BASIS_PER_POSITION,
-                                          "EURUSD", PM_DIRECTION_SHORT, points, pending,
+                                          "EURUSD", PM_DIRECTION_SHORT, points, digits, pending,
                                           false, true, 20, 2, 20, 40,
                                           tickets, indices, candidates, fallbacks) == 0 &&
               ArraySize(indices) == 0 && ArraySize(candidates) == 0 && ArraySize(fallbacks) == 0,
               "Trailing beyond own Sell entry is rejected and stale results are cleared");
    ArrayResize(positions, 1);
    PMResolveTrailingCandidates(positions, PM_TRAIL_BASIS_AVERAGE,
-                               "EURUSD", PM_DIRECTION_SHORT, points, pending,
+                               "EURUSD", PM_DIRECTION_SHORT, points, digits, pending,
                                true, false, 20, 0, 0, 0,
                                tickets, indices, candidates, fallbacks);
    AssertTrue(ArraySize(tickets) == 1 && MathAbs(candidates[0] - 1.1040) < 0.000001,
               "Single Sell average with zero lock sets entry SL");
    PMResolveTrailingCandidates(positions, PM_TRAIL_BASIS_PER_POSITION,
-                               "EURUSD", PM_DIRECTION_SHORT, points, pending,
+                               "EURUSD", PM_DIRECTION_SHORT, points, digits, pending,
                                true, false, 20, 0, 0, 0,
                                tickets, indices, candidates, fallbacks);
    AssertTrue(ArraySize(tickets) == 1 && MathAbs(candidates[0] - 1.1040) < 0.000001,
               "Single Sell per-position with zero lock agrees with average");
    ArrayResize(positions, 0);
    AssertTrue(PMResolveTrailingCandidates(positions, PM_TRAIL_BASIS_PER_POSITION,
-                                          "EURUSD", PM_DIRECTION_SHORT, points, pending,
+                                          "EURUSD", PM_DIRECTION_SHORT, points, digits, pending,
                                           true, true, 20, 2, 20, 10,
                                           tickets, indices, candidates, fallbacks) == 0,
               "Empty position snapshot clears previous results");
+  }
+
+void TestResolveTrailingCandidatesSnapToDigitGrid()
+  {
+   // Gold-style 2-digit quote: raw candidate 4282.33 snaps to the nearest 0.1.
+   PMPosition gold_position[];
+   ArrayResize(gold_position, 1);
+   gold_position[0].ticket = 501;
+   gold_position[0].symbol = "XAUUSD";
+   gold_position[0].type = POSITION_TYPE_BUY;
+   gold_position[0].volume = 1.0;
+   gold_position[0].open_price = 4280.00;
+   gold_position[0].current_price = 4282.50;
+
+   double gold_points[1] = {0.01};
+   int gold_digits[1] = {2};
+   bool gold_pending[1] = {false};
+   ulong result_tickets[];
+   int result_basis_index[];
+   double result_candidates[];
+   double result_fallback_candidates[];
+
+   AssertTrue(PMResolveTrailingCandidates(gold_position, PM_TRAIL_BASIS_PER_POSITION, "XAUUSD", PM_DIRECTION_BOTH,
+                                          gold_points, gold_digits, gold_pending, false, true, 0, 0, 200, 17,
+                                          result_tickets, result_basis_index,
+                                          result_candidates, result_fallback_candidates) == 1 &&
+              MathAbs(result_candidates[0] - 4282.30) < 0.00001,
+              "Two-digit XAUUSD-style trailing candidate snaps to the nearest 0.1");
+
+   // Five-digit FX quote: raw candidate 1.10133 snaps to the nearest pip.
+   PMPosition fx_position[];
+   ArrayResize(fx_position, 1);
+   fx_position[0].ticket = 502;
+   fx_position[0].symbol = "EURUSD";
+   fx_position[0].type = POSITION_TYPE_BUY;
+   fx_position[0].volume = 1.0;
+   fx_position[0].open_price = 1.10000;
+   fx_position[0].current_price = 1.10233;
+
+   double fx_points[1] = {0.0001};
+   int fx_digits[1] = {5};
+   bool fx_pending[1] = {false};
+
+   AssertTrue(PMResolveTrailingCandidates(fx_position, PM_TRAIL_BASIS_PER_POSITION, "EURUSD", PM_DIRECTION_BOTH,
+                                          fx_points, fx_digits, fx_pending, false, true, 0, 0, 10, 10,
+                                          result_tickets, result_basis_index,
+                                          result_candidates, result_fallback_candidates) == 1 &&
+              MathAbs(result_candidates[0] - 1.1010) < 0.00001,
+              "Five-digit FX-style trailing candidate snaps to the nearest pip");
+
+   // Four-digit quote: unrecognized digit count keeps point-level precision.
+   PMPosition plain_position[];
+   ArrayResize(plain_position, 1);
+   plain_position[0].ticket = 503;
+   plain_position[0].symbol = "OTHERFX";
+   plain_position[0].type = POSITION_TYPE_BUY;
+   plain_position[0].volume = 1.0;
+   plain_position[0].open_price = 1.1200;
+   plain_position[0].current_price = 1.1234;
+
+   double plain_points[1] = {0.0001};
+   int plain_digits[1] = {4};
+   bool plain_pending[1] = {false};
+
+   AssertTrue(PMResolveTrailingCandidates(plain_position, PM_TRAIL_BASIS_PER_POSITION, "OTHERFX", PM_DIRECTION_BOTH,
+                                          plain_points, plain_digits, plain_pending, false, true, 0, 0, 10, 5,
+                                          result_tickets, result_basis_index,
+                                          result_candidates, result_fallback_candidates) == 1 &&
+              MathAbs(result_candidates[0] - 1.1229) < 0.00001,
+              "Unrecognized digit counts keep the raw point-level trailing candidate");
   }
 
 void TestProfitPoints()
@@ -496,6 +570,25 @@ void TestPipConversion()
               "Fractional pips convert to point distance");
    AssertTrue(PMPipsToPoints(0, 5) == 0 && PMPipsToPoints(-1, 5) == 0,
               "Non-positive pips remain disabled");
+  }
+
+void TestTrailingSnapGranularity()
+  {
+   AssertTrue(PMTrailingSnapPoints(5) == 10 && PMTrailingSnapPoints(3) == 10,
+              "Five-digit and three-digit symbols snap trailing updates to one pip");
+   AssertTrue(PMTrailingSnapPoints(2) == 10,
+              "Two-digit symbols (e.g. XAUUSD) snap trailing updates to 0.1 price units");
+   AssertTrue(PMTrailingSnapPoints(4) == 1 && PMTrailingSnapPoints(1) == 1,
+              "Unrecognized digit counts fall back to point-level snapping");
+
+   AssertTrue(MathAbs(PMSnapTrailingCandidate(1.10233, 0.0001, 5) - 1.1020) < 0.00001,
+              "Five-digit candidates snap down to the nearest pip");
+   AssertTrue(MathAbs(PMSnapTrailingCandidate(4282.33, 0.01, 2) - 4282.30) < 0.00001,
+              "Two-digit candidates snap down to the nearest 0.1 price unit");
+   AssertTrue(MathAbs(PMSnapTrailingCandidate(1.1234, 0.0001, 4) - 1.1234) < 0.00001,
+              "Unrecognized digit counts leave the candidate unchanged");
+   AssertTrue(PMSnapTrailingCandidate(1.1030, 0.0, 5) == 1.1030,
+              "A non-positive point size leaves the candidate unchanged");
   }
 
 void TestIsMoreFavorableStop()

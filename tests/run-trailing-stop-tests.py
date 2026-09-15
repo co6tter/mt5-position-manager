@@ -47,14 +47,16 @@ using ulong = unsigned long;
 using uint = unsigned int;
 using datetime = long;
 enum ENUM_POSITION_TYPE { POSITION_TYPE_BUY, POSITION_TYPE_SELL };
-enum { SYMBOL_POINT };
+enum { SYMBOL_POINT, SYMBOL_DIGITS };
 template<class T> int ArraySize(const std::vector<T>& a) { return int(a.size()); }
 template<class T> int ArrayResize(std::vector<T>& a, int n) { a.resize(n); return n; }
 template<class T> void ArrayInitialize(std::vector<T>& a, T v) { std::fill(a.begin(), a.end(), v); }
 template<class T> T MathMax(T a, T b) { return std::max(a, b); }
 bool MathIsValidNumber(double x) { return std::isfinite(x); }
 double MathAbs(double x) { return std::abs(x); }
+double MathRound(double x) { return std::round(x); }
 double SymbolInfoDouble(const string&, int) { return 0.0001; }
+long SymbolInfoInteger(const string&, int) { return 5; }
 template<class... T> void PrintFormat(const string&, T...) {}
 template<class... T> string StringFormat(const string&, T...) { return "status"; }
 int failures = 0, assertions = 0;
@@ -116,9 +118,11 @@ def main() -> None:
              "TestResolveTrailingCandidatesSharedCandidate",
              "TestResolveTrailingCandidatesPendingExclusion",
              "TestResolveTrailingCandidatesSellAndScope",
+             "TestTrailingSnapGranularity", "TestResolveTrailingCandidatesSnapToDigitGrid",
              "TestIsMoreFavorableStop", "TestBestStopCandidate", "TestPanelLayoutHelpers"]
     helpers = ["PMProfitPoints", "PMDirectionMatches", "PMPositionTypeToString",
-               "PMToggleTrailBasis", "PMTrailBasisToString", "PMResolvePanelHeight"]
+               "PMToggleTrailBasis", "PMTrailBasisToString", "PMResolvePanelHeight",
+               "PMPointsPerPip"]
     defines = "\n".join(line for line in constants.splitlines()
                         if re.match(r"#define PM_(?:PANEL_|TRAIL_|STOPS_|MIN_PANEL_WIDTH)", line))
     source = PRELUDE + arrays((ROOT / "src/Models.mqh").read_text()) + defines + "\n"

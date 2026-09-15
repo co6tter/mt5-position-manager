@@ -74,6 +74,8 @@ TrailタブはScope、Basis、Break Even、Trailing、説明の順に配置す�
 
 1秒Timer周期ごとに、判定単位（`Average`はバスケット、`Per Position`は各Ticket）ごとに両候補のうち有利な方を採用し、対象Ticketの現在の実際のSLより厳密に有利な場合のみ、同じ候補価格でSLを更新する（TPは変更しない）。SLを後退させることはない。状態は保持せず、既存のSL・建値（`Average`は加重平均、`Per Position`は各Ticket自身）・現在価格から都度再計算する。
 
+Trailingの候補価格は算出後、比較・適用前に銘柄の桁数（Digits）に応じた単位へ丸める：2桁は0.1、3桁・5桁は1pips相当（＝10 points）、それ以外は丸めない。これにより、ブローカーのTick Sizeより細かい値幅でSLが追従し続けることを避ける。Break Evenの候補価格はこの丸めの対象外。
+
 候補価格（Break Evenの建値ベース、Trailingの現在価格ベース）はどちらも自前で絶対値として計算し、TicketごとのTick Sizeへの正規化・Stops Level・Freeze Levelチェックには既存の`CValidationService.CalculateTarget()`をAbsoluteモードで再利用する。`Average`は代表ポジション経由でバスケット共通の候補を検証し、受理されればバスケット内の全Ticketへ同じ候補を適用する。`Per Position`は各Ticket自身を経由して個別に候補を検証し、受理されたTicketだけへ適用する。いずれも候補が検証できない場合、両方の候補（Break EvenとTrailingが両方有効なとき）を試しても変更要求を送信しない。Break Even Trigger/Lock、Trailing Trigger/Distanceの入力欄はpips単位で、Equity Guardと同様に確定操作(ENDEDIT)まで値を確定しない。
 
 Auto Close・Equity Guardと同様にOnTimer駆動の自動処理とし、確認ダイアログは表示しない。発動時のステータスはAuto Close・Equity Guard・Retryのメッセージより優先度が低い。
