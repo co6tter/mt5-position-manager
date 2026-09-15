@@ -971,6 +971,37 @@ void TestEntryPricingAndRiskHelpers()
               "A volume maximum below the minimum fails");
    AssertTrue(!PMCalculateRiskLot(100.0, 1.0, 250.0, 0.01, 100.0, 0.0, lot, estimated_loss, reason),
               "A non-positive volume step fails");
+
+   // Non-finite inputs (NaN / Infinity) must fail the same as non-positive
+   // ones. A literal "1.0 / 0.0" is a compile-time constant division in
+   // MQL5, so route the zero through a variable to force a runtime IEEE-754
+   // division instead (MathIsValidNumber() exists precisely because this is
+   // a real, reachable value -- not a crash -- for both double division and
+   // MQL5's own float arithmetic).
+   double zero_divisor = 0.0;
+   double not_a_number = 0.0 / zero_divisor;
+   double positive_infinity = 1.0 / zero_divisor;
+   AssertTrue(!PMCalculateRiskLot(not_a_number, 1.0, 250.0, 0.01, 100.0, 0.01, lot, estimated_loss, reason) &&
+              lot == 0.0 && estimated_loss == 0.0,
+              "A non-finite budget (NaN) fails");
+   AssertTrue(!PMCalculateRiskLot(positive_infinity, 1.0, 250.0, 0.01, 100.0, 0.01, lot, estimated_loss, reason) &&
+              lot == 0.0 && estimated_loss == 0.0,
+              "A non-finite budget (Infinity) fails");
+   AssertTrue(!PMCalculateRiskLot(100.0, not_a_number, 250.0, 0.01, 100.0, 0.01, lot, estimated_loss, reason) &&
+              lot == 0.0 && estimated_loss == 0.0,
+              "A non-finite reference volume (NaN) fails");
+   AssertTrue(!PMCalculateRiskLot(100.0, 1.0, not_a_number, 0.01, 100.0, 0.01, lot, estimated_loss, reason) &&
+              lot == 0.0 && estimated_loss == 0.0,
+              "A non-finite reference loss (NaN) fails");
+   AssertTrue(!PMCalculateRiskLot(100.0, 1.0, 250.0, not_a_number, 100.0, 0.01, lot, estimated_loss, reason) &&
+              lot == 0.0 && estimated_loss == 0.0,
+              "A non-finite volume minimum (NaN) fails");
+   AssertTrue(!PMCalculateRiskLot(100.0, 1.0, 250.0, 0.01, not_a_number, 0.01, lot, estimated_loss, reason) &&
+              lot == 0.0 && estimated_loss == 0.0,
+              "A non-finite volume maximum (NaN) fails");
+   AssertTrue(!PMCalculateRiskLot(100.0, 1.0, 250.0, 0.01, 100.0, not_a_number, lot, estimated_loss, reason) &&
+              lot == 0.0 && estimated_loss == 0.0,
+              "A non-finite volume step (NaN) fails");
   }
 
 void TestPanelLayoutHelpers()
