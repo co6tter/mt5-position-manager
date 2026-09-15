@@ -24,7 +24,7 @@
 #define PM_PANEL_STATUS_LINE_HEIGHT 18
 #define PM_PANEL_CONTENT_GAP 10
 #define PM_STATUS_FONT_SIZE 10
-#define PM_PANEL_ENTRY_HEIGHT 178
+#define PM_PANEL_ENTRY_HEIGHT 300
 #define PM_PANEL_POSITIONS_HEADER_HEIGHT 80
 #define PM_PANEL_POSITION_ROW_HEIGHT 24
 #define PM_PANEL_STOPS_HEIGHT 92
@@ -435,12 +435,17 @@ PMRRStatus PMCalculateCurrentRR(const PMEntrySide side,
       reason = "Entry price or direction is invalid.";
       return PM_RR_INVALID;
      }
-   if(sl <= 0.0 || !MathIsValidNumber(sl))
+   if(!MathIsValidNumber(sl) || !MathIsValidNumber(tp) || sl < 0.0 || tp < 0.0)
+     {
+      reason = "SL or TP price is invalid.";
+      return PM_RR_INVALID;
+     }
+   if(sl == 0.0)
      {
       reason = "SL is not set.";
       return PM_RR_NOT_AVAILABLE;
      }
-   if(tp <= 0.0 || !MathIsValidNumber(tp))
+   if(tp == 0.0)
      {
       reason = "TP is not set.";
       return PM_RR_NOT_AVAILABLE;
@@ -504,7 +509,9 @@ bool PMCalculateAutoTakeProfit(const PMEntrySide side,
       reason = "RR multiplier must be a positive number.";
       return false;
      }
-   if(point <= 0.0 || tick_size <= 0.0 || digits < 0 || stops_level < 0 || freeze_level < 0)
+   if(!MathIsValidNumber(point) || !MathIsValidNumber(tick_size) ||
+      point <= 0.0 || tick_size <= 0.0 || digits < 0 || digits > 8 ||
+      stops_level < 0 || freeze_level < 0)
      {
       reason = "Current price or entry distance is invalid.";
       return false;
@@ -513,12 +520,17 @@ bool PMCalculateAutoTakeProfit(const PMEntrySide side,
    const double raw = side == PM_ENTRY_BUY ? entry + distance * rr_multiplier :
                                               entry - distance * rr_multiplier;
    const double candidate = PMNormalizePrice(raw, tick_size, digits);
-   if(candidate <= 0.0)
+   if(!MathIsValidNumber(candidate) || candidate <= 0.0)
      {
       reason = "The normalized take-profit price is invalid.";
       return false;
      }
    const double minimum_distance = (double)MathMax(stops_level, freeze_level) * point;
+   if(!MathIsValidNumber(minimum_distance))
+     {
+      reason = "The minimum take-profit distance is invalid.";
+      return false;
+     }
    if(side == PM_ENTRY_BUY ? candidate <= entry + minimum_distance :
                              candidate >= entry - minimum_distance)
      {
@@ -604,7 +616,15 @@ bool PMCalculateRiskBudget(const PMQuantityMode mode,
          reason = "Risk percent must be greater than zero and at most 100.";
          return false;
         }
-      budget = balance * percent / 100.0;
+      // Divide the percentage first so a finite budget cannot overflow
+      // merely because balance * percent exceeds the double range.
+      budget = balance * (percent / 100.0);
+      if(!MathIsValidNumber(budget) || budget <= 0.0)
+        {
+         budget = 0.0;
+         reason = "Calculated risk budget is invalid.";
+         return false;
+        }
       return true;
      }
    // PM_QUANTITY_MANUAL_LOT (and any other value) never uses a risk budget;
@@ -649,11 +669,21 @@ bool PMCalculateRiskLot(const double budget,
       return false;
      }
    const double raw_lot = budget * reference_volume / reference_loss;
+   if(!MathIsValidNumber(raw_lot) || raw_lot <= 0.0)
+     {
+      reason = "Calculated lot is invalid.";
+      return false;
+     }
    // Same epsilon as PMNormalizeVolume; intentionally floors instead of
    // rounding to nearest (do not call PMNormalizeVolume from here -- it
    // could round a risk-derived lot up past the budget).
    const double aligned_maximum = volume_min +
                                   MathFloor((volume_max - volume_min) / volume_step + 0.00000001) * volume_step;
+   if(!MathIsValidNumber(aligned_maximum) || aligned_maximum < volume_min)
+     {
+      reason = "Symbol volume limits cannot be aligned.";
+      return false;
+     }
    if(raw_lot < volume_min)
      {
       reason = "Calculated lot is below the symbol's minimum volume.";
@@ -662,22 +692,42 @@ bool PMCalculateRiskLot(const double budget,
       return false;
      }
    const double bounded = MathMin(raw_lot, aligned_maximum);
-   const double steps = MathFloor((bounded - volume_min) / volume_step + 0.00000001);
-   lot = NormalizeDouble(volume_min + steps * volume_step, 8);
-   estimated_loss = lot / reference_volume * reference_loss;
-   return true;
+   double steps = MathFloor((bounded - volume_min) / volume_step + 0.00000001);
+   // The epsilon recovers exact step boundaries lost to floating point,
+   // but can also round a just-unaffordable lot up. Check the final loss
+   // and, in that case, try exactly one lower step before accepting it.
+   for(int attempt = 0; attempt < 2; attempt++)
+     {
+      const double candidate = NormalizeDouble(volume_min + steps * volume_step, 8);
+      const double candidate_loss = candidate / reference_volume * reference_loss;
+      if(!MathIsValidNumber(candidate) || !MathIsValidNumber(candidate_loss) ||
+         candidate < volume_min || candidate_loss <= 0.0 || steps < 0.0)
+        {
+         reason = "Calculated lot or loss is invalid.";
+         return false;
+        }
+      if(candidate <= volume_max && candidate_loss <= budget)
+        {
+         lot = candidate;
+         estimated_loss = candidate_loss;
+         return true;
+        }
+      steps -= 1.0;
+     }
+   reason = "No valid lot fits the risk budget and symbol volume limits.";
+   return false;
   }
 
 void PMRecomputeEntry(const PMEntrySnapshot &snapshot, PMEntryComputation &computation)
   {
-   // Zero-initialize every field, then apply the pre-recompute effective_tp default.
+   // Clear derived prices first; a canceled TP must never reuse stale input.
    computation.entry_ok = false;
    computation.entry = 0.0;
    computation.entry_reason = "";
-   computation.effective_tp = snapshot.tp_price;
+   computation.effective_tp = snapshot.tp_state == PM_TP_STATE_MANUAL ? snapshot.tp_price : 0.0;
    computation.tp_auto_ok = false;
    computation.tp_reason = "";
-   computation.rr_status = (PMRRStatus)0;
+   computation.rr_status = PM_RR_NOT_AVAILABLE;
    computation.rr = 0.0;
    computation.rr_reason = "";
    computation.lot_ok = false;
@@ -720,8 +770,8 @@ void PMRecomputeEntry(const PMEntrySnapshot &snapshot, PMEntryComputation &compu
      }
    else
      {
-      // PM_TP_STATE_MANUAL or PM_TP_STATE_OFF: trust the snapshot's tp_price as-is.
-      computation.effective_tp = snapshot.tp_price;
+      // Only Manual may retain a price; Off always wins over old input.
+      computation.effective_tp = snapshot.tp_state == PM_TP_STATE_MANUAL ? snapshot.tp_price : 0.0;
       computation.tp_auto_ok = true;
       computation.tp_reason = "";
      }
@@ -734,11 +784,19 @@ void PMRecomputeEntry(const PMEntrySnapshot &snapshot, PMEntryComputation &compu
    // 4. Lot.
    if(snapshot.quantity_mode == PM_QUANTITY_MANUAL_LOT)
      {
-      computation.lot = snapshot.manual_lot;
-      computation.lot_ok = MathIsValidNumber(snapshot.manual_lot) && snapshot.manual_lot > 0.0;
-      computation.estimated_loss = 0.0;
-      if(!computation.lot_ok)
+      if(!MathIsValidNumber(snapshot.manual_lot) || snapshot.manual_lot <= 0.0)
          computation.lot_reason = "Entry lot must be greater than zero.";
+      else
+        {
+         computation.lot = PMNormalizeVolume(snapshot.manual_lot, snapshot.volume_min,
+                                             snapshot.volume_max, snapshot.volume_step);
+         computation.lot_ok = MathIsValidNumber(computation.lot) && computation.lot > 0.0;
+         if(!computation.lot_ok)
+           {
+            computation.lot = 0.0;
+            computation.lot_reason = "Symbol volume limits are invalid.";
+           }
+        }
      }
    else
      {
@@ -767,6 +825,46 @@ void PMRecomputeEntry(const PMEntrySnapshot &snapshot, PMEntryComputation &compu
                                  computation.lot, computation.estimated_loss, computation.lot_reason);
         }
      }
+  }
+
+// Price geometry for a new order. Market protections are constrained by the
+// current close quote; pending protections are constrained by the order price.
+bool PMValidateEntryGeometry(const PMEntryOrderType order_type, const PMEntrySide side,
+                             const double entry, const double bid, const double ask,
+                             const double sl, const double tp, const double point,
+                             const double tick_size, const int digits,
+                             const long stops_level, const long freeze_level, string &reason)
+  {
+   reason = "";
+   if(!MathIsValidNumber(entry) || entry <= 0.0 || !MathIsValidNumber(bid) || bid <= 0.0 ||
+      !MathIsValidNumber(ask) || ask < bid || !MathIsValidNumber(sl) || sl < 0.0 ||
+      !MathIsValidNumber(tp) || tp < 0.0 || !MathIsValidNumber(point) || point <= 0.0 ||
+      !MathIsValidNumber(tick_size) || tick_size <= 0.0 || digits < 0 || digits > 8 ||
+      stops_level < 0 || freeze_level < 0 || (side != PM_ENTRY_BUY && side != PM_ENTRY_SELL))
+     { reason = "Entry prices or symbol constraints are invalid."; return false; }
+   const double minimum = MathMax(stops_level, freeze_level) * point;
+   if(!MathIsValidNumber(minimum)) { reason = "Broker distance is invalid."; return false; }
+   if(order_type != PM_ENTRY_ORDER_MARKET)
+     {
+      double distance = 0.0;
+      if(order_type == PM_ENTRY_ORDER_LIMIT) distance = side == PM_ENTRY_BUY ? ask - entry : entry - bid;
+      else if(order_type == PM_ENTRY_ORDER_STOP) distance = side == PM_ENTRY_BUY ? entry - ask : bid - entry;
+      else { reason = "Order type is invalid."; return false; }
+      if(distance <= minimum) { reason = "Pending price is on the wrong side or inside the broker distance."; return false; }
+      if(MathAbs(PMNormalizePrice(entry, tick_size, digits) - entry) > tick_size * 0.000001)
+        { reason = "Order price is not aligned to Tick Size."; return false; }
+     }
+   const double base = order_type == PM_ENTRY_ORDER_MARKET ? (side == PM_ENTRY_BUY ? bid : ask) : entry;
+   if(sl > 0.0 && (!PMIsStopLossOnLossSide(side, entry, sl) ||
+                   (side == PM_ENTRY_BUY ? sl >= base - minimum : sl <= base + minimum)))
+     { reason = "SL is on the wrong side or inside the broker distance."; return false; }
+   if(tp > 0.0 && (!PMIsTakeProfitOnProfitSide(side, entry, tp) ||
+                   (side == PM_ENTRY_BUY ? tp <= base + minimum : tp >= base - minimum)))
+     { reason = "TP is on the wrong side or inside the broker distance."; return false; }
+   if((sl > 0.0 && MathAbs(PMNormalizePrice(sl, tick_size, digits) - sl) > tick_size * 0.000001) ||
+      (tp > 0.0 && MathAbs(PMNormalizePrice(tp, tick_size, digits) - tp) > tick_size * 0.000001))
+     { reason = "SL/TP is not aligned to Tick Size."; return false; }
+   return true;
   }
 
 int PMWrapStatus(const string text,

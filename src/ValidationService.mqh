@@ -2,10 +2,37 @@
 #define __MT5_POSITION_MANAGER_VALIDATION_SERVICE_MQH__
 
 #include "Models.mqh"
+#include "Constants.mqh"
 
 class CValidationService
   {
 public:
+   bool ValidateEntryPrices(const string symbol,
+                            const PMEntryOrderType order_type,
+                            const PMEntrySide side,
+                            const double entry,
+                            const double bid,
+                            const double ask,
+                            const double sl,
+                            const double tp,
+                            string &reason)
+     {
+      if(symbol == "") { reason = "Entry symbol is missing."; return false; }
+      const long modes = SymbolInfoInteger(symbol, SYMBOL_ORDER_MODE);
+      const long required = order_type == PM_ENTRY_ORDER_MARKET ? SYMBOL_ORDER_MARKET :
+                            order_type == PM_ENTRY_ORDER_LIMIT ? SYMBOL_ORDER_LIMIT : SYMBOL_ORDER_STOP;
+      if((modes & required) == 0 || (sl > 0.0 && (modes & SYMBOL_ORDER_SL) == 0) ||
+         (tp > 0.0 && (modes & SYMBOL_ORDER_TP) == 0))
+        { reason = "The symbol does not support the requested order or protection type."; return false; }
+      if(order_type != PM_ENTRY_ORDER_MARKET &&
+         (SymbolInfoInteger(symbol, SYMBOL_EXPIRATION_MODE) & SYMBOL_EXPIRATION_GTC) == 0)
+        { reason = "This symbol does not support GTC pending orders."; return false; }
+      return PMValidateEntryGeometry(order_type, side, entry, bid, ask, sl, tp,
+                SymbolInfoDouble(symbol, SYMBOL_POINT), SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE),
+                (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS), SymbolInfoInteger(symbol, SYMBOL_TRADE_STOPS_LEVEL),
+                SymbolInfoInteger(symbol, SYMBOL_TRADE_FREEZE_LEVEL), reason);
+     }
+
    bool CalculateTarget(const PMPosition &position,
                         const bool is_sl,
                         const PMPriceMode mode,

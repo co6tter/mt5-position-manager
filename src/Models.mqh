@@ -203,7 +203,7 @@ struct PMEntryComputation
    bool entry_ok;
    double entry;
    string entry_reason;
-   double effective_tp;     // tp_price as-is (Manual/Off), or the freshly computed Auto price.
+   double effective_tp;     // tp_price for Manual, zero for Off, or the freshly computed Auto price.
    bool tp_auto_ok;         // Only meaningful when tp_state == PM_TP_STATE_AUTO.
    string tp_reason;
    PMRRStatus rr_status;

@@ -972,15 +972,13 @@ void TestEntryPricingAndRiskHelpers()
    AssertTrue(!PMCalculateRiskLot(100.0, 1.0, 250.0, 0.01, 100.0, 0.0, lot, estimated_loss, reason),
               "A non-positive volume step fails");
 
-   // Non-finite inputs (NaN / Infinity) must fail the same as non-positive
-   // ones. A literal "1.0 / 0.0" is a compile-time constant division in
-   // MQL5, so route the zero through a variable to force a runtime IEEE-754
-   // division instead (MathIsValidNumber() exists precisely because this is
-   // a real, reachable value -- not a crash -- for both double division and
-   // MQL5's own float arithmetic).
-   double zero_divisor = 0.0;
-   double not_a_number = 0.0 / zero_divisor;
-   double positive_infinity = 1.0 / zero_divisor;
+   // MQL5 terminates on division by zero. These math functions return
+   // NaN/Infinity without terminating the script (see the MQL5 reference).
+   double not_a_number = MathArcsin(2.0);
+   double positive_infinity = MathExp(1000.0);
+   AssertTrue(!MathIsValidNumber(not_a_number) && !MathIsValidNumber(positive_infinity) &&
+              positive_infinity > 0.0,
+              "Non-finite fixtures are generated without division by zero");
    AssertTrue(!PMCalculateRiskLot(not_a_number, 1.0, 250.0, 0.01, 100.0, 0.01, lot, estimated_loss, reason) &&
               lot == 0.0 && estimated_loss == 0.0,
               "A non-finite budget (NaN) fails");
@@ -1032,9 +1030,9 @@ void TestEntryRecomputeOrchestration()
    snapshot.balance = 0.0;
    snapshot.reference_volume = 0.0;
    snapshot.reference_loss = 0.0;
-   snapshot.volume_min = 0.0;
-   snapshot.volume_max = 0.0;
-   snapshot.volume_step = 0.0;
+   snapshot.volume_min = 0.01;
+   snapshot.volume_max = 100.0;
+   snapshot.volume_step = 0.01;
 
    PMRecomputeEntry(snapshot, computation);
    double expected_tp = 0.0;
@@ -1092,7 +1090,7 @@ void TestEntryRecomputeOrchestration()
    PMRecomputeEntry(snapshot, computation);
    AssertTrue(computation.lot_ok && MathAbs(computation.lot - 0.05) < 0.0000001 &&
               computation.estimated_loss == 0.0,
-              "Manual Lot mode uses the manual lot directly and never estimates a loss");
+              "Manual Lot mode preserves an aligned lot and never estimates a loss");
 
    snapshot.manual_lot = 0.0;
    PMRecomputeEntry(snapshot, computation);
@@ -1101,8 +1099,8 @@ void TestEntryRecomputeOrchestration()
 
    snapshot.manual_lot = -1.0;
    PMRecomputeEntry(snapshot, computation);
-   AssertTrue(!computation.lot_ok && computation.lot == -1.0,
-              "A negative Manual Lot fails, and lot mirrors the invalid input verbatim (per spec, unlike Risk mode)");
+   AssertTrue(!computation.lot_ok && computation.lot == 0.0,
+              "A negative Manual Lot fails and clears the computed lot");
 
    // --- 6. Risk Percent mode reproduces acceptance criteria #8 through the full orchestration.
    snapshot.quantity_mode = PM_QUANTITY_RISK_PERCENT;
@@ -1169,6 +1167,119 @@ void TestEntryRecomputeOrchestration()
               "Invalid entry propagates entry_reason into lot_reason, not a generic message");
    AssertTrue(invalid_computation.tp_reason == invalid_computation.entry_reason,
               "Invalid entry propagates entry_reason into tp_reason too");
+  }
+
+void TestEntryReviewRegressions()
+  {
+   double lot = 0.0, loss = 0.0, budget = 0.0, tp = 0.0, rr = 0.0;
+   string reason = "";
+   const double nan_value = MathArcsin(2.0);
+   const double infinity = MathExp(1000.0);
+
+   // The step epsilon must never move a risk lot above the actual budget.
+   const double boundary_budget = 3.999999999;
+   AssertTrue(PMCalculateRiskLot(boundary_budget, 1.0, 100.0, 0.01, 100.0, 0.01,
+                                lot, loss, reason) &&
+              MathAbs(lot - 0.03) < 0.0000001 && loss <= boundary_budget,
+              "A budget just below a volume boundary stays below the boundary");
+   AssertTrue(PMCalculateRiskLot(100.0, 1.0, 250.0, 0.01, 100.0, 0.01,
+                                lot, loss, reason) && lot == 0.40 && loss <= 100.0,
+              "An exact budget boundary keeps the full affordable volume");
+   AssertTrue(PMCalculateRiskLot(200.0, 1.0, 100.0, 0.01, 0.99, 0.03,
+                                lot, loss, reason) && MathAbs(lot - 0.97) < 0.0000001,
+              "Risk volume respects an off-grid maximum and non-decimal step");
+   AssertTrue(!PMCalculateRiskLot(1e308, 100.0, 1.0, 0.01, 100.0, 0.01,
+                                 lot, loss, reason) && lot == 0.0 && loss == 0.0,
+              "Overflow in the raw risk lot does not become an accepted maximum lot");
+   AssertTrue(!PMCalculateRiskLot(1e308, 1e-308, 1e-308, 0.01, 100.0, 0.01,
+                                 lot, loss, reason) && lot == 0.0 && loss == 0.0,
+              "Overflow in the loss estimate cannot be returned as a successful sizing");
+   AssertTrue(PMCalculateRiskBudget(PM_QUANTITY_RISK_PERCENT, 0.0, 1e308, 100.0,
+                                   budget, reason) && MathIsValidNumber(budget) && budget == 1e308,
+              "A finite percent budget avoids overflowing the intermediate product");
+   AssertTrue(!PMCalculateRiskBudget(PM_QUANTITY_RISK_PERCENT, 0.0, 1e-308, 1e-308,
+                                    budget, reason) && budget == 0.0,
+              "A percent budget that underflows to zero is unavailable");
+
+   AssertTrue(!PMCalculateAutoTakeProfit(PM_ENTRY_BUY, 100.0, 98.0, 1.0,
+                                         nan_value, 0.01, 2, 0, 0, tp, reason) && tp == 0.0,
+              "Auto TP rejects a non-finite point size");
+   AssertTrue(!PMCalculateAutoTakeProfit(PM_ENTRY_BUY, 100.0, 98.0, 1.0,
+                                         0.01, nan_value, 2, 0, 0, tp, reason) && tp == 0.0,
+              "Auto TP rejects a non-finite tick size");
+   AssertTrue(!PMCalculateAutoTakeProfit(PM_ENTRY_BUY, 100.0, 98.0, 1.0,
+                                         0.01, infinity, 2, 0, 0, tp, reason) && tp == 0.0,
+              "Auto TP rejects an infinite tick size");
+   AssertTrue(!PMCalculateAutoTakeProfit(PM_ENTRY_BUY, 100.0, 98.0, 1.0,
+                                         0.01, 1e-308, 2, 0, 0, tp, reason) && tp == 0.0,
+              "Auto TP rejects overflow during tick normalization");
+   AssertTrue(!PMCalculateAutoTakeProfit(PM_ENTRY_BUY, 100.0, 98.0, 1.0,
+                                         1e308, 0.01, 2, 100, 0, tp, reason) && tp == 0.0,
+              "Auto TP rejects overflow in the broker minimum distance");
+   AssertTrue(PMCalculateCurrentRR(PM_ENTRY_BUY, 100.0, nan_value, 102.0, rr, reason) == PM_RR_INVALID,
+              "An invalid SL is distinguished from a canceled SL");
+
+   PMEntrySnapshot snapshot = {};
+   snapshot.order_type = PM_ENTRY_ORDER_MARKET;
+   snapshot.side = PM_ENTRY_BUY;
+   snapshot.bid = 99.95;
+   snapshot.ask = 100.0;
+   snapshot.quantity_mode = PM_QUANTITY_MANUAL_LOT;
+   snapshot.manual_lot = 0.037;
+   snapshot.volume_min = 0.01;
+   snapshot.volume_max = 1.0;
+   snapshot.volume_step = 0.01;
+   snapshot.tp_state = PM_TP_STATE_OFF;
+   // Retaining the old input text must not reactivate a canceled TP.
+   snapshot.tp_price = 104.0;
+   PMEntryComputation computation = {};
+   PMRecomputeEntry(snapshot, computation);
+   AssertTrue(computation.lot_ok && computation.lot == 0.04,
+              "Recompute normalizes manual volume to the nearest broker step");
+   AssertTrue(computation.effective_tp == 0.0 && computation.rr_status == PM_RR_NOT_AVAILABLE,
+              "TP Off overrides a previously entered TP price");
+   snapshot.manual_lot = 0.001;
+   PMRecomputeEntry(snapshot, computation);
+   AssertTrue(computation.lot_ok && computation.lot == 0.01,
+              "Manual volume below Min retains the existing clamp behavior");
+   snapshot.manual_lot = 2.0;
+   PMRecomputeEntry(snapshot, computation);
+   AssertTrue(computation.lot_ok && computation.lot == 1.0,
+              "Manual volume above Max retains the existing clamp behavior");
+   snapshot.volume_step = 0.0;
+   PMRecomputeEntry(snapshot, computation);
+   AssertTrue(!computation.lot_ok && computation.lot == 0.0 && computation.lot_reason != "",
+              "Missing broker volume settings invalidate a manual computation");
+
+   // Canceling SL preserves the generated TP; restoring SL does not overwrite it.
+   snapshot.volume_step = 0.01;
+   snapshot.manual_lot = 0.10;
+   snapshot.point = 0.01;
+   snapshot.tick_size = 0.01;
+   snapshot.digits = 2;
+   snapshot.sl_price = 98.0;
+   snapshot.tp_state = PM_TP_STATE_AUTO;
+   snapshot.rr_multiplier = 1.0;
+   PMRecomputeEntry(snapshot, computation);
+   snapshot.tp_price = computation.effective_tp;
+   PMTpState next_state = snapshot.tp_state;
+   AssertTrue(PMNextTakeProfitState(snapshot.tp_state, PM_TP_EVENT_SL_CANCELED, false,
+                                    next_state, reason), "SL cancellation is accepted");
+   snapshot.tp_state = next_state;
+   snapshot.sl_price = 0.0;
+   PMRecomputeEntry(snapshot, computation);
+   AssertTrue(computation.lot_ok && computation.effective_tp == 102.0 &&
+              computation.rr_status == PM_RR_NOT_AVAILABLE,
+              "SL cancellation preserves a TP-only manual-lot draft");
+   snapshot.quantity_mode = PM_QUANTITY_RISK_AMOUNT;
+   snapshot.risk_amount = 100.0;
+   PMRecomputeEntry(snapshot, computation);
+   AssertTrue(!computation.lot_ok && computation.lot == 0.0 && computation.effective_tp == 102.0,
+              "SL cancellation disables risk sizing without canceling TP");
+   snapshot.sl_price = 97.0;
+   PMRecomputeEntry(snapshot, computation);
+   AssertTrue(computation.effective_tp == 102.0,
+              "Restoring SL preserves the previously generated manual TP");
   }
 
 void TestPanelLayoutHelpers()
@@ -1375,6 +1486,7 @@ void OnStart()
    TestEntryHelpers();
    TestEntryPricingAndRiskHelpers();
    TestEntryRecomputeOrchestration();
+   TestEntryReviewRegressions();
    TestPanelLayoutHelpers();
    TestInputStepperHelpers();
    TestPriceEditorHelpers();

@@ -2,7 +2,7 @@
 
 ## Overview
 
-保有ポジションの管理・決済とチャート上からの成り行きエントリーを行うMetaTrader 5 Expert Advisorです。Symbol、売買方向、Ticketを指定した手動操作に加え、Auto Close、Equity Guard、Break Even、Trailing Stopを提供します。
+保有ポジションの管理・決済とチャート上からのエントリーを行うMetaTrader 5 Expert Advisorです。Symbol、売買方向、Ticketを指定した手動操作に加え、Market／Limit／Stop注文、リスクベースのLot計算、SL/TPライン編集、Auto Close、Equity Guard、Break Even、Trailing Stopを提供します。
 
 ## Tech Stack
 
@@ -88,7 +88,7 @@ Pure Testsをコンパイルする場合は、次のように`-SourcePath`を指
 
 `scripts/compile.ps1`は、MetaEditorの終了コードが0以外の場合、またはログに単語境界付きの`0 errors`が含まれない場合に失敗として扱います。
 
-MT5がない環境では、Python 3とC++17コンパイラで`python3 tests/run-price-editor-tests.py`を実行できます。実際のヘルパーと共通テストを使い、増減・ドラッグ状態・損益集計・ラベル配置の純粋ロジックを確認します。MQL5のコンパイル、チャートイベント、実際の表示・取引APIの検証は含みません。
+MT5がない環境では、Python 3とC++17コンパイラで`python3 tests/run-price-editor-tests.py`を実行できます。実際のヘルパーと共通テストに加え、Entryの入力状態・計算サービス・UI操作・ドラッグ処理・注文送信メソッドを、取引要求を記録する代替APIで検証します。6種類の注文とSL/TPの4通りの組み合わせ、キャンセル、RR、リスクLot、入力確定、拒否時の送信抑止を確認します。MQL5のコンパイル、実端末のイベント順序・表示・取引APIの検証は含みません。
 
 Trailの補助確認には`python3 tests/run-trailing-stop-tests.py`を使えます。実際の候補計算・サービスコードと共通テストをC++へ変換し、平均／個別の判定、候補検証の単位、pending除外、SL後退防止とTP保持を確認します。端末・検証・取引APIはテスト用の代替実装であり、MQL5コンパイルや実際の取引・描画の検証は含みません。
 
@@ -100,7 +100,10 @@ EAをチャートへ適用し、AutoTradingを有効にします。SymbolやDire
 
 パネルは内側に余白を持っています。`Entry`、`Positions`、`SL/TP`、`Auto Close`、`Equity Guard`、`Trail`のタブは、選択中だけ明るい青色・白文字で強調されます。タイトルバーの`-`で折り畳め、折り畳み中もタイトルバーをドラッグして移動できます。
 
-- `Entry`: チャート銘柄の最新Bid/Askを表示し、Lot、初期SL/TP（points）を指定して、MT5と同じ左`SELL MARKET` / 右`BUY MARKET`の順で実行します。確認ダイアログはありません。LotとSL/TP pointsは`-` / `+`をクリックして変更でき、SL/TPは注文直前の最新価格から計算されます。0 pointsは該当SL/TPなしです。
+- `Entry`: Market／Limit／StopとBuy／Sellを選び、Limit／StopではPriceを入力します。選択中の注文に対応したボタンから送信します。MarketのPriceは参照表示です。
+- EntryのSL／TPは独立したPrice／Points入力と`-` / `+`、`Set SL`／`Set TP`で設定し、チャート上のライン／ラベルをドラッグして価格を確定できます。`Clear SL`／`Clear TP`は片方だけを解除します。未設定側は0として送信されます。
+- SL設定時の自動TPは既定RR 1:1です。TPを直接入力・ドラッグすると価格が手動固定され、SL変更やドラッグ中も現在RRを確認できます。RR編集だけでは手動固定・キャンセルを解除せず、有効なSLがあるときに`Restore Auto`で自動計算へ戻します。SLを解除しても生成済みのTPは残ります。
+- 数量はManual Lot／Risk Amount／Risk Percentを切り替えられます。リスク方式ではSL到達損失を口座通貨で見積もり、予算以下へ切り下げたLotを読み取り専用で表示します。SL未設定・計算不能時は`N/A`となり送信を止めます。Manual LotではSLのみ・TPのみ・両方・両方なしで注文できます。Entryの送信には確認ダイアログはありません。
 - `Positions`: Position行をクリックして選択・選択解除します。Symbol、Long/Short、Lot、Entry、SL、TP、Profit、Ticketを1行に表示し、Longは緑、Shortは赤で表示します。価格は銘柄のDigitsを保持します（例: `TP=159.520`）。
 
 - `Close Now`: 上部のFilterに一致するポジションを確認後に決済します。
@@ -161,13 +164,13 @@ TriggerやDistanceがブローカーのStops Levelより小さい場合、候補
 - Auto CloseはEA、端末、取引サーバー、通信状態に依存します。決済完了を必ず確認してください。
 - EAの停止・再起動後も実行済み状態を永続化する仕様ではありません。再起動時に`Passed`設定が適用されます。
 
-### 成り行きエントリーの注意
+### エントリー注文の注意
 
-成り行き注文は`CTrade::Buy` / `Sell`へ同期送信し、retcode、Deal、Order、約定価格を確認します。BrokerのVolume Min/Max/Step、Stops Level、Freeze Level、Tick Size、取引時間、Algo Trading設定により拒否される場合があります。netting口座では反対売買が既存ポジションの決済または反転になることがあります。実口座へ適用する前に必ずデモ口座で確認してください。
+Entryの全注文は最新の確定入力を再計算し、`OrderCheck()`を通った同一リクエストを`OrderSend()`へ送信します。Limit／Stopの有効期限はGTCです。Order／Deal／retcode、数量、価格を確認し、結果不明や部分約定でも自動再送しません。BrokerのVolume Min/Max/Step、Stops Level、Freeze Level、Tick Size、注文方式、取引時間、Algo Trading設定により拒否される場合があります。リスク計算は`OrderCalcProfit()`による手数料・Swapを含まない概算です。netting口座では反対売買が既存ポジションの決済または反転になることがあります。実口座へ適用する前に必ずデモ口座で確認してください。
 
 ### 非対象
 
-自動売買戦略、インジケーター、Risk %、Partial Close、Pending Order管理、Magic Numberフィルタは対象外です。
+自動売買戦略、インジケーター、Stop Limit注文、未約定注文の一覧・変更・削除UI、Partial Close、Magic Numberフィルタは対象外です。
 
 ## Directory Structure
 
@@ -177,6 +180,8 @@ TriggerやDistanceがブローカーのStops Levelより小さい場合、候補
 │   ├── PositionManager.mq5       # EAエントリーポイントとタイマー
 │   ├── PositionService.mqh       # ポジションとSymbolの収集
 │   ├── TradeManager.mqh          # Ticket単位の決済・変更とTrade結果確認
+│   ├── EntryDraft.mqh            # Entryの確定入力と独立したSL/TP状態
+│   ├── EntryService.mqh          # Entry価格・リスクLot・概算の共通計算と検証
 │   ├── PositionActionService.mqh # 一括SL / TP操作の検証・結果集計
 │   ├── ValidationService.mqh     # SL / TPの価格・Broker制約検証
 │   ├── SessionService.mqh        # 取引セッション終了時刻の取得

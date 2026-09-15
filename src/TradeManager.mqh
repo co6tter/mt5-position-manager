@@ -126,66 +126,73 @@ public:
                         1, wait_only, failure);
      }
 
-   bool OpenMarket(const string symbol,
-                   const PMEntrySide side,
-                   const double volume,
-                   const double sl,
-                   const double tp,
-                   PMMarketEntryResult &result)
+   bool SubmitEntry(const string symbol, const PMEntrySnapshot &snapshot,
+                     const PMEntryComputation &computed, PMMarketEntryResult &result)
      {
       PMResetMarketEntryResult(result);
-      if(symbol == "" || !MathIsValidNumber(volume) || volume <= 0.0 ||
-         !MathIsValidNumber(sl) || sl < 0.0 ||
-         !MathIsValidNumber(tp) || tp < 0.0 ||
-         (side != PM_ENTRY_BUY && side != PM_ENTRY_SELL))
+      if(!computed.entry_ok || !computed.lot_ok || symbol == "" ||
+         !MathIsValidNumber(computed.lot) || computed.lot <= 0.0 ||
+         !PMValidateEntryGeometry(snapshot.order_type, snapshot.side, computed.entry,
+                                  snapshot.bid, snapshot.ask, snapshot.sl_price, computed.effective_tp,
+                                  snapshot.point, snapshot.tick_size, snapshot.digits,
+                                  snapshot.stops_level, snapshot.freeze_level, result.description))
         {
-         result.description = "Entry symbol, side, volume, SL, or TP is invalid.";
-         PrintFormat("[ERROR] Market entry rejected before send symbol=%s volume=%s sl=%s tp=%s side=%d description=%s",
-                     symbol, DoubleToString(volume, 8), DoubleToString(sl, 8),
-                     DoubleToString(tp, 8), (int)side,
-                     result.description);
+         if(result.description == "") result.description = "Entry computation is invalid.";
          return false;
         }
-      CTrade entry_trade;
-      entry_trade.SetAsyncMode(false);
-      entry_trade.SetDeviationInPoints(m_deviation_points);
-      entry_trade.LogLevel(LOG_LEVEL_ERRORS);
-      ResetLastError();
-      if(!entry_trade.SetTypeFillingBySymbol(symbol))
+      const bool market = snapshot.order_type == PM_ENTRY_ORDER_MARKET;
+      const bool buy = snapshot.side == PM_ENTRY_BUY;
+      MqlTradeRequest request = {};
+      MqlTradeResult response = {};
+      request.action = market ? TRADE_ACTION_DEAL : TRADE_ACTION_PENDING;
+      request.symbol = symbol;
+      request.volume = computed.lot;
+      request.price = computed.entry;
+      request.sl = snapshot.sl_price;
+      request.tp = computed.effective_tp;
+      request.type = market ? (buy ? ORDER_TYPE_BUY : ORDER_TYPE_SELL) :
+                     snapshot.order_type == PM_ENTRY_ORDER_LIMIT ?
+                     (buy ? ORDER_TYPE_BUY_LIMIT : ORDER_TYPE_SELL_LIMIT) :
+                     (buy ? ORDER_TYPE_BUY_STOP : ORDER_TYPE_SELL_STOP);
+      request.type_time = ORDER_TIME_GTC;
+      request.type_filling = ORDER_FILLING_RETURN;
+      if(market)
         {
-         result.description = "Unable to determine the symbol filling mode.";
-         PrintFormat("[ERROR] Market entry setup failed symbol=%s description=%s last_error=%d",
-                     symbol, result.description, GetLastError());
+         const long filling = SymbolInfoInteger(symbol, SYMBOL_FILLING_MODE);
+         if((filling & SYMBOL_FILLING_FOK) != 0) request.type_filling = ORDER_FILLING_FOK;
+         else if((filling & SYMBOL_FILLING_IOC) != 0) request.type_filling = ORDER_FILLING_IOC;
+         else if(SymbolInfoInteger(symbol, SYMBOL_TRADE_EXEMODE) == SYMBOL_TRADE_EXECUTION_MARKET)
+           { result.description = "The symbol has no supported market filling mode."; return false; }
+        }
+      request.deviation = m_deviation_points;
+      request.comment = "MT5 Position Manager";
+      MqlTradeCheckResult check = {};
+      ResetLastError();
+      if(!OrderCheck(request, check) || (check.retcode != 0 && check.retcode != TRADE_RETCODE_DONE))
+        {
+         result.retcode = check.retcode;
+         result.description = check.comment == "" ? "Entry order check failed." : check.comment;
+         PrintFormat("[ERROR] Entry check symbol=%s type=%d retcode=%u error=%d description=%s",
+                     symbol, (int)request.type, result.retcode, GetLastError(), result.description);
          return false;
         }
-
       ResetLastError();
-      const bool request_ok = side == PM_ENTRY_BUY ?
-         entry_trade.Buy(volume, symbol, 0.0, sl, tp, "MT5 Position Manager") :
-         entry_trade.Sell(volume, symbol, 0.0, sl, tp, "MT5 Position Manager");
-      const int last_error = GetLastError();
-      result.request_ok = request_ok;
-      result.retcode = entry_trade.ResultRetcode();
-      result.description = entry_trade.ResultRetcodeDescription();
-      result.deal = entry_trade.ResultDeal();
-      result.order = entry_trade.ResultOrder();
-      result.volume = entry_trade.ResultVolume();
-      result.price = entry_trade.ResultPrice();
-      if(request_ok && PMIsMarketEntrySuccessRetcode(result.retcode))
-        {
-         PrintFormat("[INFO] Market %s accepted symbol=%s requested_volume=%s result_volume=%s price=%s sl=%s tp=%s deal=%I64u order=%I64u retcode=%u",
-                     side == PM_ENTRY_BUY ? "Buy" : "Sell", symbol,
-                     DoubleToString(volume, 8), DoubleToString(result.volume, 8),
-                     DoubleToString(result.price, 8),
-                     DoubleToString(sl, 8), DoubleToString(tp, 8),
-                     result.deal, result.order, result.retcode);
-         return true;
-        }
-      PrintFormat("[ERROR] Market %s failed symbol=%s volume=%s retcode=%u description=%s last_error=%d",
-                  side == PM_ENTRY_BUY ? "Buy" : "Sell", symbol,
-                  DoubleToString(volume, 8), result.retcode,
-                  result.description, last_error);
-      return false;
+      result.request_ok = OrderSend(request, response);
+      result.retcode = response.retcode;
+      result.description = response.comment;
+      result.deal = response.deal;
+      result.order = response.order;
+      result.volume = response.volume;
+      result.price = response.price;
+      const bool accepted = result.request_ok && PMIsMarketEntrySuccessRetcode(response.retcode);
+      if(!accepted && result.description == "") result.description = "Entry failed or result unknown; check the terminal before resubmitting.";
+      PrintFormat("[%s] Entry symbol=%s type=%d requested_volume=%s result_volume=%s requested_price=%s result_price=%s sl=%s tp=%s deal=%I64u order=%I64u retcode=%u description=%s",
+                  accepted ? "INFO" : "ERROR", symbol, (int)request.type,
+                  DoubleToString(request.volume, 8), DoubleToString(result.volume, 8),
+                  DoubleToString(request.price, 8), DoubleToString(result.price, 8),
+                  DoubleToString(request.sl, 8), DoubleToString(request.tp, 8),
+                  result.deal, result.order, result.retcode, result.description);
+      return accepted;
      }
 
    int ProcessRetries(const datetime now, string &status_text)

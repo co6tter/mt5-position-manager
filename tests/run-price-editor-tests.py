@@ -3,7 +3,8 @@
 
 Checks the Trail control grouping/defaults, then compiles the actual MQL helper
 bodies and shared test functions as C++. It does not validate MQL compilation,
-chart events, font metrics, trade APIs, or any other MT5 integration.
+native chart/font behavior or live trade APIs. Entry UI actions, drag handlers,
+sizing and request submission are also exercised against a recording API boundary.
 Requires Python 3 and a C++17 compiler (CXX, clang++, or g++).
 """
 
@@ -45,8 +46,23 @@ def verify_trail_layout(ui: str) -> None:
         raise AssertionError("Trail Basis must initially display Per Position")
 
 
+def verify_entry_controls(ui: str) -> None:
+    """Protect the Entry contract and prevent the old points-only labels returning."""
+    if 'CreateLabel("ENTRY_SL_LABEL", "SL"' not in ui:
+        raise AssertionError("Entry SL label must be SL")
+    if 'CreateLabel("ENTRY_TP_LABEL", "TP"' not in ui:
+        raise AssertionError("Entry TP label must be TP")
+    if '"SL pts"' in ui or '"TP pts"' in ui:
+        raise AssertionError("Entry labels must not contain pts")
+    for control in ("ENTRY_TYPE", "ENTRY_SIDE", "ENTRY_ORDER_PRICE", "ENTRY_QTY_MODE",
+                    "ENTRY_RISK", "ENTRY_RISK_DEC", "ENTRY_RISK_INC", "ENTRY_RR", "ENTRY_AUTO_TP",
+                    "ENTRY_SL_CLEAR", "ENTRY_TP_CLEAR", "ENTRY_SL_SET", "ENTRY_TP_SET", "ENTRY_SL_MODE", "ENTRY_TP_MODE", "ENTRY_LIMIT", "ENTRY_STOP"):
+        if f'"{control}"' not in ui:
+            raise AssertionError(f"Missing Entry control: {control}")
+
+
 def function(source: str, name: str) -> str:
-    match = re.search(r"^\w+\s+" + re.escape(name) + r"\s*\(", source, re.M)
+    match = re.search(r"^\s*\w+\s+" + re.escape(name) + r"\s*\(", source, re.M)
     if not match:
         raise ValueError(f"Missing function: {name}")
     start = source.index("{", match.end())
@@ -94,25 +110,41 @@ def main() -> None:
     helpers = (ROOT / "src/Constants.mqh").read_text()
     models = (ROOT / "src/Models.mqh").read_text()
     tests = (ROOT / "tests/PositionManagerPureTests.mq5").read_text()
-    verify_trail_layout((ROOT / "src/UiPanel.mqh").read_text())
+    ui_source = (ROOT / "src/UiPanel.mqh").read_text()
+    verify_trail_layout(ui_source)
+    verify_entry_controls(ui_source)
     enum_names = ["PMEntrySide", "PMEntryOrderType", "PMQuantityMode", "PMEntryInputUnit",
                   "PMTpState", "PMTpEvent", "PMRRStatus"]
-    struct_names = ["PMEntrySnapshot", "PMEntryComputation"]
+    struct_names = ["PMEntrySnapshot", "PMEntryComputation", "PMMarketEntryResult"]
     helper_names = ["PMStepInteger", "PMStepDecimal", "PMPriceEditorStep", "PMShiftPriceEditorValue",
-                    "PMNormalizePrice", "PMCalculateAssumedEntryPrice", "PMIsStopLossOnLossSide",
+                    "PMNormalizePrice", "PMNormalizeVolume", "PMCalculateAssumedEntryPrice", "PMIsStopLossOnLossSide",
                     "PMIsTakeProfitOnProfitSide", "PMCalculateCurrentRR", "PMCalculateAutoTakeProfit",
                     "PMNextTakeProfitState", "PMCalculateRiskBudget", "PMCalculateRiskLot",
-                    "PMRecomputeEntry"]
+                    "PMRecomputeEntry", "PMIsUnsignedIntegerText", "PMIsUnsignedDecimalText",
+                    "PMValidateEntryGeometry", "PMResetMarketEntryResult", "PMIsMarketEntrySuccessRetcode"]
     test_names = ["TestInputStepperHelpers", "TestPriceEditorHelpers",
                   "TestPriceDragLifecycle", "TestPriceEstimateAggregation", "TestPriceLabelPlacement",
-                  "TestEntryPricingAndRiskHelpers", "TestEntryRecomputeOrchestration"]
+                  "TestEntryPricingAndRiskHelpers", "TestEntryRecomputeOrchestration",
+                  "TestEntryReviewRegressions"]
     prelude = r"""
 #include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <string>
 #include <type_traits>
+#include <sstream>
+#include <iomanip>
+#include <map>
+using ushort = unsigned short;
+using ulong = unsigned long;
+const unsigned int TRADE_RETCODE_DONE = 10009, TRADE_RETCODE_DONE_PARTIAL = 10010, TRADE_RETCODE_PLACED = 10008;
+
 using string = std::string;
+int StringLen(const string &s) { return (int)s.size(); }
+ushort StringGetCharacter(const string &s, int i) { return s.at(i); }
+double StringToDouble(const string &s) { try { return std::stod(s); } catch (...) { return 0.0; } }
+string DoubleToString(double v, int digits) { std::ostringstream s; s << std::fixed << std::setprecision(digits) << v; return s.str(); }
+template<class T, size_t N> int ArraySize(const T (&)[N]) { return (int)N; }
 template<class A, class B> auto MathMax(A a, B b) {
     using T = std::common_type_t<A, B>; return std::max(T(a), T(b));
 }
@@ -123,6 +155,8 @@ double MathAbs(double v) { return std::abs(v); }
 double MathCeil(double v) { return std::ceil(v); }
 double MathFloor(double v) { return std::floor(v); }
 double MathRound(double v) { return std::round(v); }
+double MathArcsin(double v) { return std::asin(v); }
+double MathExp(double v) { return std::exp(v); }
 bool MathIsValidNumber(double v) { return std::isfinite(v); }
 double NormalizeDouble(double v, int digits) {
     const double scale = std::pow(10.0, digits);
@@ -135,11 +169,51 @@ void AssertTrue(bool condition, const string &name) {
     if (!condition) { ++failures; std::cerr << "[FAIL] " << name << '\n'; }
 }
 """
+    for constant in ("PM_MAX_TRAILING_POINTS", "PM_MAX_EQUITY_THRESHOLD"):
+        prelude += re.search(r"^#define " + constant + r" .*", helpers, re.M).group(0) + "\n"
     source = prelude + "\n".join(enum_block(models, name) for name in enum_names) + "\n"
     source += "\n".join(struct_block(models, name) for name in struct_names) + "\n"
     source += "\n".join(function(helpers, name) for name in helper_names)
     source += "\n" + "\n".join(function(tests, name) for name in test_names)
+    # Compile actual Entry state/service and UI action bodies against a recording
+    # MT5 boundary. No orders leave this process.
+    boundary = (ROOT / "tests/entry-test-boundary.cpp").read_text()
+    source += "\n" + boundary
+    def without_includes(path: str) -> str:
+        return "\n".join(line for line in (ROOT / path).read_text().splitlines()
+                         if not line.startswith("#include"))
+    source += "\n" + without_includes("src/EntryDraft.mqh")
+    source += "\nclass CValidationService { public:\n" + function((ROOT / "src/ValidationService.mqh").read_text(), "ValidateEntryPrices") + "\n};\n"
+    source += without_includes("src/EntryService.mqh")
+    source += "\nclass CTradeManager { public: int m_deviation_points = 10;\n" + function((ROOT / "src/TradeManager.mqh").read_text(), "SubmitEntry") + "\n};\n"
+    ui_methods = ["EntryRRText", "RefreshEntryComputation", "EntryStopSuffix", "IsEntrySendButton", "WriteEntryStops",
+                  "CommitEntryEditor", "CommitEntryEditors", "SetEntryStop", "SwitchEntryUnit", "StepEntryInput",
+                  "HandleEntryClick", "OpenEntry", "VolumeDigits", "HandlePriceMouse", "RenderEntryState", "FitEntryLabel"]
+    source += "\nclass EntryUiHarness { public: CEntryDraft m_entry_draft; CEntryService m_entry_service; PMEntrySnapshot m_entry_snapshot; PMEntryComputation m_entry_result; bool m_entry_valid = false, m_visibility_dirty = false; string m_entry_reason, status; CPriceEditDrag m_price_drag; string Name(const string s) { return s; } void SetStatus(const string s) { status = s; }\n"
+    source += r"""
+    bool m_collapsed = false, m_price_scroll_before = true, m_price_drag_moved = false;
+    int m_active_tab = PM_PANEL_TAB_ENTRY, m_origin_x = 0, m_origin_y = 0, m_panel_width = 560;
+    int m_price_mouse_start_y = 0;
+    double m_price_mouse_start_price = 0;
+    string m_price_line_selection_key = "Entry", m_stop_committed[2];
+    bool m_price_line_visible[2] = {true, true};
+    int m_price_label_x[2] = {800, 800}, m_price_label_y[2] = {200, 250};
+    int m_price_label_width[2] = {100, 100}, m_price_label_height[2] = {40, 40};
+    int m_price_line_y[2] = {200, 250};
+    double m_price_line_price[2] = {98, 102};
+    bool EntryPriceContext() { return m_active_tab == PM_PANEL_TAB_ENTRY; }
+    bool SelectedPriceSymbol() { return true; }
+    int PanelHeight() { return 350; }
+    string StopSuffix(int i) { return i == 0 ? "SL_VALUE" : "TP_VALUE"; }
+    void SyncPriceContext() {} // Tests below keep the interaction context fixed.
+    bool PriceText(const string name, const string text) { return ObjectSetString(0, name, OBJPROP_TEXT, text); }
+    bool PriceInteger(const string name, int property, long value) { object_properties[{name, property}] = value; return true; }
+    void Render() { RenderEntryState(); }
+"""
+    source += "\n".join(function(ui_source, name) for name in ui_methods) + "\n};\n"
+    source += (ROOT / "tests/entry-integration-tests.cpp").read_text()
     source += "\nint main() {\n" + "\n".join(name + "();" for name in test_names)
+    source += "\nTestEntryIntegration();\n"
     source += r"""
 std::cout << assertions << " portable assertions, " << failures << " failures\n";
 return failures ? 1 : 0;
