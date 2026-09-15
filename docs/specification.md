@@ -62,7 +62,7 @@ Auto Closeと同様にOnTimer駆動の自動処理とし、確認ダイアログ
 
 ## Trailing Stop / Break Even
 
-対象は1つのSymbol・Directionを選択し、Auto Closeと同様に他の選択（Filter等）とは独立に保持する。加えて、計算基準（Basis）を`Average`（既定・ゼロ値）と`Per Position`から1つ選び、Break EvenとTrailingで共有する。`Basis`はボタンクリックのたびに交互に切り替わり、タブ切替・パネルの移動・折り畳み・リサイズでは値を保持するが、EAの再初期化では他のTrail設定と同じライフサイクルに従い`Average`へ戻る。稼働中の切り替えは次回のTimer評価以降の新規判定にのみ反映し、切り替え自体は取引要求を出さず、既存のSL・TP・ON/OFF・入力値を変更しない。切り替え前にキューへ入っていた再試行は、既存の再試行規則に従って完了する。
+対象は1つのSymbol・Directionを選択し、Auto Closeと同様に他の選択（Filter等）とは独立に保持する。加えて、計算基準（Basis）を`Per Position`（既定・ゼロ値）と`Average`から1つ選び、Break EvenとTrailingで共有する。`Basis`はボタンクリックのたびに交互に切り替わり、タブ切替・パネルの移動・折り畳み・リサイズでは値を保持するが、EAの再初期化では他のTrail設定と同じライフサイクルに従い`Per Position`へ戻る。稼働中の切り替えは次回のTimer評価以降の新規判定にのみ反映し、切り替え自体は取引要求を出さず、既存のSL・TP・ON/OFF・入力値を変更しない。切り替え前にキューへ入っていた再試行は、既存の再試行規則に従って完了する。
 
 `Average`では、同じSymbol・同じDirectionのポジションを1つのバスケットとして扱い、BuyとSellは別々に集計する。バスケットのVolume加重平均建値から現在価格がBreak Even Triggerに達したら、加重平均建値からLock分有利な共通SL候補とする。Trailingはバスケットの加重平均建値から現在価格がTrailing Triggerに達したら開始し、現在価格からTrailing Distance分の共通SL候補とする。共通SLは加重平均建値より不利にはしないが、個別ポジションの建値より不利な位置になることがある。バスケット内に未解決の決済・変更要求があるTicketが1件でもある場合、その周期はバスケット全体を処理しない。
 

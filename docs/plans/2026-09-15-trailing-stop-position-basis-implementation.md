@@ -35,7 +35,7 @@ Trailタブに、Break Even・Trailingの計算基準を「平均建値」と「
 ## 前提
 
 - 「各ポジションごと」は、共通の数値設定を各Ticketの建値に対して評価する意味とする。
-- 基準ボタンはBE・Trailingで1つを共有する。初期値は互換性を保つ「平均建値」。英語UIの表示案は`Basis`ラベルと、クリックで`Average` / `Per Position`が交互に切り替わるボタン。
+- 基準ボタンはBE・Trailingで1つを共有する。実装時の初期値は`Per Position`とする。英語UIの表示案は`Basis`ラベルと、クリックで`Average` / `Per Position`が交互に切り替わるボタン。
 - タブ切替・移動・折り畳み・リサイズでは基準を保持する。EA再初期化時は既存のTrail設定と同じライフサイクルに従い、平均基準へ戻す。
 - 稼働中も基準を変更できる。次回Timerの新規評価から反映し、切替そのものでは取引要求を出さず、既存SL・TPやON/OFF・入力値を変更しない。
 - 切替前にキューへ入った要求は既存のリトライ規則に従って完了させる。基準切替を過去の要求の取消しとは扱わず、この点を利用説明に記載する。
@@ -50,7 +50,7 @@ Trailタブに、Break Even・Trailingの計算基準を「平均建値」と「
 
 ## 受け入れ条件
 
-1. 初期表示は`Average`で、1クリックにつき`Per Position`との切替が1回発生し、表示と`TrailingStopConfig`の値が一致する。
+1. 初期表示は`Per Position`で、1クリックにつき`Average`との切替が1回発生し、表示と`TrailingStopConfig`の値が一致する。
 2. 平均基準では同一Symbol・方向のVolume加重平均建値、候補選択、バスケット単位のpending除外が従来どおり働く。Lotの異なる複数ポジションで確認する。
 3. 個別基準のBEでは、各Ticket自身の建値からTriggerへ到達したTicketだけに、その建値±LockのSL候補を適用する。他Ticketが発動しても未到達Ticketは更新しない。
 4. 個別基準のTrailingでは、各Ticket自身のTrigger条件と建値保護条件の両方を満たしたTicketだけが現在価格∓Distanceで追従する。BEとの候補比較・検証失敗時の代替候補もTicketごとに行う。

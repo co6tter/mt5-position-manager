@@ -137,7 +137,7 @@ Max Loss / Max Profitへの入力は、Tab／Enter／欄外クリックで確定
 
 ### Trailing Stop / Break Even
 
-Break EvenとTrailingは1つのSymbol・Direction選択と1つの計算基準（`Basis`）を共有し、Filter・Auto Close・Equity Guardの選択とは独立です。`Basis`は`Average`（既定）と`Per Position`をボタンクリックのたびに切り替えます。
+Break EvenとTrailingは1つのSymbol・Direction選択と1つの計算基準（`Basis`）を共有し、Filter・Auto Close・Equity Guardの選択とは独立です。`Basis`は`Per Position`（既定）と`Average`をボタンクリックのたびに切り替えます。
 
 `Average`では、同じSymbol・Directionに複数ポジションがある場合は1つのバスケットとして扱い、BuyとSellは別バスケットです。Break Evenは、バスケットのVolume加重平均建値から現在価格がTrigger（pips）以上有利に動いたら、加重平均建値からLock（pips）分有利な共通SLを全Ticketへ設定します。Trailingは、バスケットの加重平均建値から現在価格がTrigger（pips）以上有利に動いたら、現在価格からDistance（pips）分の共通SLで全Ticketの追従を開始します。共通SLはバスケット全体の加重平均建値より不利にはしませんが、個別の高値掴みポジションでは建値より不利な位置になる場合があります。
 
@@ -147,7 +147,7 @@ Trailing Triggerが未入力または0の場合は、Distanceを開始条件に�
 
 両方（Break EvenとTrailing）を同時に有効にした場合は、判定単位（`Average`はバスケット、`Per Position`は各Ticket）ごとにその時点でより有利な方を採用します。Stops Level・Freeze Levelにより候補が拒否される場合は、もう一方の候補を試します。`Average`ではバスケット内に決済または変更の未解決要求があるTicketが1件でもあれば、そのバスケット全体をそのTimer周期の対象から除外します。`Per Position`では未解決要求のあるTicketだけを除外し、同じSymbol・方向の他Ticketは評価を続けます。
 
-`Basis`の切り替えはタブ切替・パネルの移動・折り畳み・リサイズでは保持されますが、EAの再初期化（Symbol・時間足の変更など）では既定の`Average`に戻ります。稼働中に切り替えても次回のTimer評価から新しい基準が使われるだけで、切り替え自体が取引要求を出すことはなく、既存のSL・TP・ON/OFF・入力値も変更しません。切り替え前にキューへ入っていた再試行は、既存の再試行規則に従って完了します。
+`Basis`の切り替えはタブ切替・パネルの移動・折り畳み・リサイズでは保持されますが、EAの再初期化（Symbol・時間足の変更など）では既定の`Per Position`に戻ります。稼働中に切り替えても次回のTimer評価から新しい基準が使われるだけで、切り替え自体が取引要求を出すことはなく、既存のSL・TP・ON/OFF・入力値も変更しません。切り替え前にキューへ入っていた再試行は、既存の再試行規則に従って完了します。
 
 TriggerやDistanceがブローカーのStops Levelより小さい場合、候補が却下されてSLが動かないことがあります。ブローカーのStops Level以上の値を設定してください。Trigger / Lock / Distanceへの入力は、Tab／Enter／欄外クリックで確定するまで反映されません。入力単位はpipsです。
 

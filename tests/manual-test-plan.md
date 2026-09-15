@@ -107,7 +107,7 @@ MT5を使わない補助確認は`python3 tests/run-price-editor-tests.py`で実
 
 ## Trailing Stop / Break Even
 
-`Basis`が`Average`（既定）の状態で以下を確認する。
+`Basis`が`Per Position`（既定）の状態で以下を確認する。
 
 1. Break Even・Trailingを両方OFFのまま複数ポジションを保有し、SLが一切変化しないことを確認する。
 2. 同じSymbol・Directionで建値の異なる複数ポジションを用意し、Break EvenをONにしてTrigger/Lockを設定する。加重平均建値からTrigger以上になった瞬間に、対象Ticket全件へ加重平均建値基準の共通SLが1回だけ設定されることを確認する（Expertsログの`[INFO] Position modified...`がTicketごとに出力されること）。
@@ -120,13 +120,13 @@ MT5を使わない補助確認は`python3 tests/run-price-editor-tests.py`で実
 
 `Basis`ボタンとPer Positionモードを以下で確認する。hedging対応のデモ口座で複数Ticketを保有して検証する。
 
-9. Trailタブを開き、初期表示が`Average`であることを確認する。`Basis`ボタンをクリックするたびに`Average`と`Per Position`が交互に切り替わり、表示文字列と実際に適用される基準が一致することを確認する。
+9. Trailタブを開き、初期表示が`Per Position`であることを確認する。`Basis`ボタンをクリックするたびに`Per Position`と`Average`が交互に切り替わり、表示文字列と実際に適用される基準が一致することを確認する。
 10. 同じSymbol・Directionで建値の異なる2Ticket（例: A=1 lot、B=3 lots、Bが不利な建値）を保有し、`Basis`を`Per Position`に切り替える。Break EvenのTrigger/Lockを、Aだけが自身の建値から到達しBは到達しない値に設定し、Aだけにその建値基準のSLが設定され、Bは変更されないことを確認する。
 11. 同じ2Ticketで、TrailingのTrigger/Distanceを両Ticketが自身の建値から到達する値に設定し、両Ticketにそれぞれ現在価格基準のSLが設定されることを確認する（候補価格が同じ値になり得ることも確認する）。
 12. Per Positionのまま、片方のTicketにだけ未解決の変更・決済要求がある状態を作り、そのTicketだけが対象から除外され、同じSymbol・方向の他Ticketは通常どおり評価・更新されることを確認する。
 13. netting口座または単一ポジションで、`Average`と`Per Position`を切り替えても候補・更新結果が一致することを確認する。
 14. Trailingが稼働している状態（Timerが継続している状態）で`Basis`を切り替え、切り替え自体はSL・TP・ON/OFF・入力値を変更せず、次のTimer評価から新しい基準が使われることを確認する。切り替え前にキューへ入っていた再試行が既存の規則どおり完了することも確認する。
-15. チャートSymbol・時間足の変更でEAを再初期化し、`Basis`表示が`Average`へ戻ることを確認する。Entryを含むタブ切替・パネルの移動・折り畳み・リサイズでは`Basis`の選択が保持されることを確認する。
+15. チャートSymbol・時間足の変更でEAを再初期化し、`Basis`表示が`Per Position`へ戻ることを確認する。Entryを含むタブ切替・パネルの移動・折り畳み・リサイズでは`Basis`の選択が保持されることを確認する。
 16. 表示倍率100%・125%・150%、パネル幅560・800・1200pxで両方のBasis表記と4つの最大数値`1000000`を確認する。ON/OFF行と数値行、説明2行、Status、グリップが重ならず、最小幅でも数字が末尾まで見えることを確認する。全タブ切替・折り畳み後に追加部品が残らず、復帰後も表示できることを確認する。
 17. 同じバスケットへの変更送信中に価格が動く状況で、Averageの共通候補がTicketごとに別候補へ切り替わらないことを確認する。Per Positionでは各Ticketごとの候補検証・代替候補が働くことを確認する。決定的な補助確認は`python3 tests/run-trailing-stop-tests.py`で実行できるが、実際の取引APIの確認はMT5で行う。
 

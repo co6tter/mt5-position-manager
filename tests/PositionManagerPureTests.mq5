@@ -277,6 +277,8 @@ void TestPositionBasket()
 
 void TestTrailBasisToggle()
   {
+   AssertTrue(PM_TRAIL_BASIS_PER_POSITION == 0,
+              "Per-position is the zero-value default basis");
    AssertTrue(PMToggleTrailBasis(PM_TRAIL_BASIS_AVERAGE) == PM_TRAIL_BASIS_PER_POSITION,
               "Toggling the average basis selects per-position");
    AssertTrue(PMToggleTrailBasis(PM_TRAIL_BASIS_PER_POSITION) == PM_TRAIL_BASIS_AVERAGE,

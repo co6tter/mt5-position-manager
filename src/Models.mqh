@@ -28,8 +28,9 @@ enum PMEquityThresholdMode
 
 enum PMTrailBasis
   {
-   PM_TRAIL_BASIS_AVERAGE = 0,
-   PM_TRAIL_BASIS_PER_POSITION = 1
+   // Keep the zero value aligned with the requested per-position default.
+   PM_TRAIL_BASIS_PER_POSITION = 0,
+   PM_TRAIL_BASIS_AVERAGE = 1
   };
 
 enum PMPanelTab
