@@ -1224,6 +1224,12 @@ private:
       PriceInteger(Name(suffix), OBJPROP_COLOR, active ? clrWhite : clrSilver);
       PriceInteger(Name(suffix), OBJPROP_FONTSIZE, active ? 9 : 8);
      }
+   // Converting a stop between Pips and Price needs an entry price. Without one the
+   // toggle cannot act, so it reads as unavailable instead of looking live and doing nothing.
+   void SetEntryModeVisual(const string suffix, const bool available)
+     {
+      PriceInteger(Name(suffix), OBJPROP_COLOR, available ? clrWhite : clrSilver);
+     }
    void SetEntrySendVisual(const string suffix, const int side, const color enabled_background)
      {
       PriceInteger(Name(suffix), OBJPROP_BGCOLOR, m_entry_valid[side] ? enabled_background : PM_INACTIVE_TAB_COLOR);
@@ -1292,6 +1298,8 @@ private:
                 " / A " + PMFormatPrice(_Symbol, m_entry_snapshot[reference].ask));
       PriceText(Name("ENTRY_SL_MODE"), m_entry_draft.unit[0] == PM_ENTRY_UNIT_PRICE ? "Price" : "Pips");
       PriceText(Name("ENTRY_TP_MODE"), m_entry_draft.unit[1] == PM_ENTRY_UNIT_PRICE ? "Price" : "Pips");
+      SetEntryModeVisual("ENTRY_SL_MODE", m_entry_result[reference].entry_ok);
+      SetEntryModeVisual("ENTRY_TP_MODE", m_entry_result[reference].entry_ok);
       PriceText(Name("ENTRY_SELL_PREVIEW"), EntryPreviewText((int)PM_ENTRY_SELL));
       PriceText(Name("ENTRY_BUY_PREVIEW"), EntryPreviewText((int)PM_ENTRY_BUY));
       SetEntrySendVisual("ENTRY_SELL", (int)PM_ENTRY_SELL, clrMaroon);
@@ -1752,8 +1760,11 @@ private:
    void StepEntryInput(const string suffix, const int direction)
      {
       const string name = Name(suffix);
+      const string text = ObjectGetString(0, name, OBJPROP_TEXT);
       double value = 0.0;
-      if(!m_entry_draft.Number(ObjectGetString(0, name, OBJPROP_TEXT), true, value))
+      // An empty field means "no value yet", not bad input, so it falls through to the
+      // seeding branch below. Malformed text is still refused and left untouched.
+      if(text != "" && !m_entry_draft.Number(text, true, value))
         { SetStatus("Enter a valid number before using - / +."); return; }
       const bool price = suffix == "ENTRY_ORDER_PRICE" ||
                          (suffix == EntryStopSuffix(0) && m_entry_draft.unit[0] == PM_ENTRY_UNIT_PRICE) ||
@@ -1765,7 +1776,9 @@ private:
          if(value == 0.0)
            {
             if(suffix != "ENTRY_ORDER_PRICE") { SetEntryStop(suffix == EntryStopSuffix(0) ? 0 : 1); return; }
-            MqlTick tick = {}; SymbolInfoTick(_Symbol, tick);
+            MqlTick tick = {};
+            if(!SymbolInfoTick(_Symbol, tick) || tick.bid <= 0.0 || tick.ask <= 0.0)
+              { SetStatus("Current price is unavailable for " + _Symbol + "."); return; }
             value = EntryReferenceSide() == (int)PM_ENTRY_BUY ? tick.ask : tick.bid;
            }
          value = PMShiftPriceEditorValue(value, SymbolInfoDouble(_Symbol, SYMBOL_POINT),

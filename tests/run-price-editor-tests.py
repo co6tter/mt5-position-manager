@@ -243,7 +243,7 @@ void AssertTrue(bool condition, const string &name) {
     source += without_includes("src/EntryService.mqh")
     source += "\nclass CTradeManager { public: int m_deviation_points = 10;\n" + function((ROOT / "src/TradeManager.mqh").read_text(), "SubmitEntry") + "\n};\n"
     ui_methods = ["EntryReferenceSide", "EntrySideName", "EntryRRText", "EntryStopPreview", "EntryPreviewText",
-                  "EntryQuantityModeLabel", "EntryHintText", "SetEntrySubTabColor", "SetEntrySendVisual",
+                  "EntryQuantityModeLabel", "EntryHintText", "SetEntrySubTabColor", "SetEntryModeVisual", "SetEntrySendVisual",
                   "RefreshEntryComputation", "EntryStopSuffix", "IsEntrySendButton", "WriteEntryStops",
                   "CommitEntryEditor", "CommitEntryEditors", "SetEntryStop", "SwitchEntryUnit", "StepEntryInput",
                   "SelectEntryOrderType", "HandleEntryClick", "OpenEntry", "VolumeDigits", "HandlePriceMouse",

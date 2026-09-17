@@ -217,6 +217,72 @@ void TestEntryIntegration() {
     AssertTrue(objects["ENTRY_LOT"] == "0.01" && objects["ENTRY_QTY_MODE"] == "Lot",
                "Returning to Manual restores its original lot instead of a cached risk lot");
 
+    // An empty pending price is the initial Limit/Stop state. The steppers must seed
+    // it from the market; refusing leaves entry_ok false with no way to make it true.
+    ResetBoundary();
+    EntryUiHarness pending_ui;
+    pending_ui.HandleEntryClick("ENTRY_SUB_LIMIT", trades);
+    AssertTrue(objects["ENTRY_ORDER_PRICE"] == "" && pending_ui.m_entry_draft.order_text == "",
+               "The Limit sub-tab starts with no committed pending price");
+    pending_ui.HandleEntryClick("ENTRY_ORDER_INC", trades);
+    AssertTrue(pending_ui.m_entry_draft.order_text == "100.01" && objects["ENTRY_ORDER_PRICE"] == "100.01",
+               "Stepping an empty pending price seeds it from the market and commits it");
+    pending_ui.HandleEntryClick("ENTRY_ORDER_DEC", trades);
+    AssertTrue(pending_ui.m_entry_draft.order_text == "100.00",
+               "Stepping down from the seeded price uses the same tick step");
+    objects["ENTRY_ORDER_PRICE"] = "9x5";
+    pending_ui.HandleEntryClick("ENTRY_ORDER_INC", trades);
+    AssertTrue(objects["ENTRY_ORDER_PRICE"] == "9x5" &&
+               pending_ui.status == "Enter a valid number before using - / +.",
+               "A malformed pending price still refuses to step instead of being overwritten");
+
+    // Converting a stop between Pips and Price needs an entry price. Without one the
+    // toggle must read as unavailable rather than silently doing nothing.
+    ResetBoundary();
+    EntryUiHarness mode_ui;
+    mode_ui.HandleEntryClick("ENTRY_SUB_LIMIT", trades);
+    mode_ui.Render();
+    AssertTrue(objects["ENTRY_SL_MODE"] == "Pips" &&
+               object_properties[{"ENTRY_SL_MODE", OBJPROP_COLOR}] == clrSilver &&
+               object_properties[{"ENTRY_TP_MODE", OBJPROP_COLOR}] == clrSilver,
+               "Without a pending price the SL/TP mode toggles are drawn unavailable");
+    mode_ui.HandleEntryClick("ENTRY_ORDER_INC", trades); mode_ui.Render();
+    AssertTrue(object_properties[{"ENTRY_SL_MODE", OBJPROP_COLOR}] == clrWhite &&
+               object_properties[{"ENTRY_TP_MODE", OBJPROP_COLOR}] == clrWhite,
+               "Seeding the pending price makes the mode toggles available again");
+    mode_ui.HandleEntryClick("ENTRY_SL_MODE", trades); mode_ui.Render();
+    AssertTrue(mode_ui.m_entry_draft.unit[0] == PM_ENTRY_UNIT_PRICE && objects["ENTRY_SL_MODE"] == "Price",
+               "The mode toggle switches as soon as an entry price exists");
+
+    // Both stops must round-trip on both pending sub-tabs. The converted price differs
+    // per tab because Limit/Stop convert against the order price and each tab makes a
+    // different side orderable at the same price.
+    const string pending_tabs[2] = {"ENTRY_SUB_LIMIT", "ENTRY_SUB_STOP"};
+    const string expected_sl[2] = {"100.21", "99.81"};
+    const string expected_tp[2] = {"99.61", "100.41"};
+    const string expected_side[2] = {"SELL", "BUY"};
+    for(int tab = 0; tab < 2; ++tab) {
+        ResetBoundary();
+        EntryUiHarness pending;
+        pending.HandleEntryClick(pending_tabs[tab], trades);
+        pending.HandleEntryClick("ENTRY_ORDER_INC", trades);
+        objects["ENTRY_SL_VALUE"] = "20"; pending.CommitEntryEditor("ENTRY_SL_VALUE");
+        objects["ENTRY_TP_VALUE"] = "40"; pending.CommitEntryEditor("ENTRY_TP_VALUE");
+        pending.Render();
+        AssertTrue(pending.EntrySideName(pending.EntryReferenceSide()) == expected_side[tab],
+                   "A seeded pending price makes exactly one side orderable per sub-tab");
+        pending.HandleEntryClick("ENTRY_SL_MODE", trades);
+        pending.HandleEntryClick("ENTRY_TP_MODE", trades); pending.Render();
+        AssertTrue(objects["ENTRY_SL_MODE"] == "Price" && objects["ENTRY_SL_VALUE"] == expected_sl[tab] &&
+                   objects["ENTRY_TP_MODE"] == "Price" && objects["ENTRY_TP_VALUE"] == expected_tp[tab],
+                   "SL and TP convert to Price against the order price on both pending sub-tabs");
+        pending.HandleEntryClick("ENTRY_SL_MODE", trades);
+        pending.HandleEntryClick("ENTRY_TP_MODE", trades); pending.Render();
+        AssertTrue(objects["ENTRY_SL_MODE"] == "Pips" && objects["ENTRY_SL_VALUE"] == "20" &&
+                   objects["ENTRY_TP_MODE"] == "Pips" && objects["ENTRY_TP_VALUE"] == "40",
+                   "Converting back to Pips restores the original distances without drift");
+    }
+
     // The draft carries no side: Pips prices both sides, an absolute price fixes one.
     ResetBoundary();
     EntryUiHarness side_ui;

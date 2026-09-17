@@ -20,6 +20,8 @@ Before changing panel UI or Trail behavior, read the relevant section of `docs/s
 - The side follows the prices: an unset or Pips SL/TP leaves both sides orderable; an absolute SL/TP price, a dragged line, or a pending order price enables only the side it satisfies. Disable the other button and name it in the hint — never flip or correct a value to make a side fit.
 - Evaluate the draft once per side every refresh. `m_entry_snapshot`, `m_entry_result`, `m_entry_valid` and `m_entry_reason` are indexed by `PMEntrySide`; anything needing a single side uses `EntryReferenceSide()`.
 - Keep the two preview rows always present so the send buttons never move.
+- An empty numeric field is "not entered yet", not bad input: `-`/`+` seeds it from the market and commits. Only malformed text is refused. Limit/Stop start empty, so without this there is no way to reach a valid entry price.
+- A control that cannot act must say so. The Pips/Price toggles grey out while no entry price exists, the way the send buttons grey out for a side that is not orderable.
 - Keep each feature on one row at the 560px minimum width: SL and TP rows are label, mode, `- [value] +`, `Set`, `Clear`.
 
 ## Label conventions
