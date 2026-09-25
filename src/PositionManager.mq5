@@ -60,6 +60,7 @@ void OnDeinit(const int reason)
   {
    EventKillTimer();
    g_ui.SavePosition();
+   g_ui.SaveSettings();
    g_equity_line.Destroy();
    g_ui.Destroy();
   }

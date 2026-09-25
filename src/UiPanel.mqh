@@ -9,6 +9,7 @@
 #include "PositionActionService.mqh"
 #include "PriceEditor.mqh"
 #include "EntryService.mqh"
+#include "PanelSettings.mqh"
 
 class CUiPanel
   {
@@ -45,6 +46,7 @@ private:
    int m_be_lock_pips;
    int m_trail_trigger_pips;
    int m_trail_pips;
+   CPanelSettingsStore m_settings_store;
    int m_max_rows;
    PMPanelTab m_active_tab;
    bool m_collapsed;
@@ -105,27 +107,10 @@ public:
      {
       m_filter_symbol = "";
       m_filter_direction = PM_DIRECTION_BOTH;
-      m_auto_symbol = "";
-      m_auto_direction = PM_DIRECTION_BOTH;
       m_sl_mode = PM_PRICE_ABSOLUTE;
       m_tp_mode = PM_PRICE_ABSOLUTE;
       for(int side = 0; side < 2; side++) { m_entry_valid[side] = false; m_entry_reason[side] = ""; }
-      m_passed_behavior = PM_PASSED_CLOSE_DO_NOTHING;
-      m_auto_minutes = 10;
-      m_auto_enabled = false;
-      m_equity_guard_enabled = false;
-      m_equity_guard_mode = PM_EQUITY_THRESHOLD_AMOUNT;
-      m_equity_guard_loss_threshold = 0.0;
-      m_equity_guard_profit_threshold = 0.0;
-      m_trailing_symbol = "";
-      m_trailing_direction = PM_DIRECTION_BOTH;
-      m_trail_basis = PM_TRAIL_BASIS_PER_POSITION;
-      m_break_even_enabled = false;
-      m_trailing_enabled = false;
-      m_be_trigger_pips = 0;
-      m_be_lock_pips = 0;
-      m_trail_trigger_pips = 0;
-      m_trail_pips = 0;
+      ResetPanelSettingsDefaults();
       m_max_rows = PM_DEFAULT_MAX_ROWS;
       m_active_tab = PM_PANEL_TAB_ENTRY;
       m_collapsed = false;
@@ -201,6 +186,10 @@ public:
       m_origin_y = 0;
       RefreshChartSize();
       LoadPanelPosition();
+      m_settings_store.Configure(ChartID(), AccountInfoInteger(ACCOUNT_LOGIN),
+                                 AccountInfoString(ACCOUNT_SERVER));
+      ResetPanelSettingsDefaults();
+      LoadPanelSettings();
       m_panel_height = ExpandedPanelHeight();
       m_expanded_height = m_panel_height;
       long mouse_move_enabled = 0;
@@ -325,6 +314,7 @@ public:
       for(int line = 0; line < PM_MAX_STATUS_LINES; line++)
          created = CreateLabel("STATUS_LINE_" + IntegerToString(line), "", 14, 0, PM_STATUS_COLOR, PM_STATUS_FONT_SIZE) && created;
       created = CreateLabel("RESIZE_GRIP", "///", m_panel_width - 24, PanelHeight() - 18, clrSilver, 8) && created;
+      WritePanelSettingsInputs();
       UpdateToggleButtonVisual("AUTO_ENABLED", m_auto_enabled);
       UpdateToggleButtonVisual("BE_ENABLED", m_break_even_enabled);
       UpdateToggleButtonVisual("TRAIL_ENABLED", m_trailing_enabled);
@@ -348,6 +338,36 @@ public:
          return;
       GlobalVariableSet(PanelPositionKey("X"), (double)m_origin_x);
       GlobalVariableSet(PanelPositionKey("Y"), (double)m_origin_y);
+     }
+
+   void SaveSettings()
+     {
+      if(!m_created) return;
+      PMPanelSettings settings = {};
+      settings.auto_enabled = m_auto_enabled;
+      settings.auto_symbol = AutoSymbol();
+      settings.auto_direction = m_auto_direction;
+      settings.auto_minutes = m_auto_minutes;
+      settings.passed_behavior = m_passed_behavior;
+      settings.equity_guard_enabled = m_equity_guard_enabled;
+      settings.equity_guard_mode = m_equity_guard_mode;
+      settings.equity_guard_loss_threshold = m_equity_guard_loss_threshold;
+      settings.equity_guard_profit_threshold = m_equity_guard_profit_threshold;
+      settings.trailing_symbol = TrailingSymbol();
+      settings.trailing_direction = m_trailing_direction;
+      settings.trail_basis = m_trail_basis;
+      settings.break_even_enabled = m_break_even_enabled;
+      settings.trailing_enabled = m_trailing_enabled;
+      settings.be_trigger_pips = m_be_trigger_pips;
+      settings.be_lock_pips = m_be_lock_pips;
+      settings.trail_trigger_pips = m_trail_trigger_pips;
+      settings.trail_pips = m_trail_pips;
+      ResetLastError();
+      if(!m_settings_store.Save(settings))
+        {
+         PrintFormat("[ERROR] Automatic panel settings could not be saved. error=%d", GetLastError());
+         SetStatus("Automatic settings could not be saved.");
+        }
      }
 
    void Destroy()
@@ -713,6 +733,7 @@ public:
          StepIntegerInput("TRAIL_DIST_VALUE", m_trail_pips, 1, PM_MAX_TRAILING_POINTS, "Trailing Distance");
       else
          ToggleRowSelection(object_name);
+      if(IsAutomaticSettingControl(object_name)) SaveSettings();
       m_controls_dirty = true;
       m_positions_dirty = true;
       Render();
@@ -720,6 +741,76 @@ public:
      }
 
 private:
+   void ResetPanelSettingsDefaults()
+     {
+      m_auto_symbol = "";
+      m_auto_direction = PM_DIRECTION_BOTH;
+      m_passed_behavior = PM_PASSED_CLOSE_DO_NOTHING;
+      m_auto_minutes = 10;
+      m_auto_enabled = false;
+      m_equity_guard_enabled = false;
+      m_equity_guard_mode = PM_EQUITY_THRESHOLD_AMOUNT;
+      m_equity_guard_loss_threshold = 0.0;
+      m_equity_guard_profit_threshold = 0.0;
+      m_trailing_symbol = "";
+      m_trailing_direction = PM_DIRECTION_BOTH;
+      m_trail_basis = PM_TRAIL_BASIS_PER_POSITION;
+      m_break_even_enabled = false;
+      m_trailing_enabled = false;
+      m_be_trigger_pips = 0;
+      m_be_lock_pips = 0;
+      m_trail_trigger_pips = 0;
+      m_trail_pips = 0;
+     }
+
+   bool IsAutomaticSettingControl(const string object_name)
+     {
+      return StringFind(object_name, Name("AUTO_")) == 0 ||
+             object_name == Name("PASSED_BEHAVIOR") ||
+             StringFind(object_name, Name("EQ_")) == 0 ||
+             StringFind(object_name, Name("TS_")) == 0 ||
+             object_name == Name("BASIS_TOGGLE") ||
+             StringFind(object_name, Name("BE_")) == 0 ||
+             StringFind(object_name, Name("TRAIL_")) == 0;
+     }
+
+   void LoadPanelSettings()
+     {
+      PMPanelSettings settings = {};
+      if(!m_settings_store.Load(settings)) return;
+      m_auto_enabled = settings.auto_enabled;
+      m_auto_symbol = settings.auto_symbol;
+      m_auto_direction = settings.auto_direction;
+      m_auto_minutes = settings.auto_minutes;
+      m_passed_behavior = settings.passed_behavior;
+      m_equity_guard_enabled = settings.equity_guard_enabled;
+      m_equity_guard_mode = settings.equity_guard_mode;
+      m_equity_guard_loss_threshold = settings.equity_guard_loss_threshold;
+      m_equity_guard_profit_threshold = settings.equity_guard_profit_threshold;
+      m_trailing_symbol = settings.trailing_symbol;
+      m_trailing_direction = settings.trailing_direction;
+      m_trail_basis = settings.trail_basis;
+      m_break_even_enabled = settings.break_even_enabled;
+      m_trailing_enabled = settings.trailing_enabled;
+      m_be_trigger_pips = settings.be_trigger_pips;
+      m_be_lock_pips = settings.be_lock_pips;
+      m_trail_trigger_pips = settings.trail_trigger_pips;
+      m_trail_pips = settings.trail_pips;
+     }
+
+   void WritePanelSettingsInputs()
+     {
+      ObjectSetString(0, Name("AUTO_MINUTES"), OBJPROP_TEXT, IntegerToString(m_auto_minutes));
+      ObjectSetString(0, Name("EQ_LOSS_VALUE"), OBJPROP_TEXT,
+                      m_equity_guard_loss_threshold == 0.0 ? "" : DoubleToString(m_equity_guard_loss_threshold, 2));
+      ObjectSetString(0, Name("EQ_PROFIT_VALUE"), OBJPROP_TEXT,
+                      m_equity_guard_profit_threshold == 0.0 ? "" : DoubleToString(m_equity_guard_profit_threshold, 2));
+      ObjectSetString(0, Name("BE_TRIGGER_VALUE"), OBJPROP_TEXT, IntegerToString(m_be_trigger_pips));
+      ObjectSetString(0, Name("BE_LOCK_VALUE"), OBJPROP_TEXT, IntegerToString(m_be_lock_pips));
+      ObjectSetString(0, Name("TRAIL_TRIGGER_VALUE"), OBJPROP_TEXT, IntegerToString(m_trail_trigger_pips));
+      ObjectSetString(0, Name("TRAIL_DIST_VALUE"), OBJPROP_TEXT, IntegerToString(m_trail_pips));
+     }
+
    bool IsPriceLineObject(const string object_name)
      {
       return object_name == PM_SL_EDIT_LINE_NAME || object_name == PM_TP_EDIT_LINE_NAME ||
@@ -1541,6 +1632,7 @@ private:
       else if(object_name == Name("SL_VALUE")) { CommitStopEditor(0); SetStatus("SL draft updated."); }
       else if(object_name == Name("TP_VALUE")) { CommitStopEditor(1); SetStatus("TP draft updated."); }
       else return false;
+      if(IsAutomaticSettingControl(object_name)) SaveSettings();
       m_controls_dirty = true;
       m_positions_dirty = true;
       Render();

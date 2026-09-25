@@ -26,6 +26,8 @@ Price入力またはPips入力を受け付ける。Pipsの基準価格はLongが
 
 `SymbolInfoSessionTrade()`でサーバー時刻基準のセッションを取得する。前日から継続中の日付跨ぎセッションがあればその終了を優先し、それ以外で複数セッションがある場合は当該曜日の最終セッション終了から指定分前を実行時刻とする。OnTimerを1秒間隔で動かし、取引Tickの有無に依存しない。起動時に実行時刻を過ぎている場合は、行頭の`Passed`ラベルに続くボタンで`Do Nothing`または`Close Now`を選択する。日付単位で一度だけ決済要求を開始し、未解決TicketはTradeManagerが設定間隔で再試行する。
 
+Auto Close・Equity Guard・Trailの確定済み設定（各ON/OFF、対象Symbol・Direction、Basis、数値、各モードとPassed時の動作）は口座とチャートごとに保存する。口座を切り替えて戻した場合やMT5を再起動した場合は、その口座・チャートの設定を復元する。未確定の編集中テキストは保存しない。保存データがないか不正な場合は各機能をOFFにした既定値から始める。取引の再試行キュー、Auto Closeの日次実行状態、Equity Guardの発動状態は復元せず、再初期化後の実際のポジションと価格から判定する。
+
 ## UI
 
 標準チャートオブジェクトだけでパネルを構成する。パネル内には余白を設ける。Entry、Positions、SL/TP、Auto Close、Equity Guard、Trailの6タブを持ち、選択中タブは明るい青色・強調境界線・白文字、非選択タブは暗い青灰色・控えめな境界線・銀文字で表示し、非選択タブの本文は表示しない。タイトルバーの折り畳みボタンで本文を隠せ、折り畳み中もタイトルバーをドラッグできる。右下のグリップでは幅と高さを変更でき、必要な本文より小さくはしない。Symbol・Directionは候補を順番に切り替えるボタンとし、SL/TPとAuto Closeの数値は編集欄から入力する。処理結果は本文より少し大きい、折り返し可能な複数行StatusとExpertsログへ出力する。`OBJ_LABEL`は63文字を超える部分を表示しないため、Statusはパネル幅に加えて1行63文字以内に収まるよう単語の区切りで折り返す。空文字の`OBJ_LABEL`はMT5が`Label`と描画するため、使わないStatus行は隠す。Statusは通常を明るい色、成功・変更なしを緑、待機を黄色、失敗を赤で表示する。SL/TPの一括変更で既存値と同じTicketは`unchanged`として集計し、失敗には含めない。Positionsの価格は銘柄のDigitsで表示する。
@@ -86,7 +88,7 @@ Auto Closeと同様にOnTimer駆動の自動処理とし、確認ダイアログ
 
 ## Trailing Stop / Break Even
 
-対象は1つのSymbol・Directionを選択し、Auto Closeと同様に他の選択（Filter等）とは独立に保持する。加えて、計算基準（Basis）を`Per Position`（既定・ゼロ値）と`Average`から1つ選び、Break EvenとTrailingで共有する。`Basis`はボタンクリックのたびに交互に切り替わり、タブ切替・パネルの移動・折り畳み・リサイズでは値を保持するが、EAの再初期化では他のTrail設定と同じライフサイクルに従い`Per Position`へ戻る。稼働中の切り替えは次回のTimer評価以降の新規判定にのみ反映し、切り替え自体は取引要求を出さず、既存のSL・TP・ON/OFF・入力値を変更しない。切り替え前にキューへ入っていた再試行は、既存の再試行規則に従って完了する。
+対象は1つのSymbol・Directionを選択し、Auto Closeと同様に他の選択（Filter等）とは独立に保持する。加えて、計算基準（Basis）を`Per Position`（既定・ゼロ値）と`Average`から1つ選び、Break EvenとTrailingで共有する。`Basis`はボタンクリックのたびに交互に切り替わり、タブ切替・パネルの移動・折り畳み・リサイズでは値を保持し、EAの再初期化では保存済みの値を復元する。稼働中の切り替えは次回のTimer評価以降の新規判定にのみ反映し、切り替え自体は取引要求を出さず、既存のSL・TP・ON/OFF・入力値を変更しない。切り替え前にキューへ入っていた再試行は、既存の再試行規則に従って完了する。
 
 TrailタブはScope、Basis、Break Even、Trailing、説明の順に配置する。Break Evenはラベル・ON/OFF・Trigger・Lockを1行に、Trailingはラベル・ON/OFF・Trigger・Distanceを1行に置く。4つの数値欄は初期表示を`0`とし、パネル最小幅560pxでも行を分割せず、値・`-`・`+`を表示する。
 
