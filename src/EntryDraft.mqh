@@ -19,6 +19,10 @@ public:
    // A Pips TP resolves to a different price per side, so the "freeze on commit"
    // rule keeps one latched price for each side instead of a single value.
    double manual_tp_price[2];
+   // Per-symbol saved setting, not draft input: a Pips SL used only while the
+   // manual SL is 0, so an explicit SL always wins and Clear falls back to it.
+   bool auto_sl_enabled;
+   string auto_sl_text;
 
    CEntryDraft()
      {
@@ -29,7 +33,9 @@ public:
       stop_text[0] = "0"; stop_text[1] = "0";
       order_text = ""; lot_text = "0.01"; risk_text = "0";
       ClearManualTp();
+      ResetAutoSl();
      }
+   void ResetAutoSl() { auto_sl_enabled = false; auto_sl_text = "0"; }
    void ClearManualTp() { manual_tp_price[0] = 0.0; manual_tp_price[1] = 0.0; }
    bool Number(const string text, const bool zero_allowed, double &value)
      {
@@ -54,10 +60,40 @@ public:
       SetStop(index, DoubleToString(price, digits));
      }
    void CancelStop(const int index) { SetStop(index, "0"); }
+   bool ManualSlUnset()
+     {
+      double value = 0.0;
+      return Number(stop_text[0], true, value) && value == 0.0;
+     }
+   bool AutoSlActive()
+     {
+      double value = 0.0;
+      return auto_sl_enabled && ManualSlUnset() && Number(auto_sl_text, true, value) && value > 0.0;
+     }
    double PipsBase(const PMEntrySide side, const PMEntrySnapshot &snapshot, const double entry)
      {
       return order_type == PM_ENTRY_ORDER_MARKET ?
              (side == PM_ENTRY_BUY ? snapshot.bid : snapshot.ask) : entry;
+     }
+   double PipsStopPrice(const int index, const PMEntrySide side, const PMEntrySnapshot &snapshot,
+                        const double entry, const double pips)
+     {
+      const bool upward = side == PM_ENTRY_BUY ? index == 1 : index == 0;
+      const double distance = PMPipsToPointDistance(pips, snapshot.digits) * snapshot.point;
+      return PipsBase(side, snapshot, entry) + (upward ? distance : -distance);
+     }
+   bool ResolveAutoSl(const PMEntrySide side, const PMEntrySnapshot &snapshot,
+                      const double entry, double &price, string &reason)
+     {
+      price = 0.0;
+      if(!AutoSlActive()) return true;
+      double pips = 0.0;
+      Number(auto_sl_text, true, pips);
+      price = PMNormalizePrice(PipsStopPrice(0, side, snapshot, entry, pips),
+                               snapshot.tick_size, snapshot.digits);
+      if(!MathIsValidNumber(price) || price <= 0.0)
+        { reason = "The Auto SL price is invalid after tick rounding."; return false; }
+      return true;
      }
    bool ResolveStop(const int index, const PMEntrySide side, const PMEntrySnapshot &snapshot,
                     const double entry, double &price, string &reason)
@@ -69,12 +105,7 @@ public:
         { reason = "SL/TP input is invalid for its Price/Pips mode."; return false; }
       if(value == 0.0) return true;
       if(unit[index] == PM_ENTRY_UNIT_PRICE) price = value;
-      else
-        {
-         const bool upward = side == PM_ENTRY_BUY ? index == 1 : index == 0;
-         const double distance = PMPipsToPointDistance(value, snapshot.digits) * snapshot.point;
-         price = PipsBase(side, snapshot, entry) + (upward ? distance : -distance);
-        }
+      else price = PipsStopPrice(index, side, snapshot, entry, value);
       price = PMNormalizePrice(price, snapshot.tick_size, snapshot.digits);
       if(!MathIsValidNumber(price) || price <= 0.0)
         { reason = "The SL/TP price is invalid after tick rounding."; return false; }
@@ -95,6 +126,8 @@ public:
       if(!PMCalculateAssumedEntryPrice(order_type, side, snapshot.bid, snapshot.ask,
                                        snapshot.order_price, entry, reason)) return false;
       if(!ResolveStop(0, side, snapshot, entry, snapshot.sl_price, reason)) return false;
+      if(snapshot.sl_price == 0.0 && !ResolveAutoSl(side, snapshot, entry, snapshot.sl_price, reason))
+         return false;
       if(tp_state == PM_TP_STATE_MANUAL)
         {
          if(manual_tp_price[side] > 0.0) snapshot.tp_price = manual_tp_price[side];

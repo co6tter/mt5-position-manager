@@ -62,7 +62,8 @@ def verify_entry_controls(ui: str) -> None:
     for control in ("ENTRY_SUB_MARKET", "ENTRY_SUB_LIMIT", "ENTRY_SUB_STOP", "ENTRY_ORDER_PRICE",
                     "ENTRY_QTY_LABEL", "ENTRY_QTY_MODE", "ENTRY_RISK", "ENTRY_RISK_DEC", "ENTRY_RISK_INC",
                     "ENTRY_SL_CLEAR", "ENTRY_TP_CLEAR", "ENTRY_SL_SET", "ENTRY_TP_SET",
-                    "ENTRY_SL_MODE", "ENTRY_TP_MODE", "ENTRY_SELL_PREVIEW", "ENTRY_BUY_PREVIEW"):
+                    "ENTRY_SL_MODE", "ENTRY_TP_MODE", "ENTRY_SELL_PREVIEW", "ENTRY_BUY_PREVIEW",
+                    "ENTRY_AUTO_SL_LABEL", "ENTRY_AUTO_SL_ENABLED", "ENTRY_AUTO_SL_VALUE", "ENTRY_AUTO_SL_NOTE"):
         if f'"{control}"' not in ui:
             raise AssertionError(f"Missing Entry control: {control}")
     # The side is never a toggle, and the order type is never a cycling button.
@@ -89,6 +90,8 @@ def verify_entry_layout(ui: str) -> None:
         "PM_ENTRY_SL_ROW_Y": ['CreateLabel("ENTRY_SL_LABEL"', 'CreateButton("ENTRY_SL_MODE"',
                               'CreateNumericInput("ENTRY_SL"', 'CreateButton("ENTRY_SL_SET"',
                               'CreateButton("ENTRY_SL_CLEAR"'],
+        "PM_ENTRY_AUTO_SL_ROW_Y": ['CreateLabel("ENTRY_AUTO_SL_LABEL"', 'CreateButton("ENTRY_AUTO_SL_ENABLED"',
+                                   'CreateNumericInput("ENTRY_AUTO_SL"', 'CreateLabel("ENTRY_AUTO_SL_NOTE"'],
         "PM_ENTRY_TP_ROW_Y": ['CreateLabel("ENTRY_TP_LABEL"', 'CreateButton("ENTRY_TP_MODE"',
                               'CreateNumericInput("ENTRY_TP"', 'CreateButton("ENTRY_TP_SET"',
                               'CreateButton("ENTRY_TP_CLEAR"'],
@@ -230,7 +233,8 @@ void AssertTrue(bool condition, const string &name) {
     if (!condition) { ++failures; std::cerr << "[FAIL] " << name << '\n'; }
 }
 """
-    for constant in ("PM_MAX_TRAILING_POINTS", "PM_MAX_EQUITY_THRESHOLD", "PM_MAX_LABEL_TEXT_LENGTH"):
+    for constant in ("PM_MAX_TRAILING_POINTS", "PM_MAX_EQUITY_THRESHOLD", "PM_MAX_LABEL_TEXT_LENGTH",
+                     "PM_ENTRY_AUTO_SL_NOTE_X"):
         prelude += re.search(r"^#define " + constant + r" .*", helpers, re.M).group(0) + "\n"
     source = prelude + "\n".join(enum_block(models, name) for name in enum_names) + "\n"
     source += "\n".join(struct_block(models, name) for name in struct_names) + "\n"
@@ -245,6 +249,9 @@ void AssertTrue(bool condition, const string &name) {
                          if not line.startswith("#include"))
     source += "\n" + without_includes("src/EntryDraft.mqh")
     source += "\nclass CValidationService { public:\n" + function((ROOT / "src/ValidationService.mqh").read_text(), "ValidateEntryPrices") + "\n};\n"
+    settings_source = (ROOT / "src/PanelSettings.mqh").read_text()
+    source += "\n" + "\n".join(function(settings_source, name) for name in
+                               ("PMPanelSettingDecimal", "PMAutoSlPipsText")) + "\n"
     source += without_includes("src/EntryService.mqh")
     source += "\nclass CTradeManager { public: int m_deviation_points = 10;\n" + function((ROOT / "src/TradeManager.mqh").read_text(), "SubmitEntry") + "\n};\n"
     ui_methods = ["EntryReferenceSide", "EntrySideName", "EntryRRText", "EntryStopPreview", "EntryPreviewText",
@@ -254,7 +261,7 @@ void AssertTrue(bool condition, const string &name) {
                   "SelectEntryOrderType", "HandleEntryClick", "OpenEntry", "VolumeDigits", "HandlePriceMouse",
                   "RenderEntryState", "FitEntryLabel",
                   "LabelTextWidth", "LabelFittingCharacters", "SetEntryHint", "EntryPriceLineText",
-                  "CancelPriceDrag", "ResetStopEditor"]
+                  "CancelPriceDrag", "ResetStopEditor", "CommitEntryAutoSl", "EntryAutoSlNote", "RenderEntryAutoSl"]
     source += "\nclass EntryUiHarness { public: CEntryDraft m_entry_draft; CEntryService m_entry_service; PMEntrySnapshot m_entry_snapshot[2]; PMEntryComputation m_entry_result[2]; bool m_entry_valid[2] = {false, false}; bool m_visibility_dirty = false; string m_entry_reason[2], status; CPriceEditDrag m_price_drag; string Name(const string s) { return s; } void SetStatus(const string s) { status = s; }\n"
     source += r"""
     bool m_collapsed = false, m_price_scroll_before = true, m_price_drag_moved = false;
@@ -275,6 +282,8 @@ void AssertTrue(bool condition, const string &name) {
     bool PriceText(const string name, const string text) { return ObjectSetString(0, name, OBJPROP_TEXT, text); }
     bool PriceInteger(const string name, int property, long value) { object_properties[{name, property}] = value; return true; }
     void Render() { RenderEntryState(); }
+    int auto_sl_saves = 0; bool auto_sl_save_ok = true;
+    bool SaveAutoSlSetting() { ++auto_sl_saves; return auto_sl_save_ok; }
 """
     source += "\n".join(function(ui_source, name) for name in ui_methods) + "\n};\n"
     source += (ROOT / "tests/entry-integration-tests.cpp").read_text()

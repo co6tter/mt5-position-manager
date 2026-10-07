@@ -380,4 +380,58 @@ void TestEntryIntegration() {
                stops_ui.m_price_drag.Index() < 0 && mouse_scroll &&
                objects["TP_VALUE"] == "155.00" && stops_ui.m_stop_committed[1] == "155.00",
                "Clear SL resets only the SL draft to 0 and ends its drag");
+
+    // Auto SL fills only an unset SL, from the same Pips base as a manual Pips SL.
+    ResetBoundary();
+    draft = CEntryDraft(); draft.auto_sl_enabled = true; draft.auto_sl_text = "150";
+    AssertTrue(service.Evaluate(_Symbol, PM_ENTRY_BUY, draft, -1, 0, snapshot, result, reason) &&
+               std::abs(snapshot.sl_price - 98.4) < 1e-9,
+               "Auto SL places a Market BUY SL 150 pips below Bid");
+    AssertTrue(service.Evaluate(_Symbol, PM_ENTRY_SELL, draft, -1, 0, snapshot, result, reason) &&
+               std::abs(snapshot.sl_price - 101.5) < 1e-9,
+               "Auto SL places a Market SELL SL 150 pips above Ask, so both sides stay orderable");
+    draft.SetPrice(0, 98, 2);
+    AssertTrue(service.Evaluate(_Symbol, PM_ENTRY_BUY, draft, -1, 0, snapshot, result, reason) && snapshot.sl_price == 98,
+               "A manual SL wins over Auto SL");
+    draft.CancelStop(0);
+    AssertTrue(service.Evaluate(_Symbol, PM_ENTRY_BUY, draft, -1, 0, snapshot, result, reason) &&
+               std::abs(snapshot.sl_price - 98.4) < 1e-9,
+               "Clearing the manual SL falls back to Auto SL");
+    draft.quantity_mode = PM_QUANTITY_RISK_AMOUNT; draft.risk_text = "100";
+    AssertTrue(service.Evaluate(_Symbol, PM_ENTRY_BUY, draft, -1, 0, snapshot, result, reason) && result.lot > 0,
+               "Risk sizing uses the Auto SL distance");
+    draft.auto_sl_enabled = false;
+    AssertTrue(!service.Evaluate(_Symbol, PM_ENTRY_BUY, draft, -1, 0, snapshot, result, reason) && snapshot.sl_price == 0,
+               "Auto SL OFF leaves the SL unset again");
+    draft = CEntryDraft(); draft.auto_sl_enabled = true; draft.auto_sl_text = "0";
+    AssertTrue(service.Evaluate(_Symbol, PM_ENTRY_BUY, draft, -1, 0, snapshot, result, reason) && snapshot.sl_price == 0,
+               "Auto SL ON with 0 pips adds no SL");
+
+    ResetBoundary();
+    current_tick.bid = 2650.00; current_tick.ask = 2650.30;
+    EntryUiHarness auto_ui;
+    auto_ui.HandleEntryClick("ENTRY_AUTO_SL_ENABLED", trades);
+    AssertTrue(auto_ui.m_entry_draft.auto_sl_enabled && auto_ui.auto_sl_saves == 1,
+               "The Auto SL toggle switches ON and saves immediately");
+    auto_ui.HandleEntryClick("ENTRY_AUTO_SL_INC", trades);
+    AssertTrue(objects["ENTRY_AUTO_SL_VALUE"] == "1" && auto_ui.m_entry_draft.auto_sl_text == "1" &&
+               auto_ui.auto_sl_saves == 2, "Auto SL + steps one pip and saves the committed value");
+    objects["ENTRY_AUTO_SL_VALUE"] = "abc"; auto_ui.CommitEntryAutoSl();
+    AssertTrue(objects["ENTRY_AUTO_SL_VALUE"] == "1" && auto_ui.m_entry_draft.auto_sl_text == "1" &&
+               auto_ui.auto_sl_saves == 2, "Malformed Auto SL text is refused and the field shows the saved value");
+    objects["ENTRY_AUTO_SL_VALUE"] = "10000.0"; auto_ui.CommitEntryAutoSl();
+    auto_ui.RenderEntryState();
+    AssertTrue(auto_ui.m_entry_draft.auto_sl_text == "10000" && objects["ENTRY_AUTO_SL_ENABLED"] == "ON" &&
+               objects["ENTRY_AUTO_SL_NOTE"] == "Dist 100.00" &&
+               std::abs(auto_ui.m_entry_snapshot[PM_ENTRY_BUY].sl_price - 2550.0) < 1e-9,
+               "10000 pips on a 2-digit gold quote is a 100.00 price distance");
+    auto_ui.HandleEntryClick("ENTRY_BUY", trades);
+    AssertTrue(sends == 1 && std::abs(sent_request.sl - 2550.0) < 1e-9, "The sent order carries the Auto SL");
+    objects["ENTRY_SL_VALUE"] = "50"; auto_ui.CommitEntryEditor("ENTRY_SL_VALUE"); auto_ui.RenderEntryState();
+    AssertTrue(objects["ENTRY_AUTO_SL_NOTE"] == "Dist 100.00 | manual SL wins" &&
+               std::abs(auto_ui.m_entry_snapshot[PM_ENTRY_BUY].sl_price - 2649.5) < 1e-9,
+               "The note says when a manual SL overrides Auto SL");
+    auto_ui.auto_sl_save_ok = false;
+    auto_ui.HandleEntryClick("ENTRY_AUTO_SL_ENABLED", trades);
+    AssertTrue(auto_ui.status.find("OFF") == string::npos, "A failed save does not report success");
 }

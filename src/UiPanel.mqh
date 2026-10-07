@@ -48,6 +48,7 @@ private:
    int m_trail_trigger_pips;
    int m_trail_pips;
    CPanelSettingsStore m_settings_store;
+   CAutoSlStore m_auto_sl_store;
    int m_max_rows;
    PMPanelTab m_active_tab;
    bool m_collapsed;
@@ -191,6 +192,7 @@ public:
                                  AccountInfoString(ACCOUNT_SERVER));
       ResetPanelSettingsDefaults();
       LoadPanelSettings();
+      LoadEntryAutoSl();
       m_panel_height = ExpandedPanelHeight();
       m_expanded_height = m_panel_height;
       long mouse_move_enabled = 0;
@@ -231,6 +233,10 @@ public:
       created = CreateNumericInput("ENTRY_SL", "ENTRY_SL_VALUE", "0", PM_ENTRY_STOP_INPUT_X, ContentTop() + PM_ENTRY_SL_ROW_Y, PM_ENTRY_STOP_INPUT_WIDTH) && created;
       created = CreateButton("ENTRY_SL_SET", "Set", PM_ENTRY_STOP_SET_X, ContentTop() + PM_ENTRY_SL_ROW_Y, PM_ENTRY_STOP_SET_WIDTH) && created;
       created = CreateButton("ENTRY_SL_CLEAR", "Clear", PM_ENTRY_STOP_CLEAR_X, ContentTop() + PM_ENTRY_SL_ROW_Y, PM_ENTRY_STOP_CLEAR_WIDTH) && created;
+      created = CreateLabel("ENTRY_AUTO_SL_LABEL", "Auto SL", 12, ContentTop() + PM_ENTRY_AUTO_SL_ROW_Y + 5, clrSilver, 9) && created;
+      created = CreateButton("ENTRY_AUTO_SL_ENABLED", "OFF", PM_ENTRY_AUTO_SL_TOGGLE_X, ContentTop() + PM_ENTRY_AUTO_SL_ROW_Y, PM_ENTRY_AUTO_SL_TOGGLE_WIDTH, 22) && created;
+      created = CreateNumericInput("ENTRY_AUTO_SL", "ENTRY_AUTO_SL_VALUE", m_entry_draft.auto_sl_text, PM_ENTRY_AUTO_SL_INPUT_X, ContentTop() + PM_ENTRY_AUTO_SL_ROW_Y, PM_ENTRY_AUTO_SL_INPUT_WIDTH) && created;
+      created = CreateLabel("ENTRY_AUTO_SL_NOTE", "Dist -", PM_ENTRY_AUTO_SL_NOTE_X, ContentTop() + PM_ENTRY_AUTO_SL_ROW_Y + 6, clrSilver, 8) && created;
       created = CreateLabel("ENTRY_TP_LABEL", "TP", 12, ContentTop() + PM_ENTRY_TP_ROW_Y + 5, clrSilver, 9) && created;
       created = CreateButton("ENTRY_TP_MODE", "Pips", PM_ENTRY_STOP_MODE_X, ContentTop() + PM_ENTRY_TP_ROW_Y, PM_ENTRY_STOP_MODE_WIDTH) && created;
       created = CreateNumericInput("ENTRY_TP", "ENTRY_TP_VALUE", "0", PM_ENTRY_STOP_INPUT_X, ContentTop() + PM_ENTRY_TP_ROW_Y, PM_ENTRY_STOP_INPUT_WIDTH) && created;
@@ -815,6 +821,27 @@ private:
       m_trail_pips = settings.trail_pips;
      }
 
+   // The chart symbol is fixed for the life of this panel: changing it reinitializes the EA.
+   void LoadEntryAutoSl()
+     {
+      m_auto_sl_store.Configure(AccountInfoInteger(ACCOUNT_LOGIN), AccountInfoString(ACCOUNT_SERVER));
+      m_entry_draft.ResetAutoSl();
+      bool enabled = false;
+      string pips = "0";
+      if(!m_auto_sl_store.Load(_Symbol, enabled, pips)) return;
+      m_entry_draft.auto_sl_enabled = enabled;
+      m_entry_draft.auto_sl_text = pips;
+     }
+
+   bool SaveAutoSlSetting()
+     {
+      ResetLastError();
+      if(m_auto_sl_store.Save(_Symbol, m_entry_draft.auto_sl_enabled, m_entry_draft.auto_sl_text)) return true;
+      PrintFormat("[ERROR] Auto SL setting could not be saved. symbol=%s error=%d", _Symbol, GetLastError());
+      SetStatus("Auto SL could not be saved.");
+      return false;
+     }
+
    void WritePanelSettingsInputs()
      {
       ObjectSetString(0, Name("AUTO_MINUTES"), OBJPROP_TEXT, IntegerToString(m_auto_minutes));
@@ -1344,6 +1371,27 @@ private:
       PriceInteger(Name(suffix), OBJPROP_BGCOLOR, m_entry_valid[side] ? enabled_background : PM_INACTIVE_TAB_COLOR);
       PriceInteger(Name(suffix), OBJPROP_COLOR, m_entry_valid[side] ? clrWhite : clrSilver);
      }
+   // Show the pips as a price distance: pips mean different things per symbol
+   // (gold 10000 pips is 100.00), so the number alone is easy to misread.
+   string EntryAutoSlNote()
+     {
+      double pips = 0.0;
+      const double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+      const int digits = (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS);
+      if(!m_entry_draft.Number(m_entry_draft.auto_sl_text, true, pips) || pips <= 0.0 || point <= 0.0)
+         return "Dist -";
+      string note = "Dist " + DoubleToString(PMPipsToPointDistance(pips, digits) * point, digits);
+      if(m_entry_draft.auto_sl_enabled && !m_entry_draft.ManualSlUnset()) note += " | manual SL wins";
+      return note;
+     }
+   void RenderEntryAutoSl()
+     {
+      const bool enabled = m_entry_draft.auto_sl_enabled;
+      PriceText(Name("ENTRY_AUTO_SL_ENABLED"), enabled ? "ON" : "OFF");
+      PriceInteger(Name("ENTRY_AUTO_SL_ENABLED"), OBJPROP_BGCOLOR, enabled ? clrDarkGreen : clrMaroon);
+      PriceText(Name("ENTRY_AUTO_SL_NOTE"), EntryAutoSlNote());
+      FitEntryLabel("ENTRY_AUTO_SL_NOTE", m_panel_width - PM_ENTRY_AUTO_SL_NOTE_X - 12);
+     }
    void RefreshEntryComputation(const bool preview)
      {
       const int drag_index = preview ? m_price_drag.Index() : -1;
@@ -1414,6 +1462,7 @@ private:
       SetEntrySendVisual("ENTRY_SELL", (int)PM_ENTRY_SELL, clrMaroon);
       SetEntrySendVisual("ENTRY_BUY", (int)PM_ENTRY_BUY, clrDarkGreen);
       SetEntryHint(EntryHintText(reference));
+      RenderEntryAutoSl();
       FitEntryLabel("ENTRY_PRICE", 320);
       FitEntryLabel("ENTRY_SELL_PREVIEW", m_panel_width - 24);
       FitEntryLabel("ENTRY_BUY_PREVIEW", m_panel_width - 24);
@@ -1639,6 +1688,11 @@ private:
       else if(object_name == Name("BE_LOCK_VALUE")) { CommitIntegerValue("BE_LOCK_VALUE", m_be_lock_pips, PM_MAX_TRAILING_POINTS); SetStatus(StringFormat("Break Even Lock updated: %d pips.", m_be_lock_pips)); }
       else if(object_name == Name("TRAIL_TRIGGER_VALUE")) { CommitIntegerValue("TRAIL_TRIGGER_VALUE", m_trail_trigger_pips, PM_MAX_TRAILING_POINTS); SetStatus(StringFormat("Trailing Trigger updated: %d pips.", m_trail_trigger_pips)); }
       else if(object_name == Name("TRAIL_DIST_VALUE")) { CommitIntegerValue("TRAIL_DIST_VALUE", m_trail_pips, PM_MAX_TRAILING_POINTS); SetStatus(StringFormat("Trailing Distance updated: %d pips.", m_trail_pips)); }
+      else if(object_name == Name("ENTRY_AUTO_SL_VALUE"))
+        {
+         CommitEntryAutoSl();
+         CancelPriceDrag();
+        }
       else if(StringFind(object_name, Name("ENTRY_")) == 0)
         {
          CommitEntryEditor(object_name);
@@ -1781,6 +1835,7 @@ private:
            }
         }
       else if(name == Name("ENTRY_RISK")) m_entry_draft.risk_text = text;
+      else if(name == Name("ENTRY_AUTO_SL_VALUE")) CommitEntryAutoSl();
       else
          for(int i = 0; i < 2; i++)
             if(name == Name(EntryStopSuffix(i)) && text != m_entry_draft.stop_text[i])
@@ -1798,11 +1853,31 @@ private:
                ObjectSetString(0, name, OBJPROP_TEXT, m_entry_draft.stop_text[i]);
               }
      }
+   // Auto SL is a saved setting rather than draft input, so malformed text is
+   // refused and the field returns to the saved value instead of blocking orders.
+   void CommitEntryAutoSl()
+     {
+      const string name = Name("ENTRY_AUTO_SL_VALUE");
+      const string text = ObjectGetString(0, name, OBJPROP_TEXT);
+      if(text == m_entry_draft.auto_sl_text) return;
+      string normalized = "";
+      if(!PMAutoSlPipsText(text, normalized))
+        {
+         ObjectSetString(0, name, OBJPROP_TEXT, m_entry_draft.auto_sl_text);
+         SetStatus(StringFormat("Auto SL must be 0 to %d pips.", PM_MAX_TRAILING_POINTS));
+         return;
+        }
+      m_entry_draft.auto_sl_text = normalized;
+      ObjectSetString(0, name, OBJPROP_TEXT, normalized);
+      if(SaveAutoSlSetting())
+         SetStatus("Auto SL for " + _Symbol + " set to " + normalized + " pips.");
+     }
    void CommitEntryEditors()
      {
       CommitEntryEditor(Name("ENTRY_ORDER_PRICE"));
       CommitEntryEditor(Name("ENTRY_LOT"));
       CommitEntryEditor(Name("ENTRY_RISK"));
+      CommitEntryEditor(Name("ENTRY_AUTO_SL_VALUE"));
       CommitEntryEditor(Name(EntryStopSuffix(1)));
       CommitEntryEditor(Name(EntryStopSuffix(0)));
      }
@@ -1936,12 +2011,18 @@ private:
       else if(name == Name("ENTRY_TP_SET")) SetEntryStop(1);
       else if(name == Name("ENTRY_SL_CLEAR")) { m_entry_draft.CancelStop(0); WriteEntryStops(); }
       else if(name == Name("ENTRY_TP_CLEAR")) { m_entry_draft.CancelStop(1); WriteEntryStops(); }
+      else if(name == Name("ENTRY_AUTO_SL_ENABLED"))
+        {
+         m_entry_draft.auto_sl_enabled = !m_entry_draft.auto_sl_enabled;
+         if(SaveAutoSlSetting())
+            SetStatus(StringFormat("Auto SL %s for %s.", m_entry_draft.auto_sl_enabled ? "ON" : "OFF", _Symbol));
+        }
       else if(name == Name("ENTRY_SL_MODE")) SwitchEntryUnit(0);
       else if(name == Name("ENTRY_TP_MODE")) SwitchEntryUnit(1);
       else
         {
-         string prefixes[] = {"ENTRY_ORDER", "ENTRY_LOT", "ENTRY_RISK", "ENTRY_SL", "ENTRY_TP"};
-         string values[] = {"ENTRY_ORDER_PRICE", "ENTRY_LOT", "ENTRY_RISK", "ENTRY_SL_VALUE", "ENTRY_TP_VALUE"};
+         string prefixes[] = {"ENTRY_ORDER", "ENTRY_LOT", "ENTRY_RISK", "ENTRY_SL", "ENTRY_TP", "ENTRY_AUTO_SL"};
+         string values[] = {"ENTRY_ORDER_PRICE", "ENTRY_LOT", "ENTRY_RISK", "ENTRY_SL_VALUE", "ENTRY_TP_VALUE", "ENTRY_AUTO_SL_VALUE"};
          for(int i = 0; i < ArraySize(prefixes); i++)
            {
             if(name == Name(prefixes[i] + "_DEC")) StepEntryInput(values[i], -1);
@@ -2108,6 +2189,7 @@ private:
       string entry_controls[] = {"ENTRY_SUB_MARKET", "ENTRY_SUB_LIMIT", "ENTRY_SUB_STOP", "ENTRY_PRICE",
          "ENTRY_QTY_LABEL", "ENTRY_QTY_MODE",
          "ENTRY_SL_LABEL", "ENTRY_SL_MODE", "ENTRY_SL_DEC", "ENTRY_SL_VALUE", "ENTRY_SL_INC", "ENTRY_SL_SET", "ENTRY_SL_CLEAR",
+         "ENTRY_AUTO_SL_LABEL", "ENTRY_AUTO_SL_ENABLED", "ENTRY_AUTO_SL_DEC", "ENTRY_AUTO_SL_VALUE", "ENTRY_AUTO_SL_INC", "ENTRY_AUTO_SL_NOTE",
          "ENTRY_TP_LABEL", "ENTRY_TP_MODE", "ENTRY_TP_DEC", "ENTRY_TP_VALUE", "ENTRY_TP_INC", "ENTRY_TP_SET", "ENTRY_TP_CLEAR",
          "ENTRY_SELL_PREVIEW", "ENTRY_BUY_PREVIEW", "ENTRY_SELL", "ENTRY_BUY", "ENTRY_HINT", "ENTRY_HINT_2"};
       for(int i = 0; i < ArraySize(entry_controls); i++) SetVisible(entry_controls[i], entry);

@@ -100,7 +100,7 @@ EAをチャートへ適用し、AutoTradingを有効にします。SymbolやDire
 
 パネルは内側に余白を持っています。`Entry`、`Positions`、`SL/TP`、`Auto Close`、`Equity Guard`、`Trail`のタブは、選択中だけ明るい青色・白文字で強調されます。タイトルバーの`-`で折り畳め、折り畳み中もタイトルバーをドラッグして移動できます。
 
-Auto Close・Equity Guard・Trailの確定済み設定は口座とチャートごとに保存され、口座の切り替えやMT5の再起動後に復元されます。保存データがない場合は各機能がOFFの初期設定で始まります。
+Auto Close・Equity Guard・Trailの確定済み設定は口座とチャートごとに保存され、口座の切り替えやMT5の再起動後に復元されます。保存データがない場合は各機能がOFFの初期設定で始まります。EntryタブのAuto SL(ON/OFFとPips)は口座と銘柄ごとに保存され、同じ銘柄のチャートで共有されます。
 
 - `Entry`: Market／Limit／StopとBuy／Sellを選び、Limit／StopではPriceを入力します。選択中の注文に対応したボタンから送信します。MarketのPriceは参照表示です。
 - EntryのSL／TPは独立したPrice／Points入力と`-` / `+`、`Set SL`／`Set TP`で設定し、チャート上のライン／ラベルをドラッグして価格を確定できます。`Clear SL`／`Clear TP`は片方だけを解除します。未設定側は0として送信されます。

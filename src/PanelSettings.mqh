@@ -58,6 +58,16 @@ bool PMPanelSettingDecimal(const string text, double &value)
    return true;
   }
 
+// Keep files local to this terminal. Hash only the server name so the filename
+// stays valid even when a broker uses punctuation in its name.
+long PMPanelSettingsServerHash(const string account_server)
+  {
+   long server_hash = 0;
+   for(int i = 0; i < StringLen(account_server); i++)
+      server_hash = (server_hash * 131 + StringGetCharacter(account_server, i)) % 2147483647;
+   return server_hash;
+  }
+
 class CPanelSettingsStore
   {
 private:
@@ -71,13 +81,8 @@ public:
       m_account_server = "";
       if(chart_id <= 0 || account_login <= 0 || account_server == "") return;
       m_account_server = account_server;
-      // Keep the file local to this terminal. Hash only the server name so the
-      // filename stays valid even when a broker uses punctuation in its name.
-      long server_hash = 0;
-      for(int i = 0; i < StringLen(account_server); i++)
-         server_hash = (server_hash * 131 + StringGetCharacter(account_server, i)) % 2147483647;
       m_file_name = StringFormat("MT5PositionManager\\settings_%I64d_%I64d_%I64d.csv",
-                                 chart_id, account_login, server_hash);
+                                 chart_id, account_login, PMPanelSettingsServerHash(account_server));
      }
 
    bool Save(const PMPanelSettings &settings)
@@ -159,6 +164,111 @@ public:
       loaded.worst_first = n == 1;
       settings = loaded;
       return true;
+     }
+  };
+
+// Auto SL is saved per account and symbol, not per chart: a pips distance only
+// means something for one symbol, and every chart of that symbol shares it.
+struct PMAutoSlSetting
+  {
+   string symbol;
+   bool enabled;
+   string pips;
+  };
+
+bool PMAutoSlPipsText(const string text, string &normalized)
+  {
+   double value = 0.0;
+   if(!PMPanelSettingDecimal(text, value) || value > PM_MAX_TRAILING_POINTS) return false;
+   // 0.1 pip is the finest step any field shows; "100.0" is stored as "100".
+   normalized = DoubleToString(value, 1);
+   if(StringSubstr(normalized, StringLen(normalized) - 2) == ".0")
+      normalized = StringSubstr(normalized, 0, StringLen(normalized) - 2);
+   return true;
+  }
+
+class CAutoSlStore
+  {
+private:
+   string m_file_name;
+   string m_account_server;
+
+   // A file that fails validation reads as empty: no symbol inherits a guessed value.
+   bool ReadAll(PMAutoSlSetting &records[])
+     {
+      ArrayResize(records, 0);
+      if(m_file_name == "") return false;
+      const int file = FileOpen(m_file_name, FILE_READ | FILE_CSV | FILE_UNICODE, '\t');
+      if(file == INVALID_HANDLE) return false;
+      bool ok = !FileIsEnding(file) && FileReadString(file) == "1" &&
+                !FileIsEnding(file) && FileReadString(file) == m_account_server;
+      while(ok && !FileIsEnding(file))
+        {
+         PMAutoSlSetting record = {};
+         string fields[3];
+         for(int i = 0; i < 3 && ok; i++)
+           {
+            if(FileIsEnding(file)) ok = false;
+            else fields[i] = FileReadString(file);
+           }
+         int enabled = 0;
+         ok = ok && fields[0] != "" && PMPanelSettingInteger(fields[1], 0, 1, enabled) &&
+              PMAutoSlPipsText(fields[2], record.pips);
+         if(!ok) break;
+         record.symbol = fields[0];
+         record.enabled = enabled == 1;
+         const int size = ArraySize(records);
+         ArrayResize(records, size + 1);
+         records[size] = record;
+        }
+      FileClose(file);
+      if(!ok) ArrayResize(records, 0);
+      return ok;
+     }
+
+public:
+   void Configure(const long account_login, const string account_server)
+     {
+      m_file_name = "";
+      m_account_server = "";
+      if(account_login <= 0 || account_server == "") return;
+      m_account_server = account_server;
+      m_file_name = StringFormat("MT5PositionManager\\autosl_%I64d_%I64d.csv",
+                                 account_login, PMPanelSettingsServerHash(account_server));
+     }
+
+   bool Load(const string symbol, bool &enabled, string &pips)
+     {
+      PMAutoSlSetting records[];
+      if(!ReadAll(records)) return false;
+      for(int i = 0; i < ArraySize(records); i++)
+         if(records[i].symbol == symbol)
+           {
+            enabled = records[i].enabled;
+            pips = records[i].pips;
+            return true;
+           }
+      return false;
+     }
+
+   // Re-read before writing so another chart's symbol saved meanwhile survives.
+   bool Save(const string symbol, const bool enabled, const string pips)
+     {
+      string normalized = "";
+      if(m_file_name == "" || symbol == "" || !PMAutoSlPipsText(pips, normalized)) return false;
+      PMAutoSlSetting records[];
+      ReadAll(records);
+      const string temporary = m_file_name + ".tmp";
+      const int file = FileOpen(temporary, FILE_WRITE | FILE_CSV | FILE_UNICODE, '\t');
+      if(file == INVALID_HANDLE) return false;
+      bool written = FileWrite(file, "1", m_account_server) > 0;
+      for(int i = 0; i < ArraySize(records) && written; i++)
+         if(records[i].symbol != symbol)
+            written = FileWrite(file, records[i].symbol, (int)records[i].enabled, records[i].pips) > 0;
+      written = written && FileWrite(file, symbol, (int)enabled, normalized) > 0;
+      FileFlush(file);
+      FileClose(file);
+      return written && FileMove(temporary, 0, m_file_name, FILE_REWRITE);
      }
   };
 

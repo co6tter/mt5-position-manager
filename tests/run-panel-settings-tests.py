@@ -40,11 +40,18 @@ string DoubleToString(double n, int digits) {
     std::ostringstream out; out << std::fixed << std::setprecision(digits) << n;
     return out.str();
 }
-string StringFormat(const string&, long chart, long account, long server) {
-    return "settings_" + std::to_string(chart) + "_" + std::to_string(account) +
-           "_" + std::to_string(server) + ".csv";
+string StringSubstr(const string& s, int start, int length = -1) {
+    return s.substr(start, length < 0 ? string::npos : size_t(length));
 }
-struct OpenFile { string path; bool write; std::vector<string> fields; size_t next = 0; };
+template<class T> int ArraySize(const std::vector<T>& a) { return int(a.size()); }
+template<class T> int ArrayResize(std::vector<T>& a, int n) { a.resize(n); return n; }
+template<class... T> string StringFormat(const string& format, T... values) {
+    string name = format.substr(format.find('\\') + 1);
+    name = name.substr(0, name.find('%'));
+    for (long value : {long(values)...}) name += "_" + std::to_string(value);
+    return name + ".csv";
+}
+struct OpenFile { string path; bool write; std::vector<string> fields; size_t next = 0; string text; };
 std::map<string, string> disk;
 std::map<int, OpenFile> opened;
 int next_handle = 1;
@@ -56,31 +63,29 @@ template<class T> string Field(T value) { return std::to_string(value); }
 int FileOpen(const string& path, int flags, char) {
     bool write = flags & FILE_WRITE;
     if (!write && !disk.count(path)) return INVALID_HANDLE;
-    OpenFile file{path, write, {}, 0};
+    OpenFile file{path, write, {}, 0, ""};
     if (!write) {
-        std::istringstream in(disk[path]); string field;
-        while (std::getline(in, field, '\t')) {
-            if (!field.empty() && field.back() == '\n') field.pop_back();
-            file.fields.push_back(field);
+        // FILE_CSV reads fields across line breaks, so split on both separators.
+        std::istringstream lines(disk[path]); string line;
+        while (std::getline(lines, line)) {
+            std::istringstream in(line); string field;
+            while (std::getline(in, field, '\t')) file.fields.push_back(field);
         }
     }
     int handle = next_handle++; opened[handle] = file; return handle;
 }
+// Each FileWrite call is one line, as in MT5.
 template<class... T> uint FileWrite(int handle, T... values) {
-    opened[handle].fields = {Field(values)...};
-    return uint(opened[handle].fields.size());
+    std::vector<string> fields = {Field(values)...};
+    string& text = opened[handle].text;
+    for (size_t i = 0; i < fields.size(); ++i) text += (i ? "\t" : "") + fields[i];
+    text += '\n';
+    return uint(fields.size());
 }
 void FileFlush(int) {}
 void FileClose(int handle) {
     OpenFile file = opened.at(handle);
-    if (file.write) {
-        std::ostringstream out;
-        for (size_t i = 0; i < file.fields.size(); ++i) {
-            if (i) out << '\t';
-            out << file.fields[i];
-        }
-        out << '\n'; disk[file.path] = out.str();
-    }
+    if (file.write) disk[file.path] = file.text;
     opened.erase(handle);
 }
 bool FileMove(const string& from, int, const string& to, int) {
@@ -106,6 +111,50 @@ PMPanelSettings Defaults() {
     s.trailing_direction = PM_DIRECTION_BOTH;
     s.trail_basis = PM_TRAIL_BASIS_PER_POSITION;
     return s;
+}
+void TestAutoSlStore() {
+    CAutoSlStore store;
+    store.Configure(456, "broker-A");
+    bool enabled = false; string pips = "0";
+    Check(!store.Load("XAUUSD", enabled, pips) && !enabled && pips == "0",
+          "Auto SL without a file keeps OFF and 0");
+    Check(store.Save("XAUUSD", true, "10000") && store.Save("USDJPY", false, "25.5"),
+          "Auto SL saves two symbols");
+    string path = last_destination;
+    CAutoSlStore restarted;
+    restarted.Configure(456, "broker-A");
+    Check(restarted.Load("XAUUSD", enabled, pips) && enabled && pips == "10000",
+          "gold Auto SL survives a restart");
+    Check(restarted.Load("USDJPY", enabled, pips) && !enabled && pips == "25.5",
+          "each symbol keeps its own ON/OFF and pips");
+    Check(!restarted.Load("EURUSD", enabled, pips), "an unsaved symbol has no Auto SL");
+    Check(restarted.Save("XAUUSD", false, "100.0") && restarted.Load("XAUUSD", enabled, pips) &&
+          !enabled && pips == "100" && restarted.Load("USDJPY", enabled, pips) && pips == "25.5",
+          "updating one symbol keeps the others and normalizes the pips text");
+    CAutoSlStore other_chart_same_account;
+    other_chart_same_account.Configure(456, "broker-A");
+    Check(other_chart_same_account.Load("USDJPY", enabled, pips), "charts of one account share Auto SL");
+    CAutoSlStore other_account;
+    other_account.Configure(457, "broker-A");
+    Check(!other_account.Load("USDJPY", enabled, pips), "another account is isolated");
+    CAutoSlStore other_server;
+    other_server.Configure(456, "broker-B");
+    Check(!other_server.Load("USDJPY", enabled, pips), "the same login on another server is isolated");
+    CAutoSlStore offline;
+    offline.Configure(0, "broker-A");
+    Check(!offline.Save("USDJPY", true, "10"), "a disconnected account cannot save Auto SL");
+    Check(!store.Save("USDJPY", true, "abc") && !store.Save("USDJPY", true, "1000001") && !store.Save("", true, "1"),
+          "invalid Auto SL input is never written");
+    fail_move = true;
+    Check(!store.Save("USDJPY", true, "1"), "failed Auto SL replacement is reported");
+    fail_move = false;
+    Check(store.Load("USDJPY", enabled, pips) && pips == "25.5", "failed replacement keeps the previous Auto SL");
+    disk[path] = "1\tbroker-A\nXAUUSD\t1\t500\nUSDJPY\t2\t10\n";
+    Check(!store.Load("XAUUSD", enabled, pips), "a corrupt record rejects the whole Auto SL file");
+    disk[path] = "1\tbroker-B\nXAUUSD\t1\t500\n";
+    Check(!store.Load("XAUUSD", enabled, pips), "a mismatched server identity is rejected");
+    disk[path] = "1\tbroker-A\nXAUUSD\t1\n";
+    Check(!store.Load("XAUUSD", enabled, pips), "a truncated Auto SL record is rejected");
 }
 int main() {
     CPanelSettingsStore first;
@@ -193,6 +242,7 @@ int main() {
     Check(!restarted.Load(unchanged), "mismatched server identity is rejected");
     disk[first_path] = "1\t1\tXAUUSD\t1\t42\t1\t1\t1\t7.25\t9.50\tUSDJPY\t0\t1\t1\t1\t10\t2\n";
     Check(!restarted.Load(unchanged), "truncated file is rejected");
+    TestAutoSlStore();
     std::cout << "Panel settings round-trip, isolation and corruption checks passed\n";
 }
 '''
@@ -211,6 +261,8 @@ def main() -> None:
         raise AssertionError("EA deinitialization must save automatic settings")
     source = (ROOT / "src/PanelSettings.mqh").read_text()
     source = re.sub(r"^#.*$", "", source, flags=re.M)
+    source = re.sub(r"\b(\w+)\s+&(\w+)\[\]", r"std::vector<\1> &\2", source)
+    source = re.sub(r"\b(\w+)\s+(\w+)\[\];", r"std::vector<\1> \2;", source)
     compiler = shutil.which("clang++") or shutil.which("g++")
     if not compiler:
         raise SystemExit("A C++17 compiler is required.")

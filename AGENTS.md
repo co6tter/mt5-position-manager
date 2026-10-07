@@ -24,6 +24,7 @@ Before changing panel UI or Trail behavior, read the relevant section of `docs/s
 - An empty numeric field is "not entered yet", not bad input: `-`/`+` seeds it from the market and commits. Only malformed text is refused. Limit/Stop start empty, so without this there is no way to reach a valid entry price.
 - A control that cannot act must say so. The Pips/Price toggles grey out while no entry price exists, the way the send buttons grey out for a side that is not orderable.
 - Keep each feature on one row at the 560px minimum width: SL and TP rows are label, mode, `- [value] +`, `Set`, `Clear`.
+- The Auto SL row sits between SL and TP: label, ON/OFF, `- [pips] +`, price-distance note. It fills only an SL that is 0, resolves inside `CEntryDraft` so previews, lines, Risk sizing and the sent order agree, and is saved per account and symbol (`CAutoSlStore`), not per chart. Pips use the shared conversion; never add a per-symbol (e.g. gold) multiplier.
 
 ## Label conventions
 
