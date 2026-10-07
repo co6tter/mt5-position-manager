@@ -42,6 +42,7 @@ private:
    PMTrailBasis m_trail_basis;
    bool m_break_even_enabled;
    bool m_trailing_enabled;
+   bool m_worst_first;
    int m_be_trigger_pips;
    int m_be_lock_pips;
    int m_trail_trigger_pips;
@@ -308,6 +309,9 @@ public:
       created = CreateNumericInput("TRAIL_TRIGGER", "TRAIL_TRIGGER_VALUE", "0", PM_TRAIL_INPUT1_X, ContentTop() + PM_TRAIL_ROW_Y, PM_TRAIL_INPUT_WIDTH) && created;
       created = CreateLabel("TRAIL_DIST_LABEL", "Distance", PM_TRAIL_LABEL2_X, ContentTop() + PM_TRAIL_ROW_Y + 5, clrSilver, 9) && created;
       created = CreateNumericInput("TRAIL_DIST", "TRAIL_DIST_VALUE", "0", PM_TRAIL_INPUT2_X, ContentTop() + PM_TRAIL_ROW_Y, PM_TRAIL_INPUT_WIDTH) && created;
+      created = CreateLabel("WORST_LABEL", "Worst First", 12, ContentTop() + PM_TRAIL_WORST_ROW_Y + 5, clrSilver, 9) && created;
+      created = CreateButton("WORST_FIRST", "OFF", PM_TRAIL_TOGGLE_X, ContentTop() + PM_TRAIL_WORST_ROW_Y, 60, 22) && created;
+      created = CreateLabel("WORST_NOTE", "Others trail after the worst is protected.", PM_TRAIL_LABEL1_X, ContentTop() + PM_TRAIL_WORST_ROW_Y + 6, clrSilver, 8) && created;
       created = CreateLabel("TRAIL_HINT", "Trailing Trigger 0 uses Distance. All distances are pips.", 12, ContentTop() + PM_TRAIL_HINT_ROW_Y, clrSilver, 8) && created;
 
       created = CreateLabel("SESSION_LABEL", "Session close: - | Auto close: -", 14, 0, clrSilver, 9) && created;
@@ -318,6 +322,7 @@ public:
       UpdateToggleButtonVisual("AUTO_ENABLED", m_auto_enabled);
       UpdateToggleButtonVisual("BE_ENABLED", m_break_even_enabled);
       UpdateToggleButtonVisual("TRAIL_ENABLED", m_trailing_enabled);
+      UpdateWorstFirstVisual();
       UpdateEquityGuardVisuals();
       ApplyTabVisibility();
       UpdateStatusLayout();
@@ -358,6 +363,7 @@ public:
       settings.trail_basis = m_trail_basis;
       settings.break_even_enabled = m_break_even_enabled;
       settings.trailing_enabled = m_trailing_enabled;
+      settings.worst_first = m_worst_first;
       settings.be_trigger_pips = m_be_trigger_pips;
       settings.be_lock_pips = m_be_lock_pips;
       settings.trail_trigger_pips = m_trail_trigger_pips;
@@ -508,6 +514,7 @@ public:
       config.symbol = TrailingSymbol();
       config.direction = m_trailing_direction;
       config.basis = m_trail_basis;
+      config.worst_first = m_worst_first;
       const int digits = (int)SymbolInfoInteger(config.symbol, SYMBOL_DIGITS);
       config.be_trigger_points = PMPipsToPoints(m_be_trigger_pips, digits);
       config.be_lock_points = PMPipsToPoints(m_be_lock_pips, digits);
@@ -723,6 +730,13 @@ public:
          StepIntegerInput("BE_LOCK_VALUE", m_be_lock_pips, 1, PM_MAX_TRAILING_POINTS, "Break Even Lock");
       else if(object_name == Name("TRAIL_ENABLED"))
          m_trailing_enabled = !m_trailing_enabled;
+      else if(object_name == Name("WORST_FIRST"))
+        {
+         if(m_trail_basis == PM_TRAIL_BASIS_PER_POSITION)
+            m_worst_first = !m_worst_first;
+         else
+            SetStatus("Worst First applies only to the Per Position basis.");
+        }
       else if(object_name == Name("TRAIL_TRIGGER_DEC"))
          StepIntegerInput("TRAIL_TRIGGER_VALUE", m_trail_trigger_pips, -1, PM_MAX_TRAILING_POINTS, "Trailing Trigger");
       else if(object_name == Name("TRAIL_TRIGGER_INC"))
@@ -757,6 +771,7 @@ private:
       m_trail_basis = PM_TRAIL_BASIS_PER_POSITION;
       m_break_even_enabled = false;
       m_trailing_enabled = false;
+      m_worst_first = false;
       m_be_trigger_pips = 0;
       m_be_lock_pips = 0;
       m_trail_trigger_pips = 0;
@@ -770,6 +785,7 @@ private:
              StringFind(object_name, Name("EQ_")) == 0 ||
              StringFind(object_name, Name("TS_")) == 0 ||
              object_name == Name("BASIS_TOGGLE") ||
+             object_name == Name("WORST_FIRST") ||
              StringFind(object_name, Name("BE_")) == 0 ||
              StringFind(object_name, Name("TRAIL_")) == 0;
      }
@@ -792,6 +808,7 @@ private:
       m_trail_basis = settings.trail_basis;
       m_break_even_enabled = settings.break_even_enabled;
       m_trailing_enabled = settings.trailing_enabled;
+      m_worst_first = settings.worst_first;
       m_be_trigger_pips = settings.be_trigger_pips;
       m_be_lock_pips = settings.be_lock_pips;
       m_trail_trigger_pips = settings.trail_trigger_pips;
@@ -1259,6 +1276,7 @@ private:
                       PMTrailBasisToString(m_trail_basis));
       UpdateToggleButtonVisual("BE_ENABLED", m_break_even_enabled);
       UpdateToggleButtonVisual("TRAIL_ENABLED", m_trailing_enabled);
+      UpdateWorstFirstVisual();
      }
    string EntryRRText(const int side)
      {
@@ -2183,6 +2201,9 @@ private:
       SetVisible("TRAIL_DIST_DEC", trail);
       SetVisible("TRAIL_DIST_VALUE", trail);
       SetVisible("TRAIL_DIST_INC", trail);
+      SetVisible("WORST_LABEL", trail);
+      SetVisible("WORST_FIRST", trail);
+      SetVisible("WORST_NOTE", trail);
       SetVisible("TRAIL_HINT", trail);
       SetVisible("SESSION_LABEL", expanded);
       for(int row = 0; row < m_rendered_rows; row++)
@@ -2240,6 +2261,17 @@ private:
       ObjectSetString(0, Name(suffix), OBJPROP_TEXT, enabled ? "ON" : "OFF");
       ObjectSetInteger(0, Name(suffix), OBJPROP_BGCOLOR,
                        enabled ? clrDarkGreen : clrMaroon);
+     }
+   // Worst First only gates Per Position; an Average basket shares one stop, so
+   // the toggle greys out and the note says why instead of silently doing nothing.
+   void UpdateWorstFirstVisual()
+     {
+      const bool available = m_trail_basis == PM_TRAIL_BASIS_PER_POSITION;
+      UpdateToggleButtonVisual("WORST_FIRST", m_worst_first);
+      ObjectSetInteger(0, Name("WORST_FIRST"), OBJPROP_COLOR, available ? clrWhite : clrSilver);
+      ObjectSetString(0, Name("WORST_NOTE"), OBJPROP_TEXT,
+                      available ? "Others trail after the worst is protected." :
+                      "Not used with the Average basis.");
      }
    color StatusTextColor()
      {

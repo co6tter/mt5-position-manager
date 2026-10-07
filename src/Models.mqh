@@ -243,6 +243,7 @@ struct TrailingStopConfig
    int be_lock_points;
    int trail_trigger_points;
    int trail_points;
+   bool worst_first;
   };
 
 #endif

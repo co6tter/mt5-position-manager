@@ -140,6 +140,9 @@ MT5を使わない補助確認は`python3 tests/run-price-editor-tests.py`で実
 15. チャートSymbol・時間足の変更でEAを再初期化し、`Basis`表示が`Per Position`へ戻ることを確認する。Entryを含むタブ切替・パネルの移動・折り畳み・リサイズでは`Basis`の選択が保持されることを確認する。
 16. 表示倍率100%・125%・150%、パネル幅560・800・1200pxで両方のBasis表記と4つの最大数値`1000000`を確認する。Break Evenはラベル・ON/OFF・Trigger・Lockが1行、Trailingはラベル・ON/OFF・Trigger・Distanceが1行のまま、説明・Status・グリップと重ならず、最小幅でも数字が末尾まで見えることを確認する。全タブ切替・折り畳み後に追加部品が残らず、復帰後も表示できることを確認する。
 17. 同じバスケットへの変更送信中に価格が動く状況で、Averageの共通候補がTicketごとに別候補へ切り替わらないことを確認する。Per Positionでは各Ticketごとの候補検証・代替候補が働くことを確認する。決定的な補助確認は`python3 tests/run-trailing-stop-tests.py`で実行できるが、実際の取引APIの確認はMT5で行う。
+18. `Basis`が`Per Position`で`Worst First`をONにし、同じSymbol・Directionで建値の異なる2Ticket（Bが不利な建値）を保有する。Aだけが自身のTrailing Triggerに達している間はAのTrailingが発動せず、Break EvenをONにしている場合はAにBreak EvenのSLだけが設定されることを確認する。BがTriggerに達する、またはBのSLが建値以上になった周期以降、AのTrailingが発動することを確認する。
+19. 同じ状態でBを手動決済し、Aが次の判定基準になり、Aが条件を満たしていればTrailingが発動することを確認する。3Ticketで2番目に不利なTicketが基準へ繰り上がることも確認する。
+20. `Basis`を`Average`にすると`Worst First`ボタンが灰色文字になり、説明が`Not used with the Average basis.`へ変わること、クリックしても値が変わらずStatusへ理由が出ることを確認する。560px・100%・125%・150%でWorst First行がTrailing行・説明・Statusと重ならないこと、EA再初期化後もON/OFFが復元されることを確認する。
 
 ## パフォーマンス回帰
 

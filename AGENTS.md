@@ -9,6 +9,7 @@ Before changing panel UI or Trail behavior, read the relevant section of `docs/s
 - Keep each feature on one row at the 560px minimum panel width:
   - Break Even row: label, ON/OFF, Trigger `- [value] +`, Lock `- [value] +`.
   - Trailing row: label, ON/OFF, Trigger `- [value] +`, Distance `- [value] +`.
+  - Worst First row: label, ON/OFF, short note. Its initial value is OFF; it greys out on the `Average` basis.
 - Keep Basis on its own row. Its initial value is `Per Position`.
 - Initialize all four numeric fields with visible text `0`.
 - Preserve the one-row feature layout when changing widths or adding controls. A different row structure requires an explicit current user request.

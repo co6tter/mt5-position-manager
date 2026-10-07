@@ -132,6 +132,7 @@ int main() {
     saved.be_lock_pips = 2;
     saved.trail_trigger_pips = 15;
     saved.trail_pips = 5;
+    saved.worst_first = true;
     Check(first.Save(saved), "save all automatic settings");
     string first_path = last_destination;
     CPanelSettingsStore restarted;
@@ -148,7 +149,7 @@ int main() {
     Check(loaded.trailing_symbol == "USDJPY" && loaded.trailing_direction == PM_DIRECTION_LONG &&
           loaded.trail_basis == PM_TRAIL_BASIS_AVERAGE && loaded.break_even_enabled &&
           loaded.trailing_enabled && loaded.be_trigger_pips == 10 && loaded.be_lock_pips == 2 &&
-          loaded.trail_trigger_pips == 15 && loaded.trail_pips == 5,
+          loaded.trail_trigger_pips == 15 && loaded.trail_pips == 5 && loaded.worst_first,
           "Trail settings survive");
     CPanelSettingsStore other_account;
     other_account.Configure(123, 457, "broker-A");
@@ -173,6 +174,15 @@ int main() {
           "failed replacement keeps the previous settings");
     Check(first.Save(saved) && restarted.Load(loaded) && !loaded.auto_enabled,
           "OFF transition is persisted immediately");
+    disk[first_path] = "1\t1\tXAUUSD\t1\t42\t1\t1\t1\t7.25\t9.50\tUSDJPY\t0\t1\t1\t1\t10\t2\t15\t5\tbroker-A\n";
+    PMPanelSettings legacy = Defaults();
+    Check(restarted.Load(legacy) && legacy.auto_minutes == 42 && legacy.trail_pips == 5 &&
+          !legacy.worst_first, "version 1 file loads with Worst First OFF");
+    disk[first_path] = "2\t1\tXAUUSD\t1\t42\t1\t1\t1\t7.25\t9.50\tUSDJPY\t0\t1\t1\t1\t10\t2\t15\t5\tbroker-A\n";
+    PMPanelSettings missing_worst = Defaults();
+    Check(!restarted.Load(missing_worst), "version 2 file without Worst First is rejected");
+    disk[first_path] = "2\t1\tXAUUSD\t1\t42\t1\t1\t1\t7.25\t9.50\tUSDJPY\t0\t1\t1\t1\t10\t2\t15\t5\tbroker-A\t7\n";
+    Check(!restarted.Load(missing_worst), "invalid Worst First value is rejected");
     disk[first_path] = "1\t1\tXAUUSD\t1\t42\t1\t1\t1\t7.25\t9.50\tUSDJPY\t0\t1\t1\t1\t10\t2\t15\t9999999\tbroker-A\n";
     PMPanelSettings unchanged = Defaults();
     Check(!restarted.Load(unchanged) && unchanged.auto_minutes == 10 && !unchanged.auto_enabled,

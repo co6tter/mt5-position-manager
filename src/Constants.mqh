@@ -30,7 +30,7 @@
 #define PM_PANEL_STOPS_HEIGHT 92
 #define PM_PANEL_AUTO_HEIGHT 108
 #define PM_PANEL_GUARD_HEIGHT 126
-#define PM_PANEL_TRAIL_HEIGHT 140
+#define PM_PANEL_TRAIL_HEIGHT 168
 #define PM_TRAIL_TOGGLE_X 100
 #define PM_TRAIL_LABEL1_X 170
 #define PM_TRAIL_INPUT1_X 215
@@ -41,7 +41,8 @@
 #define PM_TRAIL_BASIS_TOGGLE_WIDTH 150
 #define PM_TRAIL_BE_ROW_Y 60
 #define PM_TRAIL_ROW_Y 88
-#define PM_TRAIL_HINT_ROW_Y 120
+#define PM_TRAIL_WORST_ROW_Y 116
+#define PM_TRAIL_HINT_ROW_Y 148
 // Entry rows. The order type lives in the sub-tab strip, so the side is never a
 // toggle: both send buttons stay on screen and each one is enabled by its own
 // evaluation. Laid out for PM_MIN_PANEL_WIDTH; extra width stays empty.

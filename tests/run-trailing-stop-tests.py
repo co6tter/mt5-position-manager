@@ -118,6 +118,7 @@ def main() -> None:
              "TestResolveTrailingCandidatesSharedCandidate",
              "TestResolveTrailingCandidatesPendingExclusion",
              "TestResolveTrailingCandidatesSellAndScope",
+             "TestResolveTrailingCandidatesWorstFirst",
              "TestTrailingSnapGranularity", "TestResolveTrailingCandidatesSnapToDigitGrid",
              "TestIsMoreFavorableStop", "TestBestStopCandidate", "TestPanelLayoutHelpers"]
     helpers = ["PMProfitPoints", "PMDirectionMatches", "PMPositionTypeToString",

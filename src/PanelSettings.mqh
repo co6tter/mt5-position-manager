@@ -24,6 +24,7 @@ struct PMPanelSettings
    int be_lock_pips;
    int trail_trigger_pips;
    int trail_pips;
+   bool worst_first;
   };
 
 bool PMPanelSettingInteger(const string text, const int minimum, const int maximum, int &value)
@@ -85,7 +86,8 @@ public:
       const string temporary = m_file_name + ".tmp";
       const int file = FileOpen(temporary, FILE_WRITE | FILE_CSV | FILE_UNICODE, '\t');
       if(file == INVALID_HANDLE) return false;
-      const uint written = FileWrite(file, "1",
+      // Version 2 appends Worst First after the server; version 1 files still load.
+      const uint written = FileWrite(file, "2",
                                      (int)settings.auto_enabled, settings.auto_symbol,
                                      (int)settings.auto_direction, settings.auto_minutes,
                                      (int)settings.passed_behavior,
@@ -97,7 +99,8 @@ public:
                                      (int)settings.trail_basis, (int)settings.break_even_enabled,
                                      (int)settings.trailing_enabled, settings.be_trigger_pips,
                                      settings.be_lock_pips, settings.trail_trigger_pips,
-                                     settings.trail_pips, m_account_server);
+                                     settings.trail_pips, m_account_server,
+                                     (int)settings.worst_first);
       FileFlush(file);
       FileClose(file);
       return written > 0 && FileMove(temporary, 0, m_file_name, FILE_REWRITE);
@@ -114,8 +117,14 @@ public:
          if(FileIsEnding(file)) { FileClose(file); return false; }
          fields[i] = FileReadString(file);
         }
+      string worst_first_field = "0";
+      if(fields[0] == "2")
+        {
+         if(FileIsEnding(file)) { FileClose(file); return false; }
+         worst_first_field = FileReadString(file);
+        }
       FileClose(file);
-      if(fields[0] != "1" || fields[2] == "" || fields[10] == "" ||
+      if((fields[0] != "1" && fields[0] != "2") || fields[2] == "" || fields[10] == "" ||
          fields[19] != m_account_server) return false;
       PMPanelSettings loaded = {};
       int n = 0;
@@ -146,6 +155,8 @@ public:
          !PMPanelSettingInteger(fields[16], 0, PM_MAX_TRAILING_POINTS, loaded.be_lock_pips) ||
          !PMPanelSettingInteger(fields[17], 0, PM_MAX_TRAILING_POINTS, loaded.trail_trigger_pips) ||
          !PMPanelSettingInteger(fields[18], 0, PM_MAX_TRAILING_POINTS, loaded.trail_pips)) return false;
+      if(!PMPanelSettingInteger(worst_first_field, 0, 1, n)) return false;
+      loaded.worst_first = n == 1;
       settings = loaded;
       return true;
      }

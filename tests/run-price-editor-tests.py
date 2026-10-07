@@ -31,6 +31,9 @@ def verify_trail_layout(ui: str) -> None:
             'CreateLabel("TRAIL_TRIGGER_LABEL"', 'CreateNumericInput("TRAIL_TRIGGER"',
             'CreateLabel("TRAIL_DIST_LABEL"', 'CreateNumericInput("TRAIL_DIST"',
         ],
+        "PM_TRAIL_WORST_ROW_Y": [
+            'CreateLabel("WORST_LABEL"', 'CreateButton("WORST_FIRST"', 'CreateLabel("WORST_NOTE"',
+        ],
     }
     lines = ui.splitlines()
     for row, controls in rows.items():
@@ -42,6 +45,8 @@ def verify_trail_layout(ui: str) -> None:
         expected = f'CreateNumericInput("{control}", "{control}_VALUE", "0"'
         if expected not in ui:
             raise AssertionError(f"{control} must initially display 0")
+    if 'CreateButton("WORST_FIRST", "OFF"' not in ui:
+        raise AssertionError("Trail Worst First must initially display OFF")
     if 'CreateButton("BASIS_TOGGLE", "Per Position"' not in ui:
         raise AssertionError("Trail Basis must initially display Per Position")
 

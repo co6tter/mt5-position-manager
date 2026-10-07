@@ -179,6 +179,101 @@ void PMAppendTrailingCandidateResult(ulong &tickets[],
    fallback_candidates[count] = fallback;
   }
 
+bool PMWorstFirstEligible(const PMPosition &position, const double point)
+  {
+   return position.ticket != 0 && point > 0.0 &&
+          MathIsValidNumber(position.volume) && position.volume > 0.0 &&
+          MathIsValidNumber(position.open_price) && position.open_price > 0.0 &&
+          MathIsValidNumber(position.current_price) && position.current_price > 0.0;
+  }
+
+bool PMWorstFirstIsWorst(const PMPosition &position, const double point, const double worst)
+  {
+   return MathAbs(position.open_price - worst) < point * 0.5;
+  }
+
+bool PMWorstFirstStopProtected(const PMPosition &position, const double point)
+  {
+   if(!MathIsValidNumber(position.sl) || position.sl <= 0.0)
+      return false;
+   const double tolerance = point * 0.5;
+   return position.type == POSITION_TYPE_BUY ?
+          position.sl >= position.open_price - tolerance :
+          position.sl <= position.open_price + tolerance;
+  }
+
+// Worst First: in a Symbol/Direction group, a ticket other than the worst one
+// (Buy: highest entry, Sell: lowest entry; equal entries all count as worst)
+// may only trail once the worst ticket is protected -- its own Break Even or
+// Trailing trigger is reached now, or its SL is already at or beyond its entry.
+// Stateless: closing the worst ticket makes the next one the worst. Break Even
+// is never gated. Index-aligned with all_positions; invalid entries stay false.
+void PMResolveWorstFirstTrailing(const PMPosition &all_positions[],
+                                 const double &point_for_position[],
+                                 const bool enabled_break_even,
+                                 const bool enabled_trailing,
+                                 const int be_trigger_points,
+                                 const int be_lock_points,
+                                 const int trail_trigger_points,
+                                 const int trail_points,
+                                 bool &trailing_allowed[])
+  {
+   const int total = ArraySize(all_positions);
+   ArrayResize(trailing_allowed, total);
+   ArrayInitialize(trailing_allowed, false);
+   bool processed[];
+   ArrayResize(processed, total);
+   ArrayInitialize(processed, false);
+   for(int i = 0; i < total; i++)
+     {
+      if(processed[i])
+         continue;
+      const string group_symbol = all_positions[i].symbol;
+      const ENUM_POSITION_TYPE group_type = all_positions[i].type;
+      bool found = false;
+      double worst = 0.0;
+      for(int j = i; j < total; j++)
+        {
+         if(all_positions[j].symbol != group_symbol || all_positions[j].type != group_type)
+            continue;
+         processed[j] = true;
+         if(!PMWorstFirstEligible(all_positions[j], point_for_position[j]))
+            continue;
+         const double open_price = all_positions[j].open_price;
+         if(!found || (group_type == POSITION_TYPE_BUY ? open_price > worst : open_price < worst))
+            worst = open_price;
+         found = true;
+        }
+      if(!found)
+         continue;
+
+      bool unlocked = false;
+      for(int j = i; j < total && !unlocked; j++)
+        {
+         if(all_positions[j].symbol != group_symbol || all_positions[j].type != group_type ||
+            !PMWorstFirstEligible(all_positions[j], point_for_position[j]) ||
+            !PMWorstFirstIsWorst(all_positions[j], point_for_position[j], worst))
+            continue;
+         double candidate = 0.0;
+         unlocked = PMWorstFirstStopProtected(all_positions[j], point_for_position[j]) ||
+                    (enabled_break_even &&
+                     PMBreakEvenCandidate(all_positions[j].open_price, group_type,
+                                          all_positions[j].current_price, point_for_position[j],
+                                          be_trigger_points, be_lock_points, candidate)) ||
+                    (enabled_trailing &&
+                     PMTrailingCandidate(all_positions[j].open_price, group_type,
+                                         all_positions[j].current_price, point_for_position[j],
+                                         trail_trigger_points, trail_points, candidate));
+        }
+
+      for(int j = i; j < total; j++)
+         if(all_positions[j].symbol == group_symbol && all_positions[j].type == group_type &&
+            PMWorstFirstEligible(all_positions[j], point_for_position[j]))
+            trailing_allowed[j] = unlocked ||
+                                  PMWorstFirstIsWorst(all_positions[j], point_for_position[j], worst);
+     }
+  }
+
 // Decides, for every position, whether a Break Even / Trailing candidate
 // applies and which reference price it is measured from -- the volume-weighted
 // basket average for PM_TRAIL_BASIS_AVERAGE, or the position's own entry for
@@ -194,6 +289,8 @@ void PMAppendTrailingCandidateResult(ulong &tickets[],
 // validation (e.g. CValidationService::CalculateTarget only reads symbol/type).
 // result_fallback_candidates[] is the alternate Break Even/Trailing candidate
 // to retry when the primary one is rejected, or 0.0 when there is none.
+// worst_first gates Trailing per PMResolveWorstFirstTrailing and only applies to
+// PM_TRAIL_BASIS_PER_POSITION; an Average basket already shares one stop.
 int PMResolveTrailingCandidates(const PMPosition &all_positions[],
                                 const PMTrailBasis basis,
                                 const string scope_symbol,
@@ -207,6 +304,7 @@ int PMResolveTrailingCandidates(const PMPosition &all_positions[],
                                 const int be_lock_points,
                                 const int trail_trigger_points,
                                 const int trail_points,
+                                const bool worst_first,
                                 ulong &result_tickets[],
                                 int &result_basis_index[],
                                 double &result_candidates[],
@@ -221,6 +319,12 @@ int PMResolveTrailingCandidates(const PMPosition &all_positions[],
 
    if(basis == PM_TRAIL_BASIS_PER_POSITION)
      {
+      bool trailing_allowed[];
+      if(worst_first)
+         PMResolveWorstFirstTrailing(all_positions, point_for_position,
+                                     enabled_break_even, enabled_trailing,
+                                     be_trigger_points, be_lock_points,
+                                     trail_trigger_points, trail_points, trailing_allowed);
       for(int i = 0; i < total; i++)
         {
          if((has_symbol_scope && all_positions[i].symbol != scope_symbol) ||
@@ -240,6 +344,7 @@ int PMResolveTrailingCandidates(const PMPosition &all_positions[],
                                  all_positions[i].current_price, point_for_position[i],
                                  be_trigger_points, be_lock_points, break_even_candidate);
          const bool has_trailing = enabled_trailing &&
+            (!worst_first || trailing_allowed[i]) &&
             PMTrailingCandidate(all_positions[i].open_price, all_positions[i].type,
                                 all_positions[i].current_price, point_for_position[i],
                                 trail_trigger_points, trail_points, trailing_candidate);
@@ -381,6 +486,7 @@ public:
                                   config.enabled_break_even, config.enabled_trailing,
                                   config.be_trigger_points, config.be_lock_points,
                                   config.trail_trigger_points, config.trail_points,
+                                  config.worst_first,
                                   result_tickets, result_basis_index,
                                   result_candidates, result_fallback_candidates);
 

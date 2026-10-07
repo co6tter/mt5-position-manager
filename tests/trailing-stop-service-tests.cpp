@@ -9,7 +9,7 @@ std::vector<PMPosition> ServicePositions()
 
 TrailingStopConfig ServiceConfig(PMTrailBasis basis)
 {
-    return {true, true, "EURUSD", PM_DIRECTION_BOTH, basis, 20, 2, 20, 10};
+    return {true, true, "EURUSD", PM_DIRECTION_BOTH, basis, 20, 2, 20, 10, false};
 }
 
 void TestServiceValidationUnit()
