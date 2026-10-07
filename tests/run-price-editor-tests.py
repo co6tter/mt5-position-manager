@@ -261,7 +261,8 @@ void AssertTrue(bool condition, const string &name) {
                   "SelectEntryOrderType", "HandleEntryClick", "OpenEntry", "VolumeDigits", "HandlePriceMouse",
                   "RenderEntryState", "FitEntryLabel",
                   "LabelTextWidth", "LabelFittingCharacters", "SetEntryHint", "EntryPriceLineText",
-                  "CancelPriceDrag", "ResetStopEditor", "CommitEntryAutoSl", "EntryAutoSlNote", "RenderEntryAutoSl"]
+                  "CancelPriceDrag", "ResetStopEditor", "CommitEntryAutoSl", "EntryAutoSlNote", "RenderEntryAutoSl",
+                  "AutoSlNow", "SyncEntryAutoSl"]
     source += "\nclass EntryUiHarness { public: CEntryDraft m_entry_draft; CEntryService m_entry_service; PMEntrySnapshot m_entry_snapshot[2]; PMEntryComputation m_entry_result[2]; bool m_entry_valid[2] = {false, false}; bool m_visibility_dirty = false; string m_entry_reason[2], status; CPriceEditDrag m_price_drag; string Name(const string s) { return s; } void SetStatus(const string s) { status = s; }\n"
     source += r"""
     bool m_collapsed = false, m_price_scroll_before = true, m_price_drag_moved = false;
@@ -284,6 +285,13 @@ void AssertTrue(bool condition, const string &name) {
     void Render() { RenderEntryState(); }
     int auto_sl_saves = 0; bool auto_sl_save_ok = true;
     bool SaveAutoSlSetting() { ++auto_sl_saves; return auto_sl_save_ok; }
+    struct SharedAutoSl {
+        bool readable = false, enabled = false; string pips = "0"; datetime enabled_at = 0;
+        bool Load(const string &, bool &e, string &p, datetime &at) {
+            if (!readable) return false;
+            e = enabled; p = pips; at = enabled_at; return true;
+        }
+    } m_auto_sl_store;
 """
     source += "\n".join(function(ui_source, name) for name in ui_methods) + "\n};\n"
     source += (ROOT / "tests/entry-integration-tests.cpp").read_text()

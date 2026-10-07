@@ -25,6 +25,7 @@ Before changing panel UI or Trail behavior, read the relevant section of `docs/s
 - A control that cannot act must say so. The Pips/Price toggles grey out while no entry price exists, the way the send buttons grey out for a side that is not orderable.
 - Keep each feature on one row at the 560px minimum width: SL and TP rows are label, mode, `- [value] +`, `Set`, `Clear`.
 - The Auto SL row sits between SL and TP: label, ON/OFF, `- [pips] +`, price-distance note. It fills only an SL that is 0, resolves inside `CEntryDraft` so previews, lines, Risk sizing and the sent order agree, and is saved per account and symbol (`CAutoSlStore`), not per chart. Pips use the shared conversion; never add a per-symbol (e.g. gold) multiplier.
+- While ON, `CAutoSlService` also gives chart-symbol positions opened elsewhere (e.g. the mobile app) an SL measured from their entry price. Keep the ON-time gate: only positions opened at or after the saved ON time with SL 0 qualify, because switching OFF before entering is how the user holds a position without an SL. Each chart re-reads the shared setting every refresh (`SyncEntryAutoSl`).
 
 ## Label conventions
 
@@ -35,11 +36,12 @@ Before changing panel UI or Trail behavior, read the relevant section of `docs/s
 
 ## Verification
 
-After changing `src/UiPanel.mqh`, `src/Constants.mqh`, or Trail settings, run:
+After changing `src/UiPanel.mqh`, `src/Constants.mqh`, `src/PanelSettings.mqh`, `src/AutoSlService.mqh`, or Trail settings, run:
 
 ```bash
 rtk proxy python3 tests/run-price-editor-tests.py
 rtk proxy python3 tests/run-trailing-stop-tests.py
+rtk proxy python3 tests/run-panel-settings-tests.py
 rtk git diff --check
 ```
 

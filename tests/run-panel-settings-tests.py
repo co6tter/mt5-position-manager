@@ -21,6 +21,7 @@ PRELUDE = r'''
 #include <vector>
 using string = std::string;
 using uint = unsigned int;
+using datetime = long;
 enum PMDirection { PM_DIRECTION_LONG, PM_DIRECTION_SHORT, PM_DIRECTION_BOTH };
 enum PMPassedCloseBehavior { PM_PASSED_CLOSE_DO_NOTHING, PM_PASSED_CLOSE_IMMEDIATELY };
 enum PMEquityThresholdMode { PM_EQUITY_THRESHOLD_AMOUNT, PM_EQUITY_THRESHOLD_PERCENT };
@@ -29,7 +30,7 @@ enum PMTrailBasis { PM_TRAIL_BASIS_PER_POSITION, PM_TRAIL_BASIS_AVERAGE };
 #define PM_MAX_TRAILING_POINTS 1000000
 #define PM_MAX_EQUITY_THRESHOLD 1000000000.0
 enum { FILE_READ = 1, FILE_WRITE = 2, FILE_CSV = 8, FILE_UNICODE = 64,
-       FILE_REWRITE = 512, INVALID_HANDLE = -1 };
+       FILE_SHARE_READ = 128, FILE_REWRITE = 512, INVALID_HANDLE = -1 };
 int StringLen(const string& s) { return int(s.size()); }
 int StringGetCharacter(const string& s, int i) { return int((unsigned char)s.at(i)); }
 long StringToInteger(const string& s) { return std::strtol(s.c_str(), nullptr, 10); }
@@ -115,46 +116,62 @@ PMPanelSettings Defaults() {
 void TestAutoSlStore() {
     CAutoSlStore store;
     store.Configure(456, "broker-A");
-    bool enabled = false; string pips = "0";
-    Check(!store.Load("XAUUSD", enabled, pips) && !enabled && pips == "0",
+    bool enabled = false; string pips = "0"; datetime enabled_at = 0;
+    Check(!store.Load("XAUUSD", enabled, pips, enabled_at) && !enabled && pips == "0" && enabled_at == 0,
           "Auto SL without a file keeps OFF and 0");
-    Check(store.Save("XAUUSD", true, "10000") && store.Save("USDJPY", false, "25.5"),
+    Check(store.Save("XAUUSD", true, "10000", 1767225600) && store.Save("USDJPY", false, "25.5", 0),
           "Auto SL saves two symbols");
     string path = last_destination;
+    Check(disk[path].rfind("2\tbroker-A\n", 0) == 0, "Auto SL files are written as version 2");
     CAutoSlStore restarted;
     restarted.Configure(456, "broker-A");
-    Check(restarted.Load("XAUUSD", enabled, pips) && enabled && pips == "10000",
-          "gold Auto SL survives a restart");
-    Check(restarted.Load("USDJPY", enabled, pips) && !enabled && pips == "25.5",
-          "each symbol keeps its own ON/OFF and pips");
-    Check(!restarted.Load("EURUSD", enabled, pips), "an unsaved symbol has no Auto SL");
-    Check(restarted.Save("XAUUSD", false, "100.0") && restarted.Load("XAUUSD", enabled, pips) &&
-          !enabled && pips == "100" && restarted.Load("USDJPY", enabled, pips) && pips == "25.5",
+    Check(restarted.Load("XAUUSD", enabled, pips, enabled_at) && enabled && pips == "10000" &&
+          enabled_at == 1767225600, "gold Auto SL and the time it was switched ON survive a restart");
+    Check(restarted.Load("USDJPY", enabled, pips, enabled_at) && !enabled && pips == "25.5" && enabled_at == 0,
+          "each symbol keeps its own ON/OFF, pips and ON time");
+    Check(!restarted.Load("EURUSD", enabled, pips, enabled_at), "an unsaved symbol has no Auto SL");
+    Check(restarted.Save("XAUUSD", false, "100.0", 0) && restarted.Load("XAUUSD", enabled, pips, enabled_at) &&
+          !enabled && pips == "100" && enabled_at == 0 &&
+          restarted.Load("USDJPY", enabled, pips, enabled_at) && pips == "25.5",
           "updating one symbol keeps the others and normalizes the pips text");
+    Check(restarted.Save("USDJPY", true, "25.5", 1767225601) && restarted.Save("XAUUSD", true, "100", 1767225602) &&
+          restarted.Load("USDJPY", enabled, pips, enabled_at) && enabled_at == 1767225601,
+          "saving another symbol keeps this symbol's ON time");
     CAutoSlStore other_chart_same_account;
     other_chart_same_account.Configure(456, "broker-A");
-    Check(other_chart_same_account.Load("USDJPY", enabled, pips), "charts of one account share Auto SL");
+    Check(other_chart_same_account.Load("USDJPY", enabled, pips, enabled_at), "charts of one account share Auto SL");
     CAutoSlStore other_account;
     other_account.Configure(457, "broker-A");
-    Check(!other_account.Load("USDJPY", enabled, pips), "another account is isolated");
+    Check(!other_account.Load("USDJPY", enabled, pips, enabled_at), "another account is isolated");
     CAutoSlStore other_server;
     other_server.Configure(456, "broker-B");
-    Check(!other_server.Load("USDJPY", enabled, pips), "the same login on another server is isolated");
+    Check(!other_server.Load("USDJPY", enabled, pips, enabled_at), "the same login on another server is isolated");
     CAutoSlStore offline;
     offline.Configure(0, "broker-A");
-    Check(!offline.Save("USDJPY", true, "10"), "a disconnected account cannot save Auto SL");
-    Check(!store.Save("USDJPY", true, "abc") && !store.Save("USDJPY", true, "1000001") && !store.Save("", true, "1"),
+    Check(!offline.Save("USDJPY", true, "10", 1), "a disconnected account cannot save Auto SL");
+    Check(!store.Save("USDJPY", true, "abc", 1) && !store.Save("USDJPY", true, "1000001", 1) &&
+          !store.Save("", true, "1", 1) && !store.Save("USDJPY", true, "1", -1),
           "invalid Auto SL input is never written");
     fail_move = true;
-    Check(!store.Save("USDJPY", true, "1"), "failed Auto SL replacement is reported");
+    Check(!store.Save("USDJPY", true, "1", 1), "failed Auto SL replacement is reported");
     fail_move = false;
-    Check(store.Load("USDJPY", enabled, pips) && pips == "25.5", "failed replacement keeps the previous Auto SL");
-    disk[path] = "1\tbroker-A\nXAUUSD\t1\t500\nUSDJPY\t2\t10\n";
-    Check(!store.Load("XAUUSD", enabled, pips), "a corrupt record rejects the whole Auto SL file");
-    disk[path] = "1\tbroker-B\nXAUUSD\t1\t500\n";
-    Check(!store.Load("XAUUSD", enabled, pips), "a mismatched server identity is rejected");
-    disk[path] = "1\tbroker-A\nXAUUSD\t1\n";
-    Check(!store.Load("XAUUSD", enabled, pips), "a truncated Auto SL record is rejected");
+    Check(store.Load("USDJPY", enabled, pips, enabled_at) && pips == "25.5",
+          "failed replacement keeps the previous Auto SL");
+    disk[path] = "1\tbroker-A\nUSDJPY\t1\t100\n";
+    Check(store.Load("USDJPY", enabled, pips, enabled_at) && enabled && pips == "100" && enabled_at == 0,
+          "a version 1 file loads with an unknown ON time");
+    disk[path] = "2\tbroker-A\nXAUUSD\t1\t500\t1767225600\nUSDJPY\t2\t10\t0\n";
+    Check(!store.Load("XAUUSD", enabled, pips, enabled_at), "a corrupt record rejects the whole Auto SL file");
+    disk[path] = "2\tbroker-B\nXAUUSD\t1\t500\t1767225600\n";
+    Check(!store.Load("XAUUSD", enabled, pips, enabled_at), "a mismatched server identity is rejected");
+    disk[path] = "2\tbroker-A\nXAUUSD\t1\t500\n";
+    Check(!store.Load("XAUUSD", enabled, pips, enabled_at), "a version 2 record without its ON time is rejected");
+    disk[path] = "2\tbroker-A\nXAUUSD\t1\t500\t-1\n";
+    Check(!store.Load("XAUUSD", enabled, pips, enabled_at), "a negative ON time is rejected");
+    disk[path] = "2\tbroker-A\nXAUUSD\t1\t500\t17x\n";
+    Check(!store.Load("XAUUSD", enabled, pips, enabled_at), "a malformed ON time is rejected");
+    disk[path] = "3\tbroker-A\nXAUUSD\t1\t500\t1\n";
+    Check(!store.Load("XAUUSD", enabled, pips, enabled_at), "an unknown Auto SL file version is rejected");
 }
 int main() {
     CPanelSettingsStore first;

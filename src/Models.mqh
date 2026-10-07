@@ -126,6 +126,7 @@ struct PMPosition
    double sl;
    double tp;
    double profit;
+   datetime open_time;      // Trade server time the position was opened (POSITION_TIME).
   };
 
 struct PMTradeFailure
@@ -244,6 +245,14 @@ struct TrailingStopConfig
    int trail_trigger_points;
    int trail_points;
    bool worst_first;
+  };
+
+struct AutoSlConfig
+  {
+   bool enabled;
+   string symbol;
+   double pips;
+   datetime enabled_at;     // Trade server time Auto SL was last switched ON; 0 while unknown.
   };
 
 #endif

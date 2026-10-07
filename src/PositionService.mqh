@@ -38,6 +38,7 @@ public:
          positions[count].sl = PositionGetDouble(POSITION_SL);
          positions[count].tp = PositionGetDouble(POSITION_TP);
          positions[count].profit = PositionGetDouble(POSITION_PROFIT);
+         positions[count].open_time = (datetime)PositionGetInteger(POSITION_TIME);
          count++;
         }
       ArrayResize(positions, count);
@@ -87,6 +88,7 @@ public:
       position.sl = PositionGetDouble(POSITION_SL);
       position.tp = PositionGetDouble(POSITION_TP);
       position.profit = PositionGetDouble(POSITION_PROFIT);
+      position.open_time = (datetime)PositionGetInteger(POSITION_TIME);
       return true;
      }
 

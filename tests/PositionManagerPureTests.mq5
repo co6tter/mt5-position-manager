@@ -8,6 +8,7 @@
 #include "..\src\EquityGuardService.mqh"
 #include "..\src\EquityLineService.mqh"
 #include "..\src\TrailingStopService.mqh"
+#include "..\src\AutoSlService.mqh"
 
 int g_failures = 0;
 
@@ -1614,6 +1615,73 @@ void TestEquityLineCalculation()
               "Equity line is unavailable when net volume is zero");
   }
 
+void TestAutoSlPositionCandidate()
+  {
+   AutoSlConfig config = {};
+   config.enabled = true;
+   config.symbol = "USDJPY";
+   config.pips = 100.0;
+   config.enabled_at = 1000;
+   PMPosition position = {};
+   position.ticket = 301;
+   position.symbol = "USDJPY";
+   position.type = POSITION_TYPE_BUY;
+   position.volume = 0.1;
+   position.open_price = 150.123;
+   position.current_price = 150.200;
+   position.open_time = 1000;
+   double candidate = 0.0;
+   AssertTrue(PMAutoSlPositionCandidate(position, config, 0.001, 0.001, 3, candidate) &&
+              MathAbs(candidate - 149.123) < 0.0000001,
+              "Auto SL puts a Buy SL 100 pips below the entry price");
+   position.type = POSITION_TYPE_SELL;
+   AssertTrue(PMAutoSlPositionCandidate(position, config, 0.001, 0.001, 3, candidate) &&
+              MathAbs(candidate - 151.123) < 0.0000001,
+              "Auto SL puts a Sell SL 100 pips above the entry price");
+   position.type = POSITION_TYPE_BUY;
+   config.pips = 0.5;
+   AssertTrue(PMAutoSlPositionCandidate(position, config, 0.001, 0.001, 3, candidate) &&
+              MathAbs(candidate - 150.118) < 0.0000001,
+              "Fractional Auto SL pips use the shared pip conversion");
+   config.pips = 100.0;
+   position.open_time = 999;
+   AssertTrue(!PMAutoSlPositionCandidate(position, config, 0.001, 0.001, 3, candidate) && candidate == 0.0,
+              "A position opened before Auto SL was switched ON is left alone");
+   position.open_time = 1000;
+   position.sl = 150.0;
+   AssertTrue(!PMAutoSlPositionCandidate(position, config, 0.001, 0.001, 3, candidate),
+              "A position that already has an SL is left alone");
+   position.sl = 0.0;
+   position.symbol = "EURUSD";
+   AssertTrue(!PMAutoSlPositionCandidate(position, config, 0.001, 0.001, 3, candidate),
+              "A position of another symbol is left alone");
+   position.symbol = "USDJPY";
+   config.enabled = false;
+   AssertTrue(!PMAutoSlPositionCandidate(position, config, 0.001, 0.001, 3, candidate),
+              "Auto SL OFF protects nothing");
+   config.enabled = true;
+   config.pips = 0.0;
+   AssertTrue(!PMAutoSlPositionCandidate(position, config, 0.001, 0.001, 3, candidate),
+              "Auto SL ON with 0 pips protects nothing");
+   config.pips = 100.0;
+   config.enabled_at = 0;
+   AssertTrue(!PMAutoSlPositionCandidate(position, config, 0.001, 0.001, 3, candidate),
+              "An unknown ON time protects nothing");
+   config.enabled_at = 1000;
+   AssertTrue(!PMAutoSlPositionCandidate(position, config, 0.0, 0.001, 3, candidate),
+              "A missing point size protects nothing");
+   config.symbol = "XAUUSD";
+   config.pips = 10000.0;
+   position.symbol = "XAUUSD";
+   position.open_price = 2650.00;
+   AssertTrue(PMAutoSlPositionCandidate(position, config, 0.01, 0.01, 2, candidate) &&
+              MathAbs(candidate - 2550.00) < 0.0000001,
+              "10000 pips on a 2-digit gold quote is a 100.00 distance from the entry");
+   config.pips = 1000000.0;
+   AssertTrue(!PMAutoSlPositionCandidate(position, config, 0.01, 0.01, 2, candidate),
+              "A Buy SL that would fall to zero or below is not placed");
+  }
+
 void OnStart()
   {
    TestDirectionMatching();
@@ -1635,6 +1703,7 @@ void OnStart()
    TestPipConversion();
    TestIsMoreFavorableStop();
    TestBestStopCandidate();
+   TestAutoSlPositionCandidate();
    TestEntryHelpers();
    TestEntryPricingAndRiskHelpers();
    TestEntryRecomputeOrchestration();

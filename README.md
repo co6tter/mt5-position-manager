@@ -100,11 +100,12 @@ EAをチャートへ適用し、AutoTradingを有効にします。SymbolやDire
 
 パネルは内側に余白を持っています。`Entry`、`Positions`、`SL/TP`、`Auto Close`、`Equity Guard`、`Trail`のタブは、選択中だけ明るい青色・白文字で強調されます。タイトルバーの`-`で折り畳め、折り畳み中もタイトルバーをドラッグして移動できます。
 
-Auto Close・Equity Guard・Trailの確定済み設定は口座とチャートごとに保存され、口座の切り替えやMT5の再起動後に復元されます。保存データがない場合は各機能がOFFの初期設定で始まります。EntryタブのAuto SL(ON/OFFとPips)は口座と銘柄ごとに保存され、同じ銘柄のチャートで共有されます。
+Auto Close・Equity Guard・Trailの確定済み設定は口座とチャートごとに保存され、口座の切り替えやMT5の再起動後に復元されます。保存データがない場合は各機能がOFFの初期設定で始まります。EntryタブのAuto SL(ON/OFF、Pips、ONにした時刻)は口座と銘柄ごとに保存され、同じ銘柄のチャートで共有されます。
 
 - `Entry`: Market／Limit／StopとBuy／Sellを選び、Limit／StopではPriceを入力します。選択中の注文に対応したボタンから送信します。MarketのPriceは参照表示です。
 - EntryのSL／TPは独立したPrice／Points入力と`-` / `+`、`Set SL`／`Set TP`で設定し、チャート上のライン／ラベルをドラッグして価格を確定できます。`Clear SL`／`Clear TP`は片方だけを解除します。未設定側は0として送信されます。
 - SL設定時の自動TPは既定RR 1:1です。TPを直接入力・ドラッグすると価格が手動固定され、SL変更やドラッグ中も現在RRを確認できます。RR編集だけでは手動固定・キャンセルを解除せず、有効なSLがあるときに`Restore Auto`で自動計算へ戻します。SLを解除しても生成済みのTPは残ります。
+- EntryのAuto SLは、手動SLが0の注文に指定Pipsの距離でSLを付けます。ONの間は、スマホアプリなどパネル以外から建てたチャート銘柄のポジションにも、建値からその距離でSLを付けます。対象はONにした後に建ったSLなしのポジションだけです。SLなしで持つときはOFFにしてから建ててください。EAを載せたチャートが動いている間だけ働きます。
 - 数量はManual Lot／Risk Amount／Risk Percentを切り替えられます。リスク方式ではSL到達損失を口座通貨で見積もり、予算以下へ切り下げたLotを読み取り専用で表示します。SL未設定・計算不能時は`N/A`となり送信を止めます。Manual LotではSLのみ・TPのみ・両方・両方なしで注文できます。Entryの送信には確認ダイアログはありません。
 - `Positions`: Position行をクリックして選択・選択解除します。Symbol、Long/Short、Lot、Entry、SL、TP、Profit、Ticketを1行に表示し、Longは緑、Shortは赤で表示します。価格は銘柄のDigitsを保持します（例: `TP=159.520`）。
 
@@ -191,6 +192,7 @@ Entryの全注文は最新の確定入力を再計算し、`OrderCheck()`を通�
 │   ├── EquityGuardService.mqh    # Equity Guard判定
 │   ├── EquityLineService.mqh     # チャートSymbolの損益分岐ライン
 │   ├── TrailingStopService.mqh   # Break Even・Trailing StopのSL更新
+│   ├── AutoSlService.mqh         # ON後に建ったSLなしポジションへのAuto SL付与
 │   ├── UiPanel.mqh               # チャートオブジェクトによる操作パネル
 │   ├── PriceEditor.mqh           # 価格ドラッグの状態・概算集計・ラベル配置
 │   └── Models.mqh / Constants.mqh # 共通モデルと補助関数

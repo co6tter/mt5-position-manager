@@ -21,8 +21,11 @@ public:
    double manual_tp_price[2];
    // Per-symbol saved setting, not draft input: a Pips SL used only while the
    // manual SL is 0, so an explicit SL always wins and Clear falls back to it.
+   // enabled_at is unused by the draft; positions opened from then on receive
+   // the same distance from CAutoSlService.
    bool auto_sl_enabled;
    string auto_sl_text;
+   datetime auto_sl_enabled_at;
 
    CEntryDraft()
      {
@@ -35,7 +38,7 @@ public:
       ClearManualTp();
       ResetAutoSl();
      }
-   void ResetAutoSl() { auto_sl_enabled = false; auto_sl_text = "0"; }
+   void ResetAutoSl() { auto_sl_enabled = false; auto_sl_text = "0"; auto_sl_enabled_at = 0; }
    void ClearManualTp() { manual_tp_price[0] = 0.0; manual_tp_price[1] = 0.0; }
    bool Number(const string text, const bool zero_allowed, double &value)
      {

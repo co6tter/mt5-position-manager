@@ -401,6 +401,7 @@ public:
    void Refresh(const PMPosition &position_snapshot[],
                 CPositionService &positions)
      {
+      SyncEntryAutoSl();
       const int position_count = ArraySize(position_snapshot);
       ArrayResize(m_positions, position_count);
       for(int i = 0; i < position_count; i++)
@@ -511,6 +512,15 @@ public:
       config.mode = m_equity_guard_mode;
       config.loss_threshold = m_equity_guard_loss_threshold;
       config.profit_threshold = m_equity_guard_profit_threshold;
+     }
+
+   void GetAutoSlConfig(AutoSlConfig &config)
+     {
+      config.enabled = m_entry_draft.auto_sl_enabled;
+      config.symbol = _Symbol;
+      config.enabled_at = m_entry_draft.auto_sl_enabled_at;
+      if(!m_entry_draft.Number(m_entry_draft.auto_sl_text, true, config.pips))
+         config.pips = 0.0;
      }
 
    void GetTrailingStopConfig(TrailingStopConfig &config)
@@ -826,17 +836,44 @@ private:
      {
       m_auto_sl_store.Configure(AccountInfoInteger(ACCOUNT_LOGIN), AccountInfoString(ACCOUNT_SERVER));
       m_entry_draft.ResetAutoSl();
+      SyncEntryAutoSl();
+     }
+
+   // Charts of one symbol share Auto SL, and it acts on positions, so every
+   // refresh follows the saved value: a chart must not keep acting on an ON that
+   // another chart switched OFF. An unreadable file keeps the current value.
+   // A record without an ON time (saved by version 1) counts as switched ON now.
+   void SyncEntryAutoSl()
+     {
       bool enabled = false;
       string pips = "0";
-      if(!m_auto_sl_store.Load(_Symbol, enabled, pips)) return;
+      datetime enabled_at = 0;
+      if(!m_auto_sl_store.Load(_Symbol, enabled, pips, enabled_at)) return;
+      // Rewrite the field only on a real change so an edit in progress survives.
+      if(pips != m_entry_draft.auto_sl_text)
+         ObjectSetString(0, Name("ENTRY_AUTO_SL_VALUE"), OBJPROP_TEXT, pips);
       m_entry_draft.auto_sl_enabled = enabled;
       m_entry_draft.auto_sl_text = pips;
+      m_entry_draft.auto_sl_enabled_at = enabled_at;
+      if(enabled && enabled_at <= 0)
+        {
+         m_entry_draft.auto_sl_enabled_at = AutoSlNow();
+         SaveAutoSlSetting();
+        }
+     }
+
+   // Compared with POSITION_TIME, so it must be trade server time.
+   datetime AutoSlNow()
+     {
+      const datetime now = TimeTradeServer();
+      return now > 0 ? now : TimeCurrent();
      }
 
    bool SaveAutoSlSetting()
      {
       ResetLastError();
-      if(m_auto_sl_store.Save(_Symbol, m_entry_draft.auto_sl_enabled, m_entry_draft.auto_sl_text)) return true;
+      if(m_auto_sl_store.Save(_Symbol, m_entry_draft.auto_sl_enabled, m_entry_draft.auto_sl_text,
+                              m_entry_draft.auto_sl_enabled_at)) return true;
       PrintFormat("[ERROR] Auto SL setting could not be saved. symbol=%s error=%d", _Symbol, GetLastError());
       SetStatus("Auto SL could not be saved.");
       return false;
@@ -2014,8 +2051,12 @@ private:
       else if(name == Name("ENTRY_AUTO_SL_ENABLED"))
         {
          m_entry_draft.auto_sl_enabled = !m_entry_draft.auto_sl_enabled;
+         // Only positions opened from this switch on receive Auto SL.
+         m_entry_draft.auto_sl_enabled_at = m_entry_draft.auto_sl_enabled ? AutoSlNow() : 0;
          if(SaveAutoSlSetting())
-            SetStatus(StringFormat("Auto SL %s for %s.", m_entry_draft.auto_sl_enabled ? "ON" : "OFF", _Symbol));
+            SetStatus(m_entry_draft.auto_sl_enabled ?
+                      "Auto SL ON for " + _Symbol + ": positions opened from now get an SL." :
+                      "Auto SL OFF for " + _Symbol + ".");
         }
       else if(name == Name("ENTRY_SL_MODE")) SwitchEntryUnit(0);
       else if(name == Name("ENTRY_TP_MODE")) SwitchEntryUnit(1);

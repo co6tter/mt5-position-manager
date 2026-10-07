@@ -169,11 +169,14 @@ public:
 
 // Auto SL is saved per account and symbol, not per chart: a pips distance only
 // means something for one symbol, and every chart of that symbol shares it.
+// enabled_at is the trade server time of the last OFF->ON switch: positions
+// opened from then on are the ones Auto SL may protect.
 struct PMAutoSlSetting
   {
    string symbol;
    bool enabled;
    string pips;
+   datetime enabled_at;
   };
 
 bool PMAutoSlPipsText(const string text, string &normalized)
@@ -187,6 +190,18 @@ bool PMAutoSlPipsText(const string text, string &normalized)
    return true;
   }
 
+// Seconds since 1970 as plain digits; FileWrite would format a datetime as a date.
+bool PMAutoSlEnabledAtText(const string text, datetime &value)
+  {
+   if(text == "" || StringLen(text) > 18) return false;
+   for(int i = 0; i < StringLen(text); i++)
+      if(StringGetCharacter(text, i) < '0' || StringGetCharacter(text, i) > '9') return false;
+   const long parsed = StringToInteger(text);
+   if(IntegerToString(parsed) != text) return false;
+   value = (datetime)parsed;
+   return true;
+  }
+
 class CAutoSlStore
   {
 private:
@@ -194,26 +209,31 @@ private:
    string m_account_server;
 
    // A file that fails validation reads as empty: no symbol inherits a guessed value.
+   // Version 1 records have no ON time; they load with enabled_at 0 ("unknown").
    bool ReadAll(PMAutoSlSetting &records[])
      {
       ArrayResize(records, 0);
       if(m_file_name == "") return false;
-      const int file = FileOpen(m_file_name, FILE_READ | FILE_CSV | FILE_UNICODE, '\t');
+      const int file = FileOpen(m_file_name, FILE_READ | FILE_SHARE_READ | FILE_CSV | FILE_UNICODE, '\t');
       if(file == INVALID_HANDLE) return false;
-      bool ok = !FileIsEnding(file) && FileReadString(file) == "1" &&
+      const string version = FileIsEnding(file) ? "" : FileReadString(file);
+      const int field_count = version == "2" ? 4 : 3;
+      bool ok = (version == "1" || version == "2") &&
                 !FileIsEnding(file) && FileReadString(file) == m_account_server;
       while(ok && !FileIsEnding(file))
         {
          PMAutoSlSetting record = {};
-         string fields[3];
-         for(int i = 0; i < 3 && ok; i++)
+         string fields[4];
+         fields[3] = "0";
+         for(int i = 0; i < field_count && ok; i++)
            {
             if(FileIsEnding(file)) ok = false;
             else fields[i] = FileReadString(file);
            }
          int enabled = 0;
          ok = ok && fields[0] != "" && PMPanelSettingInteger(fields[1], 0, 1, enabled) &&
-              PMAutoSlPipsText(fields[2], record.pips);
+              PMAutoSlPipsText(fields[2], record.pips) &&
+              PMAutoSlEnabledAtText(fields[3], record.enabled_at);
          if(!ok) break;
          record.symbol = fields[0];
          record.enabled = enabled == 1;
@@ -237,7 +257,7 @@ public:
                                  account_login, PMPanelSettingsServerHash(account_server));
      }
 
-   bool Load(const string symbol, bool &enabled, string &pips)
+   bool Load(const string symbol, bool &enabled, string &pips, datetime &enabled_at)
      {
       PMAutoSlSetting records[];
       if(!ReadAll(records)) return false;
@@ -246,26 +266,30 @@ public:
            {
             enabled = records[i].enabled;
             pips = records[i].pips;
+            enabled_at = records[i].enabled_at;
             return true;
            }
       return false;
      }
 
    // Re-read before writing so another chart's symbol saved meanwhile survives.
-   bool Save(const string symbol, const bool enabled, const string pips)
+   bool Save(const string symbol, const bool enabled, const string pips, const datetime enabled_at)
      {
       string normalized = "";
-      if(m_file_name == "" || symbol == "" || !PMAutoSlPipsText(pips, normalized)) return false;
+      if(m_file_name == "" || symbol == "" || enabled_at < 0 ||
+         !PMAutoSlPipsText(pips, normalized)) return false;
       PMAutoSlSetting records[];
       ReadAll(records);
       const string temporary = m_file_name + ".tmp";
       const int file = FileOpen(temporary, FILE_WRITE | FILE_CSV | FILE_UNICODE, '\t');
       if(file == INVALID_HANDLE) return false;
-      bool written = FileWrite(file, "1", m_account_server) > 0;
+      bool written = FileWrite(file, "2", m_account_server) > 0;
       for(int i = 0; i < ArraySize(records) && written; i++)
          if(records[i].symbol != symbol)
-            written = FileWrite(file, records[i].symbol, (int)records[i].enabled, records[i].pips) > 0;
-      written = written && FileWrite(file, symbol, (int)enabled, normalized) > 0;
+            written = FileWrite(file, records[i].symbol, (int)records[i].enabled, records[i].pips,
+                                IntegerToString((long)records[i].enabled_at)) > 0;
+      written = written && FileWrite(file, symbol, (int)enabled, normalized,
+                                     IntegerToString((long)enabled_at)) > 0;
       FileFlush(file);
       FileClose(file);
       return written && FileMove(temporary, 0, m_file_name, FILE_REWRITE);

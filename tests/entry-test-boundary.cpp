@@ -66,6 +66,9 @@ string ObjectGetString(int, const string &name, int) { return objects[name]; }
 bool ObjectSetString(int, const string &name, int property, const string &value) { if(property == OBJPROP_TEXT) objects[name] = value; return true; }
 
 using datetime = long;
+datetime server_time = 1767225600, current_time = 1767225500;
+datetime TimeTradeServer() { return server_time; }
+datetime TimeCurrent() { return current_time; }
 const int CHART_MOUSE_SCROLL = 900;
 const int PM_PANEL_TAB_ENTRY = 0, PM_PANEL_TAB_STOPS = 2;
 bool mouse_scroll = true;

@@ -410,9 +410,11 @@ void TestEntryIntegration() {
     ResetBoundary();
     current_tick.bid = 2650.00; current_tick.ask = 2650.30;
     EntryUiHarness auto_ui;
+    server_time = 1767225600;
     auto_ui.HandleEntryClick("ENTRY_AUTO_SL_ENABLED", trades);
-    AssertTrue(auto_ui.m_entry_draft.auto_sl_enabled && auto_ui.auto_sl_saves == 1,
-               "The Auto SL toggle switches ON and saves immediately");
+    AssertTrue(auto_ui.m_entry_draft.auto_sl_enabled && auto_ui.auto_sl_saves == 1 &&
+               auto_ui.m_entry_draft.auto_sl_enabled_at == 1767225600,
+               "The Auto SL toggle switches ON, records the server time and saves immediately");
     auto_ui.HandleEntryClick("ENTRY_AUTO_SL_INC", trades);
     AssertTrue(objects["ENTRY_AUTO_SL_VALUE"] == "1" && auto_ui.m_entry_draft.auto_sl_text == "1" &&
                auto_ui.auto_sl_saves == 2, "Auto SL + steps one pip and saves the committed value");
@@ -434,4 +436,36 @@ void TestEntryIntegration() {
     auto_ui.auto_sl_save_ok = false;
     auto_ui.HandleEntryClick("ENTRY_AUTO_SL_ENABLED", trades);
     AssertTrue(auto_ui.status.find("OFF") == string::npos, "A failed save does not report success");
+    auto_ui.auto_sl_save_ok = true;
+    AssertTrue(!auto_ui.m_entry_draft.auto_sl_enabled && auto_ui.m_entry_draft.auto_sl_enabled_at == 0,
+               "Switching Auto SL OFF forgets the ON time");
+    server_time = 0;
+    auto_ui.HandleEntryClick("ENTRY_AUTO_SL_ENABLED", trades);
+    AssertTrue(auto_ui.m_entry_draft.auto_sl_enabled_at == current_time,
+               "Without a server time estimate the last known server time marks ON");
+
+    // Charts of one symbol share the saved Auto SL and follow it every refresh.
+    EntryUiHarness shared_ui;
+    shared_ui.m_entry_draft.auto_sl_enabled = true;
+    shared_ui.m_entry_draft.auto_sl_text = "100";
+    shared_ui.m_entry_draft.auto_sl_enabled_at = 1767225600;
+    objects["ENTRY_AUTO_SL_VALUE"] = "100";
+    shared_ui.SyncEntryAutoSl();
+    AssertTrue(shared_ui.m_entry_draft.auto_sl_enabled && shared_ui.m_entry_draft.auto_sl_text == "100",
+               "An unreadable shared setting keeps the current Auto SL");
+    shared_ui.m_auto_sl_store = {true, false, "150", 0};
+    shared_ui.SyncEntryAutoSl();
+    AssertTrue(!shared_ui.m_entry_draft.auto_sl_enabled && shared_ui.m_entry_draft.auto_sl_text == "150" &&
+               shared_ui.m_entry_draft.auto_sl_enabled_at == 0 && objects["ENTRY_AUTO_SL_VALUE"] == "150" &&
+               shared_ui.auto_sl_saves == 0,
+               "Another chart switching Auto SL OFF stops this chart too");
+    objects["ENTRY_AUTO_SL_VALUE"] = "175";
+    shared_ui.SyncEntryAutoSl();
+    AssertTrue(objects["ENTRY_AUTO_SL_VALUE"] == "175", "An unchanged saved value never overwrites an edit in progress");
+    server_time = 1767229200;
+    shared_ui.m_auto_sl_store = {true, true, "100", 0};
+    shared_ui.SyncEntryAutoSl();
+    AssertTrue(shared_ui.m_entry_draft.auto_sl_enabled && shared_ui.m_entry_draft.auto_sl_enabled_at == 1767229200 &&
+               shared_ui.auto_sl_saves == 1,
+               "A saved ON without an ON time counts as switched ON now and is saved with it");
 }

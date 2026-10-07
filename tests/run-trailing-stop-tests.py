@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise the actual Trail resolver/service and shared MQL tests as C++.
+"""Exercise the actual Trail and Auto SL position services and shared MQL tests as C++.
 
 Only MQL array syntax is adapted. Terminal position, quote, validation and
 trade boundaries are simulated; this does not verify MQL compilation, broker
@@ -47,16 +47,25 @@ using ulong = unsigned long;
 using uint = unsigned int;
 using datetime = long;
 enum ENUM_POSITION_TYPE { POSITION_TYPE_BUY, POSITION_TYPE_SELL };
-enum { SYMBOL_POINT, SYMBOL_DIGITS };
+enum { SYMBOL_POINT, SYMBOL_TRADE_TICK_SIZE, SYMBOL_DIGITS };
 template<class T> int ArraySize(const std::vector<T>& a) { return int(a.size()); }
 template<class T> int ArrayResize(std::vector<T>& a, int n) { a.resize(n); return n; }
 template<class T> void ArrayInitialize(std::vector<T>& a, T v) { std::fill(a.begin(), a.end(), v); }
+template<class T> bool ArrayRemove(std::vector<T>& a, int start, int count) {
+    a.erase(a.begin() + start, a.begin() + start + count); return true;
+}
 template<class T> T MathMax(T a, T b) { return std::max(a, b); }
 bool MathIsValidNumber(double x) { return std::isfinite(x); }
 double MathAbs(double x) { return std::abs(x); }
 double MathRound(double x) { return std::round(x); }
-double SymbolInfoDouble(const string&, int) { return 0.0001; }
-long SymbolInfoInteger(const string&, int) { return 5; }
+double NormalizeDouble(double x, int digits) {
+    const double scale = std::pow(10.0, digits);
+    return std::round(x * scale) / scale;
+}
+// Point and tick size are equal on every simulated symbol.
+double SymbolInfoDouble(const string& symbol, int) { return symbol == "USDJPY" ? 0.001 : 0.0001; }
+long SymbolInfoInteger(const string& symbol, int) { return symbol == "USDJPY" ? 3 : 5; }
+string DoubleToString(double x, int) { return std::to_string(x); }
 template<class... T> void PrintFormat(const string&, T...) {}
 template<class... T> string StringFormat(const string&, T...) { return "status"; }
 int failures = 0, assertions = 0;
@@ -79,12 +88,13 @@ class CTradeManager {
 public:
     std::vector<ulong> pending, sent;
     std::vector<double> stops, take_profits;
+    PMTradeAttemptStatus result = PM_TRADE_ATTEMPT_SUCCESS;
     bool HasPending(ulong ticket) {
         return std::find(pending.begin(), pending.end(), ticket) != pending.end();
     }
     PMTradeAttemptStatus ModifyTicket(ulong ticket, double sl, double tp, PMTradeFailure&) {
         sent.push_back(ticket); stops.push_back(sl); take_profits.push_back(tp);
-        return PM_TRADE_ATTEMPT_SUCCESS;
+        return result;
     }
 };
 class CValidationService {
@@ -112,6 +122,7 @@ def main() -> None:
     constants = (ROOT / "src/Constants.mqh").read_text()
     tests = (ROOT / "tests/PositionManagerPureTests.mq5").read_text()
     service = (ROOT / "src/TrailingStopService.mqh").read_text()
+    service += (ROOT / "src/AutoSlService.mqh").read_text()
     service = re.sub(r'^#include .*$', '', service, flags=re.M)
     names = ["TestBreakEvenCandidate", "TestTrailingCandidate", "TestPositionBasket",
              "TestTrailBasisToggle", "TestResolveTrailingCandidatesBasisSelection",
@@ -120,22 +131,27 @@ def main() -> None:
              "TestResolveTrailingCandidatesSellAndScope",
              "TestResolveTrailingCandidatesWorstFirst",
              "TestTrailingSnapGranularity", "TestResolveTrailingCandidatesSnapToDigitGrid",
-             "TestIsMoreFavorableStop", "TestBestStopCandidate", "TestPanelLayoutHelpers"]
+             "TestIsMoreFavorableStop", "TestBestStopCandidate", "TestAutoSlPositionCandidate",
+             "TestPanelLayoutHelpers"]
     helpers = ["PMProfitPoints", "PMDirectionMatches", "PMPositionTypeToString",
                "PMToggleTrailBasis", "PMTrailBasisToString", "PMResolvePanelHeight",
-               "PMPointsPerPip"]
+               "PMPointsPerPip", "PMPipsToPointDistance", "PMNormalizePrice"]
     defines = "\n".join(line for line in constants.splitlines()
-                        if re.match(r"#define PM_(?:PANEL_|TRAIL_|STOPS_|MIN_PANEL_WIDTH)", line))
+                        if re.match(r"#define PM_(?:PANEL_|TRAIL_|STOPS_|MIN_PANEL_WIDTH|AUTO_SL_RETRY)", line))
     source = PRELUDE + arrays((ROOT / "src/Models.mqh").read_text()) + defines + "\n"
     source += "\n".join(function(constants, name) for name in helpers)
     source += BOUNDARIES + arrays(service)
     source += "\n".join(arrays(function(tests, name)) for name in names)
     source += (ROOT / "tests/trailing-stop-service-tests.cpp").read_text()
+    source += (ROOT / "tests/auto-sl-service-tests.cpp").read_text()
     source += "\nint main() {\n" + "\n".join(name + "();" for name in names)
     source += r"""
 TestServiceValidationUnit();
 TestServicePendingAndRatchet();
-std::cout << assertions << " Trail assertions, " << failures << " failures\n";
+TestAutoSlServiceProtectsNewPositions();
+TestAutoSlServiceUsesLatestState();
+TestAutoSlServiceWaitsAfterRejection();
+std::cout << assertions << " Trail and Auto SL assertions, " << failures << " failures\n";
 return failures ? 1 : 0;
 }
 """

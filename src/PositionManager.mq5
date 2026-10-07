@@ -13,6 +13,7 @@
 #include "EquityGuardService.mqh"
 #include "EquityLineService.mqh"
 #include "TrailingStopService.mqh"
+#include "AutoSlService.mqh"
 #include "UiPanel.mqh"
 
 input int InpMaxPositionRows = PM_DEFAULT_MAX_ROWS;
@@ -29,6 +30,7 @@ CAutoCloseService g_auto_close;
 CEquityGuardService g_equity_guard;
 CEquityLineService g_equity_line;
 CTrailingStopService g_trailing_stop;
+CAutoSlService g_auto_sl;
 CUiPanel g_ui;
 
 int OnInit()
@@ -102,6 +104,14 @@ void OnTimer()
                               g_trades, equity_guard_status);
    if(equity_guard_handled)
       g_positions.Collect(positions);
+   // Auto SL runs before Trail so a newly protected position is trailed from
+   // its real SL in the same cycle.
+   AutoSlConfig auto_sl_config = {};
+   g_ui.GetAutoSlConfig(auto_sl_config);
+   string auto_sl_status = "";
+   if(g_auto_sl.Evaluate(auto_sl_config, now, positions, g_positions,
+                         g_trades, g_validation, auto_sl_status))
+      g_positions.Collect(positions);
    TrailingStopConfig trailing_stop_config = {};
    g_ui.GetTrailingStopConfig(trailing_stop_config);
    string trailing_stop_status = "";
@@ -113,6 +123,8 @@ void OnTimer()
       g_ui.SetStatus(auto_status);
    else if(retry_status != "")
       g_ui.SetStatus(retry_status);
+   else if(auto_sl_status != "")
+      g_ui.SetStatus(auto_sl_status);
    else if(trailing_stop_status != "")
       g_ui.SetStatus(trailing_stop_status);
    g_ui.Render();

@@ -3,8 +3,8 @@
 // are simulated by the runner.
 std::vector<PMPosition> ServicePositions()
 {
-    return {{201, "EURUSD", POSITION_TYPE_BUY, 1, 1.1000, 1.1040, 0, 1.1200, 0},
-            {202, "EURUSD", POSITION_TYPE_BUY, 3, 1.1020, 1.1040, 0, 1.1300, 0}};
+    return {{201, "EURUSD", POSITION_TYPE_BUY, 1, 1.1000, 1.1040, 0, 1.1200, 0, 0},
+            {202, "EURUSD", POSITION_TYPE_BUY, 3, 1.1020, 1.1040, 0, 1.1300, 0, 0}};
 }
 
 TrailingStopConfig ServiceConfig(PMTrailBasis basis)
